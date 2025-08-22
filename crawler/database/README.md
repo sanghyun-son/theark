@@ -69,7 +69,8 @@ High-level operations for each entity:
 2. **summary**: Paper summaries
    - `summary_id` (PK)
    - `paper_id` (FK)
-   - `version`, `style`, `content`
+   - `version`, `overview`, `motivation`, `method`, `result`, `conclusion`
+   - `language` (Korean/English), `interests`, `relevance` (0-10)
    - `model` (LLM used)
 
 3. **app_user**: Application users
@@ -104,7 +105,7 @@ High-level operations for each entity:
 - `idx_paper_published_at`: Recent papers
 - `idx_paper_primary_category`: Category filtering
 - `idx_user_star_user`: User favorites
-- `idx_summary_paper`: Paper summaries
+- `idx_summary_paper`: Paper summaries by language
 
 ### Full-Text Search
 
@@ -137,16 +138,16 @@ with SQLiteManager(db_path) as db_manager:
 
 The database system supports different environments:
 
-- **Development**: Uses `./db/arxiv.db`
+- **Production**: Uses `./db/arxiv.db`
+- **Development**: Uses `./db/arxiv.dev.db`
 - **Testing**: Uses temporary files in `/tmp`
-- **Production**: Uses `./db/arxiv.db` (same as development)
 
 ```python
 from crawler.database import DatabaseConfig
 
 # Development environment
 config = DatabaseConfig("development")
-db_path = config.database_path  # ./db/arxiv.db
+db_path = config.database_path  # ./db/arxiv.dev.db
 
 # Testing environment
 config = DatabaseConfig("testing")
@@ -177,6 +178,31 @@ paper = Paper(
 
 paper_id = paper_repo.create(paper)
 retrieved_paper = paper_repo.get_by_arxiv_id("2101.00001")
+```
+
+### Summary Operations
+
+```python
+from crawler.database.models import Summary
+
+# Create a summary
+summary = Summary(
+    paper_id=1,
+    version=1,
+    overview="This paper presents a novel approach",
+    motivation="Current methods have limitations",
+    method="We propose a new neural network",
+    result="Our method achieves state-of-the-art results",
+    conclusion="This work opens new research directions",
+    language="English",
+    interests="machine learning,neural networks,nlp",
+    relevance=8,
+    model="gpt-4"
+)
+summary_id = summary_repo.create(summary)
+
+# Get summary by paper and language
+summary = summary_repo.get_by_paper_and_language(paper_id=1, language="English")
 ```
 
 ### Search Operations
@@ -255,8 +281,9 @@ The Strategy pattern allows easy extension to other databases:
 ## Database Directory Structure
 
 ```
-./db/
-├── arxiv.db              # Main database file
+./db/                     # Development and Production
+├── arxiv.db              # Production database file
+├── arxiv.dev.db          # Development database file
 ├── database.log          # Database operation logs
 └── backups/              # Database backups
     ├── backup_20231201_143022.db

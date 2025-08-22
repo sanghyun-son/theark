@@ -29,8 +29,8 @@ class TestDatabaseConfig:
             expected_db_dir = tmp_path / "db"
             assert config.database_dir == expected_db_dir
 
-            # Should use arxiv.db file
-            expected_db_path = expected_db_dir / "arxiv.db"
+            # Should use arxiv.dev.db file
+            expected_db_path = expected_db_dir / "arxiv.dev.db"
             assert config.database_path == expected_db_path
 
             # Should create directory when accessed
@@ -154,7 +154,7 @@ class TestDatabaseConfigFunctions:
 
             # Test development environment
             dev_path = get_database_path("development")
-            expected_dev_path = tmp_path / "db" / "arxiv.db"
+            expected_dev_path = tmp_path / "db" / "arxiv.dev.db"
             assert dev_path == expected_dev_path
 
             # Test testing environment

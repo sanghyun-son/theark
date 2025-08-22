@@ -78,8 +78,14 @@ def main() -> None:
             summary = Summary(
                 paper_id=paper_id,
                 version=1,
-                style="tldr",
-                content="This paper introduces the Transformer architecture for sequence modeling.",
+                overview="This paper presents the Transformer architecture as a novel approach to sequence-to-sequence modeling.",
+                motivation="Existing models rely heavily on recurrent or convolutional neural networks which are slow and difficult to parallelize.",
+                method="The authors propose a model based entirely on attention mechanisms, eliminating recurrence and convolutions.",
+                result="The Transformer achieves new state-of-the-art results on machine translation tasks while being more parallelizable.",
+                conclusion="Attention is all you need for sequence modeling, opening up new possibilities for parallelization and efficiency.",
+                language="English",
+                interests="attention,transformer,machine translation,neural networks",
+                relevance=9,
                 model="gpt-4",
             )
 
@@ -166,7 +172,9 @@ def main() -> None:
 
             for event in events:
                 event_id = event_repo.log_event(event)
-                logger.info(f"Logged event {event.event_type} with ID: {event_id}")
+                logger.info(
+                    f"Logged event {event.event_type} with ID: {event_id}"
+                )
 
             # Demo 6: Search functionality
             logger.info("=== Demo 6: Search Functionality ===")
@@ -202,7 +210,9 @@ def main() -> None:
 
             # Search for transformer-related papers
             search_results = paper_repo.search_by_keywords("transformer")
-            logger.info(f"Found {len(search_results)} papers matching 'transformer'")
+            logger.info(
+                f"Found {len(search_results)} papers matching 'transformer'"
+            )
             for result in search_results:
                 logger.info(f"  - {result.title}")
 
@@ -239,7 +249,7 @@ def main() -> None:
         logger.error(f"Error during demonstration: {e}")
         raise
     finally:
-        # Database file is preserved in ./db/arxiv.db for inspection
+        # Database file is preserved in ./db/arxiv.dev.db for inspection
         logger.info(f"Database file saved at: {db_path}")
 
 

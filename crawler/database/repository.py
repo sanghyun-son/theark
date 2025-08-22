@@ -195,10 +195,16 @@ class SummaryRepository:
             summary_id=row[0],
             paper_id=row[1],
             version=row[2],
-            style=row[3],
-            content=row[4],
-            model=row[5],
-            created_at=row[6],
+            overview=row[3],
+            motivation=row[4],
+            method=row[5],
+            result=row[6],
+            conclusion=row[7],
+            language=row[8],
+            interests=row[9],
+            relevance=row[10],
+            model=row[11],
+            created_at=row[12],
         )
 
     def create(self, summary: Summary) -> int:
@@ -211,40 +217,48 @@ class SummaryRepository:
             Created summary ID
         """
         query = """
-        INSERT INTO summary (paper_id, version, style, content, model)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO summary (
+            paper_id, version, overview, motivation, method, result, 
+            conclusion, language, interests, relevance, model
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """
         params = (
             summary.paper_id,
             summary.version,
-            summary.style,
-            summary.content,
+            summary.overview,
+            summary.motivation,
+            summary.method,
+            summary.result,
+            summary.conclusion,
+            summary.language,
+            summary.interests,
+            summary.relevance,
             summary.model,
         )
 
         cursor = self.db.execute(query, params)
         return cursor.lastrowid
 
-    def get_by_paper_and_style(
-        self, paper_id: int, style: str
+    def get_by_paper_and_language(
+        self, paper_id: int, language: str
     ) -> Summary | None:
-        """Get summary by paper ID and style.
+        """Get summary by paper ID and language.
 
         Args:
             paper_id: Paper ID
-            style: Summary style
+            language: Summary language
 
         Returns:
             Summary model or None if not found
         """
         query = """
         SELECT * FROM summary 
-        WHERE paper_id = ? AND style = ?
+        WHERE paper_id = ? AND language = ?
         ORDER BY version DESC
         LIMIT 1
         """
 
-        row = self.db.fetch_one(query, (paper_id, style))
+        row = self.db.fetch_one(query, (paper_id, language))
 
         if row:
             return self._row_to_summary(row)

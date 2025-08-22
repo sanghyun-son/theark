@@ -83,7 +83,9 @@ class SQLiteManager(DatabaseManager):
             self.connection.rollback()
             raise
 
-    def execute_many(self, query: str, params_list: list[tuple[Any, ...]]) -> None:
+    def execute_many(
+        self, query: str, params_list: list[tuple[Any, ...]]
+    ) -> None:
         """Execute a query with multiple parameter sets.
 
         Args:
@@ -178,11 +180,17 @@ class SQLiteManager(DatabaseManager):
                 summary_id    INTEGER PRIMARY KEY AUTOINCREMENT,
                 paper_id      INTEGER NOT NULL REFERENCES paper(paper_id) ON DELETE CASCADE,
                 version       INTEGER NOT NULL,
-                style         TEXT NOT NULL,
-                content       TEXT NOT NULL,
+                overview      TEXT NOT NULL,
+                motivation    TEXT NOT NULL,
+                method        TEXT NOT NULL,
+                result        TEXT NOT NULL,
+                conclusion    TEXT NOT NULL,
+                language      TEXT NOT NULL,
+                interests     TEXT NOT NULL,
+                relevance     INTEGER NOT NULL,
                 model         TEXT,
                 created_at    TEXT NOT NULL DEFAULT (datetime('now')),
-                UNIQUE (paper_id, version, style)
+                UNIQUE (paper_id, version, language)
             )""",
             # 3) 사용자
             """CREATE TABLE IF NOT EXISTS app_user (
@@ -241,7 +249,7 @@ class SQLiteManager(DatabaseManager):
             """CREATE INDEX IF NOT EXISTS idx_paper_published_at ON paper(published_at DESC)""",
             """CREATE INDEX IF NOT EXISTS idx_paper_primary_category ON paper(primary_category)""",
             """CREATE INDEX IF NOT EXISTS idx_user_star_user ON user_star(user_id, created_at DESC)""",
-            """CREATE INDEX IF NOT EXISTS idx_summary_paper ON summary(paper_id, style)""",
+            """CREATE INDEX IF NOT EXISTS idx_summary_paper ON summary(paper_id, language)""",
         ]
 
         try:

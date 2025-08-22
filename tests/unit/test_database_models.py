@@ -68,7 +68,9 @@ class TestPaper:
 
     def test_invalid_datetime(self) -> None:
         """Test invalid datetime validation."""
-        with pytest.raises(ValidationError, match="Invalid ISO8601 datetime format"):
+        with pytest.raises(
+            ValidationError, match="Invalid ISO8601 datetime format"
+        ):
             Paper(
                 arxiv_id="2101.00001",
                 title="Test Paper",
@@ -90,23 +92,52 @@ class TestSummary:
         summary = Summary(
             paper_id=1,
             version=1,
-            style="tldr",
-            content="This is a summary",
+            overview="This paper presents a novel approach",
+            motivation="Current methods have limitations",
+            method="We propose a new neural network",
+            result="Our method achieves state-of-the-art results",
+            conclusion="This work opens new research directions",
+            language="English",
+            interests="machine learning,neural networks,nlp",
+            relevance=8,
             model="gpt-4",
         )
 
         assert summary.paper_id == 1
-        assert summary.style == "tldr"
+        assert summary.language == "English"
+        assert summary.relevance == 8
         assert summary.model == "gpt-4"
 
-    def test_invalid_style(self) -> None:
-        """Test invalid style validation."""
-        with pytest.raises(ValidationError, match="Invalid style"):
+    def test_invalid_language(self) -> None:
+        """Test invalid language validation."""
+        with pytest.raises(ValidationError, match="Invalid language"):
             Summary(
                 paper_id=1,
                 version=1,
-                style="invalid",
-                content="This is a summary",
+                overview="Overview",
+                motivation="Motivation",
+                method="Method",
+                result="Result",
+                conclusion="Conclusion",
+                language="Spanish",
+                interests="ai",
+                relevance=5,
+            )
+
+    def test_invalid_relevance(self) -> None:
+        """Test invalid relevance validation."""
+        with pytest.raises(ValidationError):
+            Summary(
+                paper_id=1,
+                version=1,
+                overview="Overview",
+                motivation="Motivation",
+                method="Method",
+                result="Result",
+                conclusion="Conclusion",
+                language="English",
+                interests="ai",
+                relevance=11,  # > 10
             )
 
 
@@ -162,11 +193,15 @@ class TestUserInterest:
     def test_weight_bounds(self) -> None:
         """Test weight bounds validation."""
         # Test minimum weight
-        interest = UserInterest(user_id=1, kind="category", value="test", weight=0.0)
+        interest = UserInterest(
+            user_id=1, kind="category", value="test", weight=0.0
+        )
         assert interest.weight == 0.0
 
         # Test maximum weight
-        interest = UserInterest(user_id=1, kind="category", value="test", weight=10.0)
+        interest = UserInterest(
+            user_id=1, kind="category", value="test", weight=10.0
+        )
         assert interest.weight == 10.0
 
         # Test invalid weight

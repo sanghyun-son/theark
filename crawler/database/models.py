@@ -14,7 +14,9 @@ class Paper(BaseModel):
     latest_version: int = Field(default=1, ge=1)
     title: str = Field(..., min_length=1)
     abstract: str = Field(..., min_length=1)
-    primary_category: str = Field(..., description="Primary category (e.g., cs.CL)")
+    primary_category: str = Field(
+        ..., description="Primary category (e.g., cs.CL)"
+    )
     categories: str = Field(..., description="Comma-separated categories")
     authors: str = Field(..., description="Semicolon-separated authors")
     url_abs: str = Field(..., description="Abstract URL")
@@ -55,18 +57,32 @@ class Summary(BaseModel):
     summary_id: int | None = None
     paper_id: int = Field(..., gt=0)
     version: int = Field(..., ge=1)
-    style: str = Field(..., description="Summary style (tldr, bullet, ko, en)")
-    content: str = Field(..., min_length=1)
+    overview: str = Field(..., min_length=1, description="Paper overview")
+    motivation: str = Field(
+        ..., min_length=1, description="Research motivation"
+    )
+    method: str = Field(..., min_length=1, description="Methodology")
+    result: str = Field(..., min_length=1, description="Results")
+    conclusion: str = Field(..., min_length=1, description="Conclusion")
+    language: str = Field(
+        ..., description="Summary language (Korean or English)"
+    )
+    interests: str = Field(..., description="Comma-separated interests")
+    relevance: int = Field(
+        ..., ge=0, le=10, description="Relevance score (0-10)"
+    )
     model: str | None = None
     created_at: str | None = None
 
-    @field_validator("style")
+    @field_validator("language")
     @classmethod
-    def validate_style(cls, v: str) -> str:
-        """Validate summary style."""
-        valid_styles = {"tldr", "bullet", "ko", "en"}
-        if v not in valid_styles:
-            raise ValueError(f"Invalid style. Must be one of: {valid_styles}")
+    def validate_language(cls, v: str) -> str:
+        """Validate summary language."""
+        valid_languages = {"Korean", "English"}
+        if v not in valid_languages:
+            raise ValueError(
+                f"Invalid language. Must be one of: {valid_languages}"
+            )
         return v
 
 
@@ -90,7 +106,9 @@ class UserInterest(BaseModel):
     """User interest model."""
 
     user_id: int = Field(..., gt=0)
-    kind: str = Field(..., description="Interest kind (category, keyword, author)")
+    kind: str = Field(
+        ..., description="Interest kind (category, keyword, author)"
+    )
     value: str = Field(..., min_length=1)
     weight: float = Field(default=1.0, ge=0.0, le=10.0)
 
@@ -151,5 +169,7 @@ class CrawlEvent(BaseModel):
         """Validate event type."""
         valid_types = {"FOUND", "UPDATED", "SKIPPED", "ERROR"}
         if v not in valid_types:
-            raise ValueError(f"Invalid event type. Must be one of: {valid_types}")
+            raise ValueError(
+                f"Invalid event type. Must be one of: {valid_types}"
+            )
         return v

@@ -44,8 +44,11 @@ class DatabaseConfig:
             import tempfile
 
             return Path(tempfile.mktemp(suffix=".db"))
+        elif self.environment == "development":
+            # For development, use arxiv.dev.db
+            return db_dir / "arxiv.dev.db"
         else:
-            # For development and production, use arxiv.db
+            # For production, use arxiv.db
             return db_dir / "arxiv.db"
 
     def get_connection_string(self) -> str:
@@ -54,7 +57,7 @@ class DatabaseConfig:
 
     def setup_database_directory(self) -> None:
         """Create database directory if it doesn't exist."""
-        if self.environment != "testing":
+        if self.environment not in ["testing"]:
             self.database_dir.mkdir(parents=True, exist_ok=True)
             logger.info(f"Database directory: {self.database_dir}")
 
@@ -70,7 +73,9 @@ class DatabaseConfig:
         if backup_name is None:
             from datetime import datetime
 
-            backup_name = f"backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.db"
+            backup_name = (
+                f"backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.db"
+            )
 
         return self.database_dir / "backups" / backup_name
 

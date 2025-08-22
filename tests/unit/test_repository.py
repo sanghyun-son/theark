@@ -223,8 +223,14 @@ class TestSummaryRepository:
         summary = Summary(
             paper_id=paper_id,
             version=1,
-            style="tldr",
-            content="This is a TLDR summary",
+            overview="This paper presents a novel approach",
+            motivation="Current methods have limitations",
+            method="We propose a new neural network",
+            result="Our method achieves state-of-the-art results",
+            conclusion="This work opens new research directions",
+            language="English",
+            interests="machine learning,neural networks",
+            relevance=8,
             model="gpt-4",
         )
 
@@ -232,10 +238,11 @@ class TestSummaryRepository:
         assert summary_id > 0
 
         # Retrieve summary
-        retrieved = summary_repo.get_by_paper_and_style(paper_id, "tldr")
+        retrieved = summary_repo.get_by_paper_and_language(paper_id, "English")
         assert retrieved is not None
-        assert retrieved.content == "This is a TLDR summary"
-        assert retrieved.style == "tldr"
+        assert retrieved.overview == "This paper presents a novel approach"
+        assert retrieved.language == "English"
+        assert retrieved.relevance == 8
         assert retrieved.model == "gpt-4"
 
 
@@ -279,14 +286,18 @@ class TestUserRepository:
 
         # Add interests
         interests = [
-            UserInterest(user_id=user_id, kind="category", value="cs.CL", weight=2.0),
+            UserInterest(
+                user_id=user_id, kind="category", value="cs.CL", weight=2.0
+            ),
             UserInterest(
                 user_id=user_id,
                 kind="keyword",
                 value="machine learning",
                 weight=1.5,
             ),
-            UserInterest(user_id=user_id, kind="author", value="John Doe", weight=1.0),
+            UserInterest(
+                user_id=user_id, kind="author", value="John Doe", weight=1.0
+            ),
         ]
 
         for interest in interests:
@@ -301,7 +312,9 @@ class TestUserRepository:
         assert category_interest.value == "cs.CL"
         assert category_interest.weight == 2.0
 
-    def test_user_stars(self, user_repo: UserRepository, temp_db_path: Path) -> None:
+    def test_user_stars(
+        self, user_repo: UserRepository, temp_db_path: Path
+    ) -> None:
         """Test user star operations."""
         # Create user
         user = AppUser(email="test@example.com", display_name="Test User")
@@ -417,11 +430,15 @@ class TestCrawlEventRepository:
             manager.create_tables()
             yield CrawlEventRepository(manager)
 
-    def test_crawl_event_operations(self, event_repo: CrawlEventRepository) -> None:
+    def test_crawl_event_operations(
+        self, event_repo: CrawlEventRepository
+    ) -> None:
         """Test crawl event operations."""
         # Log events
         events = [
-            CrawlEvent(arxiv_id="2101.00001", event_type="FOUND", detail="Paper found"),
+            CrawlEvent(
+                arxiv_id="2101.00001", event_type="FOUND", detail="Paper found"
+            ),
             CrawlEvent(
                 arxiv_id="2101.00002",
                 event_type="UPDATED",
