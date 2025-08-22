@@ -73,9 +73,7 @@ class DatabaseConfig:
         if backup_name is None:
             from datetime import datetime
 
-            backup_name = (
-                f"backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.db"
-            )
+            backup_name = f"backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.db"
 
         return self.database_dir / "backups" / backup_name
 

@@ -83,9 +83,7 @@ class SQLiteManager(DatabaseManager):
             self.connection.rollback()
             raise
 
-    def execute_many(
-        self, query: str, params_list: list[tuple[Any, ...]]
-    ) -> None:
+    def execute_many(self, query: str, params_list: list[tuple[Any, ...]]) -> None:
         """Execute a query with multiple parameter sets.
 
         Args:
@@ -125,7 +123,7 @@ class SQLiteManager(DatabaseManager):
                 cursor.execute(query, params)
             else:
                 cursor.execute(query)
-            return cursor.fetchone()
+            return cursor.fetchone()  # type: ignore
         except sqlite3.Error as e:
             self.logger.error(f"Fetch one failed: {e}")
             raise

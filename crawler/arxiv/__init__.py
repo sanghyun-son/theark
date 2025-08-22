@@ -9,7 +9,13 @@ from .exceptions import (
 )
 from .client import ArxivClient
 from .parser import ArxivParser
-from .crawler import ArxivCrawler, CrawlStatus, CrawlStrategy, CrawlConfig
+from .crawler import (
+    ArxivCrawler,
+    CrawlStatus,
+    CrawlConfig,
+    OnDemandCrawlConfig,
+    PeriodicCrawlConfig,
+)
 
 __all__ = [
     "ArxivError",
@@ -21,6 +27,7 @@ __all__ = [
     "ArxivParser",
     "ArxivCrawler",
     "CrawlStatus",
-    "CrawlStrategy",
     "CrawlConfig",
+    "OnDemandCrawlConfig",
+    "PeriodicCrawlConfig",
 ]

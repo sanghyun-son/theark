@@ -2,7 +2,12 @@
 
 import asyncio
 from core import setup_logging
-from crawler.arxiv import ArxivCrawler, CrawlConfig
+from crawler.arxiv import (
+    ArxivCrawler,
+    CrawlConfig,
+    OnDemandCrawlConfig,
+    PeriodicCrawlConfig,
+)
 from crawler.database import setup_database_environment, SQLiteManager
 
 
@@ -35,9 +40,14 @@ async def demo_crawler():
 
     # Create crawler with custom config
     config = CrawlConfig(
-        background_interval=5,  # 5 seconds for demo
-        max_concurrent_papers=2,
-        requests_per_second=1.0,
+        on_demand=OnDemandCrawlConfig(
+            recent_papers_limit=10,
+            monthly_papers_limit=50,
+        ),
+        periodic=PeriodicCrawlConfig(
+            background_interval=5,  # 5 seconds for demo
+            recent_papers_limit=10,
+        ),
     )
 
     async with ArxivCrawler(
@@ -50,10 +60,10 @@ async def demo_crawler():
         print(f"\n📊 Initial Status:")
         print("-" * 30)
         status = await crawler.get_status()
-        print(f"Status: {status['status']}")
-        print(f"Background Task: {status['background_task_running']}")
-        print(f"Papers Crawled: {status['stats']['papers_crawled']}")
-        print(f"Papers Failed: {status['stats']['papers_failed']}")
+        print(f"Status: {status.status}")
+        print(f"Background Task: {status.background_task_running}")
+        print(f"Papers Crawled: {status.on_demand.core.stats.papers_crawled}")
+        print(f"Papers Failed: {status.on_demand.core.stats.papers_failed}")
 
         print(f"\n📄 Crawling Single Papers:")
         print("-" * 30)
@@ -87,7 +97,7 @@ async def demo_crawler():
             await asyncio.sleep(1)
             status = await crawler.get_status()
             print(
-                f"   Status: {status['status']}, Background: {status['background_task_running']}"
+                f"   Status: {status.status}, Background: {status.background_task_running}"
             )
 
         print(f"\n⏹️  Stopping Background Loop:")
@@ -99,11 +109,11 @@ async def demo_crawler():
         print(f"\n📊 Final Status:")
         print("-" * 30)
         status = await crawler.get_status()
-        print(f"Status: {status['status']}")
-        print(f"Background Task: {status['background_task_running']}")
-        print(f"Papers Crawled: {status['stats']['papers_crawled']}")
-        print(f"Papers Failed: {status['stats']['papers_failed']}")
-        print(f"Start Time: {status['stats']['start_time']}")
+        print(f"Status: {status.status}")
+        print(f"Background Task: {status.background_task_running}")
+        print(f"Papers Crawled: {status.on_demand.core.stats.papers_crawled}")
+        print(f"Papers Failed: {status.on_demand.core.stats.papers_failed}")
+        print(f"Start Time: {status.on_demand.core.stats.start_time}")
 
         print(f"\n🔍 Testing Placeholder Methods:")
         print("-" * 30)

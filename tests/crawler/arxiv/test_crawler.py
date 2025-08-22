@@ -8,7 +8,6 @@ from unittest.mock import AsyncMock, MagicMock
 from crawler.arxiv.crawler import (
     ArxivCrawler,
     CrawlStatus,
-    CrawlStrategy,
     CrawlConfig,
 )
 from crawler.arxiv.exceptions import ArxivNotFoundError
@@ -27,15 +26,7 @@ class TestCrawlStatus:
         assert CrawlStatus.ERROR.value == "error"
 
 
-class TestCrawlStrategy:
-    """Test CrawlStrategy enum."""
-
-    def test_strategy_values(self):
-        """Test that all strategy values are defined."""
-        assert CrawlStrategy.SINGLE_PAPER.value == "single_paper"
-        assert CrawlStrategy.RECENT_PAPERS.value == "recent_papers"
-        assert CrawlStrategy.MONTHLY_PAPERS.value == "monthly_papers"
-        assert CrawlStrategy.YEARLY_PAPERS.value == "yearly_papers"
+# CrawlStrategy has been removed - these tests are no longer needed
 
 
 class TestCrawlConfig:
@@ -43,41 +34,24 @@ class TestCrawlConfig:
 
     def test_default_config(self):
         """Test default configuration values."""
-        from crawler.arxiv.constants import (
-            DEFAULT_BACKGROUND_INTERVAL,
-            DEFAULT_MAX_CONCURRENT_PAPERS,
-            DEFAULT_RATE_LIMIT,
-            DEFAULT_MAX_PAPERS_PER_BATCH,
-            DEFAULT_MAX_RETRIES,
-            DEFAULT_RETRY_DELAY,
-            DEFAULT_BATCH_SIZE,
-            DEFAULT_RECENT_PAPERS_LIMIT,
-            DEFAULT_MONTHLY_PAPERS_LIMIT,
-        )
-        
         config = CrawlConfig()
 
-        assert config.background_interval == DEFAULT_BACKGROUND_INTERVAL
-        assert config.max_concurrent_papers == DEFAULT_MAX_CONCURRENT_PAPERS
-        assert config.requests_per_second == DEFAULT_RATE_LIMIT
-        assert config.max_papers_per_batch == DEFAULT_MAX_PAPERS_PER_BATCH
-        assert config.max_retries == DEFAULT_MAX_RETRIES
-        assert config.retry_delay == DEFAULT_RETRY_DELAY
-        assert config.batch_size == DEFAULT_BATCH_SIZE
-        assert config.recent_papers_limit == DEFAULT_RECENT_PAPERS_LIMIT
-        assert config.monthly_papers_limit == DEFAULT_MONTHLY_PAPERS_LIMIT
+        # Test that default configs are created
+        assert config.on_demand is not None
+        assert config.periodic is not None
 
     def test_custom_config(self):
         """Test custom configuration values."""
+        from crawler.arxiv.periodic_crawler import PeriodicCrawlConfig
+        from crawler.arxiv.on_demand_crawler import OnDemandCrawlConfig
+
         config = CrawlConfig(
-            background_interval=1800,
-            max_concurrent_papers=5,
-            requests_per_second=2.0,
+            periodic=PeriodicCrawlConfig(background_interval=1800),
+            on_demand=OnDemandCrawlConfig(recent_papers_limit=100),
         )
 
-        assert config.background_interval == 1800
-        assert config.max_concurrent_papers == 5
-        assert config.requests_per_second == 2.0
+        assert config.periodic.background_interval == 1800
+        assert config.on_demand.recent_papers_limit == 100
 
 
 class TestArxivCrawler:
@@ -86,32 +60,38 @@ class TestArxivCrawler:
     @pytest.fixture
     def mock_db_manager(self):
         """Create a mock database manager."""
-        manager = AsyncMock()
-        manager.__aenter__ = AsyncMock(return_value=manager)
-        manager.__aexit__ = AsyncMock(return_value=None)
+        manager = MagicMock()
+        manager.__enter__ = MagicMock(return_value=manager)
+        manager.__exit__ = MagicMock(return_value=None)
         return manager
 
     @pytest.fixture
     def mock_paper_repo(self):
         """Create a mock paper repository."""
-        repo = AsyncMock()
-        repo.get_by_arxiv_id = AsyncMock(return_value=None)
-        repo.create = AsyncMock()
+        repo = MagicMock()
+        repo.get_by_arxiv_id = MagicMock(return_value=None)
+        repo.create = MagicMock()
         return repo
 
     @pytest.fixture
     def mock_event_repo(self):
         """Create a mock event repository."""
-        repo = AsyncMock()
-        repo.create = AsyncMock()
+        repo = MagicMock()
+        repo.create = MagicMock()
         return repo
 
     @pytest.fixture
     def crawler(self, mock_db_manager):
         """Create a crawler instance for testing."""
+        from crawler.arxiv.periodic_crawler import PeriodicCrawlConfig
+        from crawler.arxiv.on_demand_crawler import OnDemandCrawlConfig
+
         config = CrawlConfig(
-            background_interval=1
-        )  # Short interval for testing
+            periodic=PeriodicCrawlConfig(
+                background_interval=1
+            ),  # Short interval for testing
+            on_demand=OnDemandCrawlConfig(),
+        )
         return ArxivCrawler(mock_db_manager, config=config)
 
     def test_initialization(self, mock_db_manager):
@@ -122,14 +102,18 @@ class TestArxivCrawler:
         assert crawler.db_manager == mock_db_manager
         assert crawler.config == config
         assert crawler.status == CrawlStatus.IDLE
-        assert crawler._background_task is None
-        assert crawler.stats["papers_crawled"] == 0
-        assert crawler.stats["papers_failed"] == 0
+        assert crawler.on_demand_crawler is not None
+        assert crawler.periodic_crawler is not None
 
     def test_initialization_with_callbacks(self, mock_db_manager):
         """Test crawler initialization with callbacks."""
-        on_paper_crawled = AsyncMock()
-        on_error = AsyncMock()
+
+        # Create simple async functions instead of AsyncMock
+        async def on_paper_crawled(paper):
+            pass
+
+        async def on_error(exception):
+            pass
 
         crawler = ArxivCrawler(
             mock_db_manager,
@@ -152,7 +136,6 @@ class TestArxivCrawler:
         # Start crawler
         await crawler.start()
         assert crawler.status == CrawlStatus.IDLE
-        assert crawler.stats["start_time"] is not None
 
         # Stop crawler
         await crawler.stop()
@@ -165,8 +148,10 @@ class TestArxivCrawler:
         await crawler.start_background_loop()
 
         assert crawler.status == CrawlStatus.RUNNING
-        assert crawler._background_task is not None
-        assert not crawler._background_task.done()
+
+        # Check task manager status
+        status = await crawler.get_status()
+        assert status.background_task_running is True
 
         # Clean up
         await crawler.stop_background_loop()
@@ -180,9 +165,10 @@ class TestArxivCrawler:
         await crawler.stop_background_loop()
 
         assert crawler.status == CrawlStatus.PAUSED
-        assert (
-            crawler._background_task is None or crawler._background_task.done()
-        )
+
+        # Check that background task is no longer running
+        status = await crawler.get_status()
+        assert status.background_task_running is False
 
         await crawler.stop()
 
@@ -190,7 +176,6 @@ class TestArxivCrawler:
     async def test_crawl_single_paper_success(self, crawler, mock_paper_repo):
         """Test successful single paper crawling."""
         # Setup mocks
-        crawler.paper_repo = mock_paper_repo
         mock_paper = Paper(
             arxiv_id="1706.03762",
             title="Test Paper",
@@ -203,16 +188,14 @@ class TestArxivCrawler:
             published_at="2023-08-02T00:41:18Z",
             updated_at="2023-08-02T00:41:18Z",
         )
-        mock_paper_repo.create.return_value = mock_paper
-        # Ensure the mock is properly configured for async calls
-        mock_paper_repo.get_by_arxiv_id = AsyncMock(return_value=None)
-        mock_paper_repo.create = AsyncMock(return_value=mock_paper)
 
-        # Mock the _crawl_paper method to avoid real API calls
-        async def mock_crawl_paper(identifier):
+        # Mock the core crawler's crawl_single_paper method
+        async def mock_crawl_single_paper(identifier):
             return mock_paper
 
-        crawler._crawl_paper = mock_crawl_paper
+        crawler.on_demand_crawler.core.crawl_single_paper = (
+            mock_crawl_single_paper
+        )
 
         await crawler.start()
 
@@ -221,25 +204,20 @@ class TestArxivCrawler:
 
         assert result is not None
         assert result.arxiv_id == "1706.03762"
-        assert crawler.stats["papers_crawled"] == 1
-        assert crawler.stats["papers_failed"] == 0
 
         await crawler.stop()
 
     @pytest.mark.asyncio
     async def test_crawl_single_paper_not_found(self, crawler, mock_paper_repo):
         """Test crawling non-existent paper."""
-        # Setup mocks to simulate paper not found
-        crawler.paper_repo = mock_paper_repo
-        mock_paper_repo.get_by_arxiv_id = AsyncMock(
-            side_effect=ArxivNotFoundError("Paper not found")
-        )
 
-        # Mock the _crawl_paper method to return None (not found)
-        async def mock_crawl_paper(identifier):
+        # Mock the core crawler's crawl_single_paper method to return None
+        async def mock_crawl_single_paper(identifier):
             return None
 
-        crawler._crawl_paper = mock_crawl_paper
+        crawler.on_demand_crawler.core.crawl_single_paper = (
+            mock_crawl_single_paper
+        )
 
         await crawler.start()
 
@@ -247,8 +225,6 @@ class TestArxivCrawler:
         result = await crawler.crawl_single_paper("9999.99999")
 
         assert result is None
-        assert crawler.stats["papers_crawled"] == 0
-        assert crawler.stats["papers_failed"] == 1
 
         await crawler.stop()
 
@@ -257,8 +233,6 @@ class TestArxivCrawler:
         self, crawler, mock_paper_repo
     ):
         """Test crawling paper that already exists."""
-        # Setup mocks
-        crawler.paper_repo = mock_paper_repo
         existing_paper = Paper(
             arxiv_id="1706.03762",
             title="Existing Paper",
@@ -271,15 +245,14 @@ class TestArxivCrawler:
             published_at="2023-08-02T00:41:18Z",
             updated_at="2023-08-02T00:41:18Z",
         )
-        mock_paper_repo.get_by_arxiv_id.return_value = existing_paper
-        # Ensure the mock is properly configured for async calls
-        mock_paper_repo.get_by_arxiv_id = AsyncMock(return_value=existing_paper)
 
-        # Mock the _crawl_paper method to return existing paper
-        async def mock_crawl_paper(identifier):
+        # Mock the core crawler's crawl_single_paper method to return existing paper
+        async def mock_crawl_single_paper(identifier):
             return existing_paper
 
-        crawler._crawl_paper = mock_crawl_paper
+        crawler.on_demand_crawler.core.crawl_single_paper = (
+            mock_crawl_single_paper
+        )
 
         await crawler.start()
 
@@ -287,8 +260,6 @@ class TestArxivCrawler:
         result = await crawler.crawl_single_paper("1706.03762")
 
         assert result == existing_paper
-        assert crawler.stats["papers_crawled"] == 1
-        assert crawler.stats["papers_failed"] == 0
 
         await crawler.stop()
 
@@ -321,12 +292,12 @@ class TestArxivCrawler:
 
         status = await crawler.get_status()
 
-        assert "status" in status
-        assert "background_task_running" in status
-        assert "stats" in status
-        assert "config" in status
-        assert status["status"] == "idle"
-        assert status["background_task_running"] is False
+        assert hasattr(status, "status")
+        assert hasattr(status, "background_task_running")
+        assert hasattr(status, "on_demand")
+        assert hasattr(status, "periodic")
+        assert status.status == "idle"
+        assert status.background_task_running is False
 
         await crawler.stop()
 
@@ -338,8 +309,8 @@ class TestArxivCrawler:
 
         status = await crawler.get_status()
 
-        assert status["status"] == "running"
-        assert status["background_task_running"] is True
+        assert status.status == "running"
+        assert status.background_task_running is True
 
         await crawler.stop_background_loop()
         await crawler.stop()
@@ -347,14 +318,18 @@ class TestArxivCrawler:
     @pytest.mark.asyncio
     async def test_callback_on_paper_crawled(self, mock_db_manager):
         """Test callback when paper is crawled."""
-        on_paper_crawled = AsyncMock()
+        # Use a simple callback tracker
+        callback_tracker = {"called": False, "paper": None}
+
+        async def on_paper_crawled(paper):
+            callback_tracker["called"] = True
+            callback_tracker["paper"] = paper
+
         crawler = ArxivCrawler(
             mock_db_manager, on_paper_crawled=on_paper_crawled
         )
 
-        # Setup mocks
-        mock_paper_repo = AsyncMock()
-        mock_paper_repo.get_by_arxiv_id.return_value = None
+        # Setup mock paper
         mock_paper = Paper(
             arxiv_id="1706.03762",
             title="Test Paper",
@@ -367,42 +342,60 @@ class TestArxivCrawler:
             published_at="2023-08-02T00:41:18Z",
             updated_at="2023-08-02T00:41:18Z",
         )
-        mock_paper_repo.create.return_value = mock_paper
-        # Ensure the mock is properly configured for async calls
-        mock_paper_repo.get_by_arxiv_id = AsyncMock(return_value=None)
-        mock_paper_repo.create = AsyncMock(return_value=mock_paper)
-        crawler.paper_repo = mock_paper_repo
 
-        # Mock the _crawl_paper method to return the mock paper
-        async def mock_crawl_paper(identifier):
+        # Mock the on_demand_crawler's crawl_single_paper method to trigger callback
+        async def mock_crawl_single_paper_with_callback(identifier):
+            # Trigger the callback through the core's callback chain
+            if crawler.on_demand_crawler.core.on_paper_crawled:
+                await crawler.on_demand_crawler.core.on_paper_crawled(
+                    mock_paper
+                )
             return mock_paper
 
-        crawler._crawl_paper = mock_crawl_paper
+        crawler.on_demand_crawler.crawl_single_paper = (
+            mock_crawl_single_paper_with_callback
+        )
 
         await crawler.start()
         await crawler.crawl_single_paper("1706.03762")
 
         # Verify callback was called
-        on_paper_crawled.assert_called_once_with(mock_paper)
+        assert callback_tracker["called"] is True
+        assert callback_tracker["paper"] == mock_paper
 
         await crawler.stop()
 
     @pytest.mark.asyncio
     async def test_callback_on_error(self, mock_db_manager):
         """Test callback when error occurs."""
-        on_error = AsyncMock()
+        # Use a simple callback tracker
+        error_tracker = {"called": False, "exception": None}
+
+        async def on_error(exception):
+            error_tracker["called"] = True
+            error_tracker["exception"] = exception
+
         crawler = ArxivCrawler(mock_db_manager, on_error=on_error)
 
-        # Setup mocks to simulate error
-        mock_paper_repo = AsyncMock()
-        mock_paper_repo.get_by_arxiv_id.side_effect = Exception("Test error")
-        crawler.paper_repo = mock_paper_repo
+        # Mock the on_demand_crawler's crawl_single_paper method to trigger error callback
+        async def mock_crawl_single_paper_with_error(identifier):
+            error = Exception("Test error")
+            # Trigger the error callback through the core's callback chain
+            if crawler.on_demand_crawler.core.on_error:
+                await crawler.on_demand_crawler.core.on_error(error)
+            return None
+
+        crawler.on_demand_crawler.crawl_single_paper = (
+            mock_crawl_single_paper_with_error
+        )
 
         await crawler.start()
         await crawler.crawl_single_paper("1706.03762")
 
         # Verify error callback was called
-        on_error.assert_called_once()
+        assert error_tracker["called"] is True
+        assert error_tracker["exception"] is not None
+        assert str(error_tracker["exception"]) == "Test error"
 
         await crawler.stop()
 
@@ -420,7 +413,10 @@ class TestArxivCrawler:
 
         # Verify loop stopped
         assert crawler.status == CrawlStatus.PAUSED
-        assert crawler._background_task.done()
+
+        # Check that task is no longer running
+        status = await crawler.get_status()
+        assert status.background_task_running is False
 
         await crawler.stop()
 

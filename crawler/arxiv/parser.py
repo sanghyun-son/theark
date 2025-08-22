@@ -2,7 +2,7 @@
 
 import re
 from datetime import datetime
-from typing import Optional
+from typing import Any
 from xml.etree import ElementTree
 
 from core import get_logger
@@ -26,12 +26,12 @@ logger = get_logger(__name__)
 class ArxivParser:
     """Parser for arXiv XML responses."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the parser."""
         # Register the arXiv namespace
         self.namespace = ARXIV_NAMESPACES
 
-    def parse_paper(self, xml_content: str) -> Optional[Paper]:
+    def parse_paper(self, xml_content: str) -> Paper | None:
         """Parse XML content and extract paper metadata.
 
         Args:
@@ -84,9 +84,7 @@ class ArxivParser:
         # Extract categories
         categories = self._extract_categories(entry)
         primary_category = (
-            categories.split(",")[0].strip()
-            if categories
-            else DEFAULT_PRIMARY_CATEGORY
+            categories.split(",")[0].strip() if categories else DEFAULT_PRIMARY_CATEGORY
         )
 
         # Extract dates
@@ -198,7 +196,7 @@ class ArxivParser:
         # Fallback to current time
         return datetime.now().strftime(ISO8601_DATE_FORMAT)
 
-    def _extract_doi(self, entry: ElementTree.Element) -> Optional[str]:
+    def _extract_doi(self, entry: ElementTree.Element) -> str | None:
         """Extract DOI if available."""
         # Look for DOI in links
         for link in entry.findall("atom:link", self.namespace):
@@ -213,7 +211,7 @@ class ArxivParser:
 
         return None
 
-    def _extract_comments(self, entry: ElementTree.Element) -> Optional[str]:
+    def _extract_comments(self, entry: ElementTree.Element) -> str | None:
         """Extract comments if available."""
         comments_elem = entry.find("arxiv:comment", self.namespace)
         if comments_elem is not None and comments_elem.text:

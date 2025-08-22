@@ -28,9 +28,7 @@ DEFAULT_MONTHLY_PAPERS_LIMIT = 200
 
 # HTTP constants
 DEFAULT_TIMEOUT = 30.0
-DEFAULT_USER_AGENT = (
-    "theark-arxiv-crawler/1.0 (https://github.com/your-repo/theark)"
-)
+DEFAULT_USER_AGENT = "theark-arxiv-crawler/1.0 (https://github.com/your-repo/theark)"
 
 # Date format
 ISO8601_DATE_FORMAT = "%Y-%m-%dT%H:%M:%SZ"

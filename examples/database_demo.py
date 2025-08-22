@@ -53,8 +53,8 @@ def main() -> None:
 
             # Create a paper
             paper = Paper(
-                arxiv_id="2101.00001",
-                title="Attention Is All You Need",
+                arxiv_id="2101.00099",
+                title="Attention Is All You Need (Demo)",
                 abstract="The dominant sequence transduction models are based on complex recurrent or convolutional neural networks...",
                 primary_category="cs.CL",
                 categories="cs.CL,cs.LG",
@@ -69,7 +69,7 @@ def main() -> None:
             logger.info(f"Created paper with ID: {paper_id}")
 
             # Retrieve the paper
-            retrieved_paper = paper_repo.get_by_arxiv_id("2101.00001")
+            retrieved_paper = paper_repo.get_by_arxiv_id("2101.00099")
             logger.info(f"Retrieved paper: {retrieved_paper.title}")
 
             # Demo 2: Summary operations
@@ -96,8 +96,8 @@ def main() -> None:
             logger.info("=== Demo 3: User Operations ===")
 
             user = AppUser(
-                email="researcher@example.com",
-                display_name="AI Researcher",
+                email="demo_researcher@example.com",
+                display_name="AI Researcher (Demo)",
             )
 
             user_id = user_repo.create_user(user)
@@ -154,7 +154,7 @@ def main() -> None:
 
             events = [
                 CrawlEvent(
-                    arxiv_id="2101.00001",
+                    arxiv_id="2101.00099",
                     event_type="FOUND",
                     detail="Paper found during crawl",
                 ),

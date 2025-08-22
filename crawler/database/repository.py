@@ -1,5 +1,7 @@
 """Repository layer for database operations."""
 
+from typing import Any
+
 from .base import DatabaseManager
 from .models import (
     AppUser,
@@ -73,7 +75,7 @@ class PaperRepository:
         )
 
         cursor = self.db.execute(query, params)
-        return cursor.lastrowid
+        return cursor.lastrowid  # type: ignore
 
     def get_by_arxiv_id(self, arxiv_id: str) -> Paper | None:
         """Get paper by arXiv ID.
@@ -123,7 +125,7 @@ class PaperRepository:
         )
 
         cursor = self.db.execute(query, params)
-        return cursor.rowcount > 0
+        return cursor.rowcount > 0  # type: ignore
 
     def search_by_keywords(self, keywords: str, limit: int = 50) -> list[Paper]:
         """Search papers by keywords using simple LIKE search.
@@ -237,11 +239,9 @@ class SummaryRepository:
         )
 
         cursor = self.db.execute(query, params)
-        return cursor.lastrowid
+        return cursor.lastrowid  # type: ignore
 
-    def get_by_paper_and_language(
-        self, paper_id: int, language: str
-    ) -> Summary | None:
+    def get_by_paper_and_language(self, paper_id: int, language: str) -> Summary | None:
         """Get summary by paper ID and language.
 
         Args:
@@ -332,7 +332,7 @@ class UserRepository:
         params = (user.email, user.display_name)
 
         cursor = self.db.execute(query, params)
-        return cursor.lastrowid
+        return cursor.lastrowid  # type: ignore
 
     def get_user_by_email(self, email: str) -> AppUser | None:
         """Get user by email.
@@ -471,7 +471,7 @@ class FeedRepository:
         )
 
         cursor = self.db.execute(query, params)
-        return cursor.lastrowid
+        return cursor.lastrowid  # type: ignore
 
     def get_user_feed(
         self, user_id: int, feed_date: str, limit: int = 50
@@ -542,7 +542,7 @@ class CrawlEventRepository:
         params = (event.arxiv_id, event.event_type, event.detail)
 
         cursor = self.db.execute(query, params)
-        return cursor.lastrowid
+        return cursor.lastrowid  # type: ignore
 
     def get_recent_events(self, limit: int = 100) -> list[CrawlEvent]:
         """Get recent crawl events.

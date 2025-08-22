@@ -1,8 +1,7 @@
 """ArXiv API client for fetching papers."""
 
 import re
-from typing import Optional
-from urllib.parse import urlparse
+from typing import Any
 
 import httpx
 
@@ -33,23 +32,24 @@ class ArxivClient:
             base_url: Base URL for arXiv API
         """
         self.base_url = base_url
-        self.client: Optional[httpx.AsyncClient] = None
+        self.client: httpx.AsyncClient | None = None
         self.rate_limiter = AsyncRateLimiter(requests_per_second=DEFAULT_RATE_LIMIT)
 
-    async def __aenter__(self):
+    async def __aenter__(self) -> "ArxivClient":
         """Async context manager entry."""
         self.client = httpx.AsyncClient(
             timeout=httpx.Timeout(DEFAULT_TIMEOUT),
-            limits=httpx.Limits(
-                max_keepalive_connections=5, max_connections=10
-            ),
-            headers={
-                "User-Agent": DEFAULT_USER_AGENT
-            },
+            limits=httpx.Limits(max_keepalive_connections=5, max_connections=10),
+            headers={"User-Agent": DEFAULT_USER_AGENT},
         )
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: Any,
+    ) -> None:
         """Async context manager exit."""
         if self.client:
             await self.client.aclose()
@@ -81,9 +81,7 @@ class ArxivClient:
             return pdf_match.group(1)
 
         # Handle full URLs with version numbers
-        version_match = re.search(
-            r"arxiv\.org/abs/(\d{4}\.\d{4,5})v\d+", identifier
-        )
+        version_match = re.search(r"arxiv\.org/abs/(\d{4}\.\d{4,5})v\d+", identifier)
         if version_match:
             return version_match.group(1)
 
@@ -104,9 +102,7 @@ class ArxivClient:
             ArxivTimeoutError: If request times out
         """
         if not self.client:
-            raise RuntimeError(
-                "Client not initialized. Use async context manager."
-            )
+            raise RuntimeError("Client not initialized. Use async context manager.")
 
         # Extract arXiv ID from various input formats
         arxiv_id = self._extract_arxiv_id(identifier)
@@ -115,7 +111,13 @@ class ArxivClient:
         # Rate limit before API call
         await self.rate_limiter.wait()
 
-        params = {"id_list": arxiv_id, "start": 0, "max_results": 1}
+        params = httpx.QueryParams(
+            {
+                "id_list": arxiv_id,
+                "start": 0,
+                "max_results": 1,
+            }
+        )
 
         try:
             response = await self.client.get(self.base_url, params=params)

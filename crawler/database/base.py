@@ -44,9 +44,7 @@ class DatabaseManager(ABC):
         pass
 
     @abstractmethod
-    def execute_many(
-        self, query: str, params_list: list[tuple[Any, ...]]
-    ) -> None:
+    def execute_many(self, query: str, params_list: list[tuple[Any, ...]]) -> None:
         """Execute a query with multiple parameter sets.
 
         Args:

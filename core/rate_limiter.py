@@ -2,7 +2,7 @@
 
 import asyncio
 import time
-from typing import Optional, TypeVar, Callable, Awaitable
+from typing import TypeVar, Callable, Awaitable
 
 from core.log import get_logger
 
@@ -26,7 +26,7 @@ class AsyncRateLimiter:
 
         self.requests_per_second = requests_per_second
         self.min_interval = 1.0 / requests_per_second
-        self.last_request_time: Optional[float] = None
+        self.last_request_time: float | None = None
 
     async def wait(self) -> None:
         """Wait if necessary to respect rate limits."""
@@ -62,7 +62,9 @@ class AsyncRateLimiter:
             items: List of items to process
             processor: Async function to process each item
         """
-        await self._process_items(items, processor)
+        for item in items:
+            await self.wait()
+            await processor(item)
 
     async def iterate_with_results(
         self, items: list[T], processor: Callable[[T], Awaitable[T]]
