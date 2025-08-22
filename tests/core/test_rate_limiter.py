@@ -2,6 +2,7 @@
 
 import asyncio
 import time
+
 import pytest
 
 from core.rate_limiter import AsyncRateLimiter
@@ -19,14 +20,10 @@ class TestAsyncRateLimiter:
 
     def test_initialization_with_invalid_rate(self):
         """Test initialization with invalid rate."""
-        with pytest.raises(
-            ValueError, match="requests_per_second must be positive"
-        ):
+        with pytest.raises(ValueError, match="requests_per_second must be positive"):
             AsyncRateLimiter(requests_per_second=0)
 
-        with pytest.raises(
-            ValueError, match="requests_per_second must be positive"
-        ):
+        with pytest.raises(ValueError, match="requests_per_second must be positive"):
             AsyncRateLimiter(requests_per_second=-1.0)
 
     @pytest.mark.asyncio
@@ -226,9 +223,7 @@ class TestAsyncRateLimiter:
         assert set(processed_items) == {1, 2, 3, 4, 5}
         # Should be faster than sequential but still respect rate limits
         assert total_elapsed >= 0.9  # At least 2 intervals
-        assert (
-            total_elapsed < 3.0
-        )  # But faster than sequential (5 * 0.5s = 2.5s)
+        assert total_elapsed < 3.0  # But faster than sequential (5 * 0.5s = 2.5s)
 
     @pytest.mark.asyncio
     async def test_iterate_empty_list(self):

@@ -3,11 +3,11 @@
 import pytest
 
 from crawler.arxiv.exceptions import (
+    ArxivAPIError,
     ArxivError,
     ArxivNotFoundError,
-    ArxivAPIError,
-    ArxivTimeoutError,
     ArxivRateLimitError,
+    ArxivTimeoutError,
 )
 
 

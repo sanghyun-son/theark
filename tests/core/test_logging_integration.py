@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from core import setup_production_logging, setup_test_logging, get_logger
+from core import get_logger, setup_production_logging, setup_test_logging
 
 
 def test_production_logging_setup():

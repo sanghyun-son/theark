@@ -1,7 +1,8 @@
 """Tests for ArXivParser."""
 
-import pytest
 from xml.etree import ElementTree
+
+import pytest
 
 from crawler.arxiv.parser import ArxivParser
 from crawler.database import Paper

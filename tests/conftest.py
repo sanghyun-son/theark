@@ -3,6 +3,7 @@
 import pytest
 import pytest_asyncio
 from pytest_httpserver import HTTPServer
+
 from core import setup_test_logging
 
 
@@ -99,8 +100,6 @@ def mock_arxiv_server(httpserver: HTTPServer):
     # Mock server error
     httpserver.expect_request(
         "/api/query", query_string="id_list=1706.99999&start=0&max_results=1"
-    ).respond_with_data(
-        "Internal Server Error", status=500, content_type="text/plain"
-    )
+    ).respond_with_data("Internal Server Error", status=500, content_type="text/plain")
 
     return httpserver

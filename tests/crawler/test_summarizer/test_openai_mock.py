@@ -1,10 +1,11 @@
 """Tests for OpenAI mock server using pytest-httpserver."""
 
 import json
+from typing import Any
+
 import pytest
 import pytest_asyncio
 from pytest_httpserver import HTTPServer
-from typing import Any
 
 from crawler.summarizer.openai_summarizer import OpenAISummarizer
 from crawler.summarizer.summarizer import SummaryRequest
@@ -20,6 +21,7 @@ class TestOpenAIMockServer:
         def chat_completion_handler(request):
             """Handle chat completion requests with or without tools."""
             import json
+
             from werkzeug.wrappers import Response
 
             body = json.loads(request.data.decode("utf-8"))
@@ -112,6 +114,7 @@ class TestOpenAIMockServer:
         def batch_handler(request):
             """Handle batch requests for multiple summaries."""
             import json
+
             from werkzeug.wrappers import Response
 
             response_data = {
@@ -192,9 +195,7 @@ class TestOpenAIMockServer:
         )
 
     @pytest.mark.asyncio
-    async def test_chat_completions_endpoint(
-        self, mock_openai_server: HTTPServer
-    ):
+    async def test_chat_completions_endpoint(self, mock_openai_server: HTTPServer):
         """Test /v1/chat/completions endpoint."""
         # Test that the endpoint is configured correctly
         # The mock server should have the endpoint configured
@@ -297,9 +298,7 @@ class TestOpenAIMockServer:
             assert response.status_code == 200
 
     @pytest.mark.asyncio
-    async def test_tool_based_summarization(
-        self, mock_openai_server: HTTPServer
-    ):
+    async def test_tool_based_summarization(self, mock_openai_server: HTTPServer):
         """Test summarization with tools/function calling."""
         import httpx
 
@@ -363,9 +362,7 @@ class TestOpenAIMockServer:
             choice = response_data["choices"][0]
             assert "message" in choice
             message = choice["message"]
-            assert (
-                message["content"] is None
-            )  # Content should be None for tool calls
+            assert message["content"] is None  # Content should be None for tool calls
             assert "tool_calls" in message
             assert len(message["tool_calls"]) > 0
 
@@ -385,9 +382,7 @@ class TestOpenAIMockServer:
             assert "relevance" in args
 
     @pytest.mark.asyncio
-    async def test_non_tool_based_summarization(
-        self, mock_openai_server: HTTPServer
-    ):
+    async def test_non_tool_based_summarization(self, mock_openai_server: HTTPServer):
         """Test summarization without tools (regular text response)."""
         import httpx
 
@@ -420,7 +415,5 @@ class TestOpenAIMockServer:
             assert "message" in choice
             message = choice["message"]
             assert message["content"] is not None  # Content should have text
-            assert (
-                "tool_calls" not in message or message.get("tool_calls") is None
-            )
+            assert "tool_calls" not in message or message.get("tool_calls") is None
             assert choice["finish_reason"] == "stop"

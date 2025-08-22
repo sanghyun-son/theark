@@ -1,13 +1,14 @@
 """Tests for the summarizer module structure."""
 
-import pytest
 from dataclasses import dataclass
 
+import pytest
+
 from crawler.summarizer.summarizer import (
+    AbstractSummarizer,
+    StructuredSummary,
     SummaryRequest,
     SummaryResponse,
-    StructuredSummary,
-    AbstractSummarizer,
 )
 
 

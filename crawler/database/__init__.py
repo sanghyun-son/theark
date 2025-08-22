@@ -8,6 +8,9 @@ from .config import (
     get_database_path,
     setup_database_environment,
 )
+from .llm_db import LLMDatabaseManager, close_llm_db_manager, get_llm_db_manager
+from .llm_models import LLMRequest, LLMUsageStats
+from .llm_repository import LLMRequestRepository
 from .models import (
     AppUser,
     CrawlEvent,
@@ -46,4 +49,11 @@ __all__ = [
     "UserRepository",
     "FeedRepository",
     "CrawlEventRepository",
+    # LLM tracking
+    "LLMDatabaseManager",
+    "get_llm_db_manager",
+    "close_llm_db_manager",
+    "LLMRequest",
+    "LLMUsageStats",
+    "LLMRequestRepository",
 ]

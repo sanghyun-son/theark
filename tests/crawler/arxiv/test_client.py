@@ -1,13 +1,13 @@
 """Tests for ArXivClient."""
 
-import pytest
 import httpx
+import pytest
 
 from crawler.arxiv.client import ArxivClient
 from crawler.arxiv.exceptions import (
+    ArxivAPIError,
     ArxivError,
     ArxivNotFoundError,
-    ArxivAPIError,
     ArxivTimeoutError,
 )
 

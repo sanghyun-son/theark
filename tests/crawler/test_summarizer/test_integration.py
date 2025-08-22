@@ -1,9 +1,10 @@
 """Integration tests for summarization with crawler."""
 
 import os
+from unittest.mock import AsyncMock, patch
+
 import pytest
 import pytest_asyncio
-from unittest.mock import AsyncMock, patch
 
 from crawler.arxiv.core import SummarizationConfig
 from crawler.database import DatabaseManager
@@ -122,7 +123,7 @@ class TestSummarizationIntegration:
     @pytest.mark.asyncio
     async def test_summarization_response_creation(self):
         """Test creating summarization responses."""
-        from crawler.summarizer import SummaryResponse, StructuredSummary
+        from crawler.summarizer import StructuredSummary, SummaryResponse
 
         structured = StructuredSummary(
             tldr="Test summary",

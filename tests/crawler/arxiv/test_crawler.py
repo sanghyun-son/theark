@@ -1,14 +1,15 @@
 """Tests for ArxivCrawler."""
 
-import pytest
 import asyncio
 from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock
 
+import pytest
+
 from crawler.arxiv.crawler import (
     ArxivCrawler,
-    CrawlStatus,
     CrawlConfig,
+    CrawlStatus,
 )
 from crawler.arxiv.exceptions import ArxivNotFoundError
 from crawler.database import Paper
@@ -42,8 +43,8 @@ class TestCrawlConfig:
 
     def test_custom_config(self):
         """Test custom configuration values."""
-        from crawler.arxiv.periodic_crawler import PeriodicCrawlConfig
         from crawler.arxiv.on_demand_crawler import OnDemandCrawlConfig
+        from crawler.arxiv.periodic_crawler import PeriodicCrawlConfig
 
         config = CrawlConfig(
             periodic=PeriodicCrawlConfig(background_interval=1800),
@@ -83,8 +84,8 @@ class TestArxivCrawler:
     @pytest.fixture
     def crawler(self, mock_db_manager):
         """Create a crawler instance for testing."""
-        from crawler.arxiv.periodic_crawler import PeriodicCrawlConfig
         from crawler.arxiv.on_demand_crawler import OnDemandCrawlConfig
+        from crawler.arxiv.periodic_crawler import PeriodicCrawlConfig
 
         config = CrawlConfig(
             periodic=PeriodicCrawlConfig(
