@@ -1,0 +1,80 @@
+---
+alwaysApply: true
+---
+# Python Coding Rules (Improved)
+
+## General Principles
+- Default to simplicity and clarity.  
+- Implement only what is necessary for the current task.  
+- Evolve design incrementally rather than over-abstracting upfront.  
+- Code should be production-ready and pass strict senior-level review at a top-tier tech company.  
+- Favor readability and maintainability over cleverness.
+
+## Environment
+- **Python**: >=3.11  
+- **Type Checking**: `mypy --strict`  
+- **Formatting**: `black`  
+- **Testing**: `pytest`  
+  - Unit tests → `tests/unit/`  
+  - Integration tests → `tests/integration/`  
+- **Dependency Management**: `uv`  
+  - Always run your command with `uv run`
+  - Always add with `uv add`  
+  - Never modify dependency files manually  
+- **Packaging**: Make repo installable with a unified namespace for imports (no relative paths).
+
+## Code Style
+- Follow **PEP8**, **PEP484**, **PEP604**, **PEP257**.
+- Use built-in generics (`dict`, `list`, `set`, `tuple`) instead of `Dict`, `List`, etc.
+- Use modern type hints:  
+  - `int | None` instead of `Optional[int]`.  
+  - `list[str]`, not `List[str]`.  
+- Line length: ≤ 88 chars.
+- Avoid print and use logging. Use the following convention: logger = logger.getLogger(__name__)
+
+### Naming Conventions
+- **Variables & functions** → `snake_case`  
+- **Classes & exceptions** → `PascalCase`  
+- **Constants** → `UPPER_CASE`  
+
+## Functions
+- Small, focused, and single-purpose (≤40 lines).  
+- Explicit arguments and return types.  
+- Raise **precise exceptions** (`ValueError`, `KeyError`, not bare `Exception`).  
+- Use **f-strings** for interpolation.  
+- Always use **context managers** (`with`) for file/network/DB handling.  
+
+## Classes & Data Structures
+- Use `@dataclass` for structured data unless validation/serialization is required.  
+- Use **Pydantic** models for API input/output and schema validation.  
+- Avoid speculative abstraction.  
+
+## Imports
+- Absolute imports except for intra-package relative.  
+- Order:  
+  1. Standard library  
+  2. Third-party  
+  3. In-repo  
+- No wildcard imports (`from module import *`).  
+- Group imports cleanly, one per line.  
+
+## Documentation
+- Each **public function, class, and module** must have a concise docstring.  
+- Format: [One-line summary] → [Optional details].  
+- Example:
+  ```python
+  def parse_config(path: str) -> dict[str, str]:
+      """Load and parse a config file into key-value pairs."""
+
+## Testing
+- Mandatory tests for all new functionality.  
+- Cover **normal flow**, **edge cases**, and **error handling**.  
+- Use **pytest fixtures** for setup/teardown.  
+- No unnecessary mocks; prefer real objects when feasible.  
+
+## Review Checklist
+- ✅ Correctness (logic, types, error handling)  
+- ✅ Clarity (readable, explicit, documented)  
+- ✅ Maintainability (no dead code, duplication, or premature abstraction)  
+- ✅ Test coverage  
+- ✅ Minimal dependencies  
