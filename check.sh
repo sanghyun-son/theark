@@ -29,6 +29,9 @@ print_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
+# Source directories to check
+SOURCE_DIRS="core/ crawler/ api/"
+
 # Function to check if command exists
 command_exists() {
     command -v "$1" >/dev/null 2>&1
@@ -90,14 +93,14 @@ done
 run_typecheck() {
     print_status "Running type checking with mypy..."
     if $VERBOSE; then
-        if uv run mypy core/ crawler/ --ignore-missing-imports --strict; then
+        if uv run mypy $SOURCE_DIRS --ignore-missing-imports --strict; then
             print_success "Type checking passed"
         else
             print_error "Type checking failed"
             return 1
         fi
     else
-        if uv run mypy core/ crawler/ --ignore-missing-imports --strict >/dev/null 2>&1; then
+        if uv run mypy $SOURCE_DIRS --ignore-missing-imports --strict >/dev/null 2>&1; then
             print_success "Type checking passed"
         else
             print_error "Type checking failed"
@@ -110,13 +113,13 @@ run_typecheck() {
 run_linting() {
     print_status "Running linting with flake8..."
     if $VERBOSE; then
-        if uv run flake8 core/ crawler/; then
+        if uv run flake8 $SOURCE_DIRS; then
             print_success "Linting passed"
         else
             print_warning "Linting found issues (some line length warnings)"
         fi
     else
-        if uv run flake8 core/ crawler/ >/dev/null 2>&1; then
+        if uv run flake8 $SOURCE_DIRS >/dev/null 2>&1; then
             print_success "Linting passed"
         else
             print_warning "Linting found issues (some line length warnings)"
@@ -125,9 +128,9 @@ run_linting() {
     
     print_status "Running security checks with bandit..."
     if $VERBOSE; then
-        uv run bandit -r core/ crawler/ -f json -o bandit-report.json || true
+        uv run bandit -r $SOURCE_DIRS -f json -o bandit-report.json || true
     else
-        uv run bandit -r core/ crawler/ -f json -o bandit-report.json >/dev/null 2>&1 || true
+        uv run bandit -r $SOURCE_DIRS -f json -o bandit-report.json >/dev/null 2>&1 || true
     fi
     print_success "Security checks completed"
 }
@@ -136,14 +139,14 @@ run_linting() {
 run_formatting() {
     print_status "Checking code formatting with black..."
     if $VERBOSE; then
-        if uv run black --check core/ crawler/ examples/; then
+        if uv run black --check $SOURCE_DIRS examples/; then
             print_success "Code formatting check passed"
         else
             print_error "Code formatting check failed"
             return 1
         fi
     else
-        if uv run black --check core/ crawler/ examples/ >/dev/null 2>&1; then
+        if uv run black --check $SOURCE_DIRS examples/ >/dev/null 2>&1; then
             print_success "Code formatting check passed"
         else
             print_error "Code formatting check failed"
@@ -153,14 +156,14 @@ run_formatting() {
     
     print_status "Checking import sorting with isort..."
     if $VERBOSE; then
-        if uv run isort --check-only core/ crawler/ examples/; then
+        if uv run isort --check-only $SOURCE_DIRS examples/; then
             print_success "Import sorting check passed"
         else
             print_error "Import sorting check failed"
             return 1
         fi
     else
-        if uv run isort --check-only core/ crawler/ examples/ >/dev/null 2>&1; then
+        if uv run isort --check-only $SOURCE_DIRS examples/ >/dev/null 2>&1; then
             print_success "Import sorting check passed"
         else
             print_error "Import sorting check failed"

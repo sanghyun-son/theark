@@ -23,8 +23,10 @@ classifiers = [
 ]
 dependencies = [
     "colorlog>=6.8.0",
+    "fastapi>=0.116.1",
     "httpx>=0.28.1",
     "pydantic>=2.11.7",
+    "uvicorn>=0.35.0",
 ]
 
 [project.optional-dependencies]
@@ -115,4 +117,5 @@ dev = [
     "flake8>=7.0.0",
     "bandit>=1.7.0",
     "isort>=5.13.0",
+    "pytest-cov>=6.2.1",
 ]

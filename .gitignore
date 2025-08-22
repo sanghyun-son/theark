@@ -1,26 +1,71 @@
 # Python-generated files
 __pycache__/
 *.py[oc]
+*.pyc
+*.pyo
+*.pyd
+.Python
 build/
+develop-eggs/
 dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
 wheels/
-*.egg-info
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
 
 # Virtual environments
-.venv
+.venv/
+venv/
+ENV/
+env/
 ai/.env
-test/*
+
+# IDE and editor files
 .idea/
+.vscode/
+*.swp
+*.swo
+*~
 .cursorrules
 
-# Development
-.vscode/
-
-# Tests
+# Development and testing
+test/*
 .coverage
 coverage.xml
+.pytest_cache/
+.mypy_cache/
+.dmypy.json
+dmypy.json
 bandit-report.json
 
-# Logs and DB
+# Logs and databases
 logs/
+*.log
 db/
+*.db
+*.sqlite
+*.sqlite3
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+.cache/

@@ -79,10 +79,10 @@ jobs:
       run: uv sync
 
     - name: Check code formatting
-      run: uv run black --check core/ crawler/ examples/
+      run: uv run black --check core/ crawler/ api/ examples/
 
     - name: Check import sorting
-      run: uv run isort --check-only core/ crawler/ examples/
+      run: uv run isort --check-only core/ crawler/ api/ examples/
 
   lint:
     runs-on: ubuntu-latest
@@ -113,10 +113,10 @@ jobs:
       run: uv sync
 
     - name: Run flake8
-      run: uv run flake8 core/ crawler/
+      run: uv run flake8 core/ crawler/ api/
 
     - name: Run bandit security checks
-      run: uv run bandit -r core/ crawler/ -f json -o bandit-report.json || true
+      run: uv run bandit -r core/ crawler/ api/ -f json -o bandit-report.json || true
 
   typecheck:
     runs-on: ubuntu-latest
@@ -147,6 +147,6 @@ jobs:
       run: uv sync
 
     - name: Run mypy
-      run: uv run mypy core/ crawler/ --ignore-missing-imports --strict
+      run: uv run mypy core/ crawler/ api/ --ignore-missing-imports --strict
 
 
