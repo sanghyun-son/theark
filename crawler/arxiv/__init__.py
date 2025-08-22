@@ -7,6 +7,9 @@ from .exceptions import (
     ArxivTimeoutError,
     ArxivRateLimitError,
 )
+from .client import ArxivClient
+from .parser import ArxivParser
+from .crawler import ArxivCrawler, CrawlStatus, CrawlStrategy, CrawlConfig
 
 __all__ = [
     "ArxivError",
@@ -14,4 +17,10 @@ __all__ = [
     "ArxivAPIError",
     "ArxivTimeoutError",
     "ArxivRateLimitError",
+    "ArxivClient",
+    "ArxivParser",
+    "ArxivCrawler",
+    "CrawlStatus",
+    "CrawlStrategy",
+    "CrawlConfig",
 ]

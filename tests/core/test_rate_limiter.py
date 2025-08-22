@@ -43,6 +43,7 @@ class TestAsyncRateLimiter:
         assert limiter.last_request_time is not None
 
     @pytest.mark.asyncio
+    @pytest.mark.slow
     async def test_subsequent_waits_respect_rate_limit(self):
         """Test that subsequent waits respect the rate limit."""
         limiter = AsyncRateLimiter(requests_per_second=2.0)  # 0.5s interval
@@ -61,6 +62,7 @@ class TestAsyncRateLimiter:
         assert limiter.last_request_time > first_time
 
     @pytest.mark.asyncio
+    @pytest.mark.slow
     async def test_high_rate_limit(self):
         """Test with high rate limit (small intervals)."""
         limiter = AsyncRateLimiter(requests_per_second=10.0)  # 0.1s interval
@@ -75,6 +77,7 @@ class TestAsyncRateLimiter:
         assert 0.05 <= elapsed <= 0.15
 
     @pytest.mark.asyncio
+    @pytest.mark.slow
     async def test_multiple_rapid_calls(self):
         """Test multiple rapid calls respect rate limit."""
         limiter = AsyncRateLimiter(requests_per_second=2.0)  # 0.5s interval
@@ -92,6 +95,7 @@ class TestAsyncRateLimiter:
         assert total_elapsed >= 0.9
 
     @pytest.mark.asyncio
+    @pytest.mark.slow
     async def test_rate_limit_accuracy(self):
         """Test that rate limiting is reasonably accurate."""
         limiter = AsyncRateLimiter(requests_per_second=1.0)  # 1s interval
@@ -111,6 +115,7 @@ class TestAsyncRateLimiter:
         assert 0.8 <= times[2] <= 1.2
 
     @pytest.mark.asyncio
+    @pytest.mark.slow
     async def test_concurrent_waits_with_gather(self):
         """Test concurrent waits using asyncio.gather."""
         limiter1 = AsyncRateLimiter(requests_per_second=2.0)  # 0.5s interval
@@ -137,6 +142,7 @@ class TestAsyncRateLimiter:
         assert limiter2.last_request_time > start_time
 
     @pytest.mark.asyncio
+    @pytest.mark.slow
     async def test_multiple_concurrent_limiters(self):
         """Test multiple limiters with concurrent operations."""
         limiters = [
@@ -162,6 +168,7 @@ class TestAsyncRateLimiter:
             assert limiter.last_request_time > start_time
 
     @pytest.mark.asyncio
+    @pytest.mark.slow
     async def test_iterate(self):
         """Test basic iteration with rate limiting."""
         limiter = AsyncRateLimiter(requests_per_second=2.0)  # 0.5s interval
@@ -181,6 +188,7 @@ class TestAsyncRateLimiter:
         assert total_elapsed >= 0.9
 
     @pytest.mark.asyncio
+    @pytest.mark.slow
     async def test_iterate_with_results(self):
         """Test iteration with results collection."""
         limiter = AsyncRateLimiter(requests_per_second=2.0)  # 0.5s interval
@@ -199,6 +207,7 @@ class TestAsyncRateLimiter:
         assert total_elapsed >= 0.9
 
     @pytest.mark.asyncio
+    @pytest.mark.slow
     async def test_iterate_concurrent(self):
         """Test concurrent iteration with rate limiting."""
         limiter = AsyncRateLimiter(requests_per_second=2.0)  # 0.5s interval
@@ -238,6 +247,7 @@ class TestAsyncRateLimiter:
         assert processed_items == []
 
     @pytest.mark.asyncio
+    @pytest.mark.slow
     async def test_iterate_concurrent_semaphore_limit(self):
         """Test that concurrent iteration respects semaphore limits."""
         limiter = AsyncRateLimiter(requests_per_second=10.0)  # Fast rate
