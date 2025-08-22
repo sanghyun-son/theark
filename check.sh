@@ -110,13 +110,13 @@ run_typecheck() {
 run_linting() {
     print_status "Running linting with flake8..."
     if $VERBOSE; then
-        if uv run flake8 core/ crawler/ --max-line-length=88 --extend-ignore=E203,W503; then
+        if uv run flake8 core/ crawler/; then
             print_success "Linting passed"
         else
             print_warning "Linting found issues (some line length warnings)"
         fi
     else
-        if uv run flake8 core/ crawler/ --max-line-length=88 --extend-ignore=E203,W503 >/dev/null 2>&1; then
+        if uv run flake8 core/ crawler/ >/dev/null 2>&1; then
             print_success "Linting passed"
         else
             print_warning "Linting found issues (some line length warnings)"
