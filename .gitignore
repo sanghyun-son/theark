@@ -18,3 +18,7 @@ test/*
 
 # Tests
 .coverage
+
+# Logs and DB
+logs/
+db/

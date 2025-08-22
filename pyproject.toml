@@ -22,13 +22,14 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
 ]
 dependencies = [
-    "pytest>=8.4.1",
-    "pytest-coverage>=0.0",
+    "colorlog>=6.8.0",
+    "mypy>=1.17.1",
+    "pydantic>=2.11.7",
 ]
 
 [project.optional-dependencies]
 dev = [
-    "pytest>=7.0.0",
+    "pytest>=8.4.1",
     "pytest-cov>=4.0.0",
     "black>=23.0.0",
     "mypy>=1.0.0",
@@ -65,8 +66,13 @@ python_functions = ["test_*"]
 addopts = [
     "--strict-markers",
     "--strict-config",
-    "--cov=core",
-    "--cov=crawler",
-    "--cov-report=term-missing",
-    "--cov-report=html",
+]
+
+[dependency-groups]
+dev = [
+    "black>=25.1.0",
+    "mypy>=1.17.1",
+    "pytest>=8.4.1",
+    "pytest-cov>=6.2.1",
+    "ruff>=0.12.10",
 ]

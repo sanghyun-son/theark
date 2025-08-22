@@ -30,7 +30,9 @@ alwaysApply: true
   - `int | None` instead of `Optional[int]`.  
   - `list[str]`, not `List[str]`.  
 - Line length: ≤ 88 chars.
+- Avoid string-based path representation and os.path. Use pathlib instead.
 - Avoid print and use logging. Use the following convention: logger = logger.getLogger(__name__)
+- Avoid inline comments if the line is self-explanable.
 
 ### Naming Conventions
 - **Variables & functions** → `snake_case`  

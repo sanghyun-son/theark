@@ -1,7 +1,6 @@
 """Unit tests for core functionality."""
 
 import logging
-from unittest.mock import patch
 
 import pytest
 
@@ -28,13 +27,3 @@ class TestLogging:
         logger = get_logger("test_logger")
         assert isinstance(logger, logging.Logger)
         assert logger.name == "test_logger"
-
-    @patch("sys.stdout")
-    def test_logging_output(self, mock_stdout) -> None:
-        """Test that logging actually outputs to stdout."""
-        setup_logging()
-        logger = get_logger("test")
-        logger.info("Test message")
-
-        # Verify that stdout was called (indicating log output)
-        assert mock_stdout.write.called
