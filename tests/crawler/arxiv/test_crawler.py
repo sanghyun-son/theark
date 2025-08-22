@@ -193,9 +193,7 @@ class TestArxivCrawler:
         async def mock_crawl_single_paper(identifier):
             return mock_paper
 
-        crawler.on_demand_crawler.core.crawl_single_paper = (
-            mock_crawl_single_paper
-        )
+        crawler.on_demand_crawler.core.crawl_single_paper = mock_crawl_single_paper
 
         await crawler.start()
 
@@ -215,9 +213,7 @@ class TestArxivCrawler:
         async def mock_crawl_single_paper(identifier):
             return None
 
-        crawler.on_demand_crawler.core.crawl_single_paper = (
-            mock_crawl_single_paper
-        )
+        crawler.on_demand_crawler.core.crawl_single_paper = mock_crawl_single_paper
 
         await crawler.start()
 
@@ -229,9 +225,7 @@ class TestArxivCrawler:
         await crawler.stop()
 
     @pytest.mark.asyncio
-    async def test_crawl_single_paper_already_exists(
-        self, crawler, mock_paper_repo
-    ):
+    async def test_crawl_single_paper_already_exists(self, crawler, mock_paper_repo):
         """Test crawling paper that already exists."""
         existing_paper = Paper(
             arxiv_id="1706.03762",
@@ -250,9 +244,7 @@ class TestArxivCrawler:
         async def mock_crawl_single_paper(identifier):
             return existing_paper
 
-        crawler.on_demand_crawler.core.crawl_single_paper = (
-            mock_crawl_single_paper
-        )
+        crawler.on_demand_crawler.core.crawl_single_paper = mock_crawl_single_paper
 
         await crawler.start()
 
@@ -325,9 +317,7 @@ class TestArxivCrawler:
             callback_tracker["called"] = True
             callback_tracker["paper"] = paper
 
-        crawler = ArxivCrawler(
-            mock_db_manager, on_paper_crawled=on_paper_crawled
-        )
+        crawler = ArxivCrawler(mock_db_manager, on_paper_crawled=on_paper_crawled)
 
         # Setup mock paper
         mock_paper = Paper(
@@ -347,9 +337,7 @@ class TestArxivCrawler:
         async def mock_crawl_single_paper_with_callback(identifier):
             # Trigger the callback through the core's callback chain
             if crawler.on_demand_crawler.core.on_paper_crawled:
-                await crawler.on_demand_crawler.core.on_paper_crawled(
-                    mock_paper
-                )
+                await crawler.on_demand_crawler.core.on_paper_crawled(mock_paper)
             return mock_paper
 
         crawler.on_demand_crawler.crawl_single_paper = (

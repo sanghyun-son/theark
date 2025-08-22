@@ -67,9 +67,7 @@ class TestPaper:
             )
 
         # Test invalid datetime
-        with pytest.raises(
-            ValidationError, match="Invalid ISO8601 datetime format"
-        ):
+        with pytest.raises(ValidationError, match="Invalid ISO8601 datetime format"):
             Paper(
                 arxiv_id="2101.00001",
                 title="Test Paper",
@@ -191,14 +189,10 @@ class TestUserInterest:
             )
 
         # Test weight bounds
-        interest = UserInterest(
-            user_id=1, kind="category", value="test", weight=0.0
-        )
+        interest = UserInterest(user_id=1, kind="category", value="test", weight=0.0)
         assert interest.weight == 0.0
 
-        interest = UserInterest(
-            user_id=1, kind="category", value="test", weight=10.0
-        )
+        interest = UserInterest(user_id=1, kind="category", value="test", weight=10.0)
         assert interest.weight == 10.0
 
         with pytest.raises(ValidationError):

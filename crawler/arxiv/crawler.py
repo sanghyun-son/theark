@@ -5,6 +5,7 @@ from enum import Enum
 from typing import Any, Awaitable, Callable
 
 from core import get_logger
+from crawler.arxiv.core import SummarizationConfig
 from crawler.arxiv.on_demand_crawler import (
     OnDemandCrawlConfig,
     OnDemandCrawler,
@@ -46,6 +47,12 @@ class CrawlConfig:
             self.on_demand = OnDemandCrawlConfig()
         if self.periodic is None:
             self.periodic = PeriodicCrawlConfig()
+
+        # Ensure summarization config is set
+        if self.on_demand.summarization is None:
+            self.on_demand.summarization = SummarizationConfig()
+        if self.periodic.summarization is None:
+            self.periodic.summarization = SummarizationConfig()
 
 
 @dataclass

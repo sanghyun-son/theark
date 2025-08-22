@@ -8,7 +8,12 @@ from crawler.arxiv.constants import (
     DEFAULT_MONTHLY_PAPERS_LIMIT,
     DEFAULT_RECENT_PAPERS_LIMIT,
 )
-from crawler.arxiv.core import ArxivCrawlerCore, CrawlConfig, CrawlerStatus
+from crawler.arxiv.core import (
+    ArxivCrawlerCore,
+    CrawlConfig,
+    CrawlerStatus,
+    SummarizationConfig,
+)
 from crawler.database import DatabaseManager, Paper
 
 logger = get_logger(__name__)
@@ -21,6 +26,11 @@ class OnDemandCrawlConfig(CrawlConfig):
     # Crawl limits
     recent_papers_limit: int = DEFAULT_RECENT_PAPERS_LIMIT
     monthly_papers_limit: int = DEFAULT_MONTHLY_PAPERS_LIMIT
+
+    def __post_init__(self) -> None:
+        """Initialize default summarization config if not provided."""
+        if self.summarization is None:
+            self.summarization = SummarizationConfig()
 
 
 @dataclass

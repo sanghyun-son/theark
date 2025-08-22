@@ -1,6 +1,7 @@
 """Pytest configuration for theark project."""
 
 import pytest
+import pytest_asyncio
 from pytest_httpserver import HTTPServer
 from core import setup_test_logging
 

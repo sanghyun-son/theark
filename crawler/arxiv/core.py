@@ -22,8 +22,29 @@ from crawler.database import (
     PaperRepository,
     SummaryRepository,
 )
+from crawler.summarizer.service import SummarizationService
 
 logger = get_logger(__name__)
+
+
+@dataclass
+class SummarizationConfig:
+    """Configuration for summarization behavior."""
+
+    # Whether to summarize papers immediately after crawling
+    summarize_immediately: bool = False
+
+    # Whether to use structured output (function calling)
+    use_tools: bool = True
+
+    # OpenAI model to use
+    model: str = "gpt-4o-mini"
+
+    # Language for summaries
+    language: str = "English"
+
+    # User interest section for relevance scoring
+    interest_section: str = ""
 
 
 @dataclass
@@ -39,6 +60,9 @@ class CrawlConfig:
 
     # Database settings
     batch_size: int = 100
+
+    # Summarization settings
+    summarization: SummarizationConfig | None = None
 
 
 @dataclass
@@ -92,6 +116,9 @@ class ArxivCrawlerCore:
 
         # Parser
         self.parser = ArxivParser()
+
+        # Summarization service (initialized lazily)
+        self.summarization_service: SummarizationService | None = None
 
         # Statistics
         self.stats = CrawlStats()
@@ -228,6 +255,23 @@ class ArxivCrawlerCore:
         self.summary_repo = SummaryRepository(self.db_manager)
         self.event_repo = CrawlEventRepository(self.db_manager)
 
+    async def _initialize_summarization_service(self) -> None:
+        """Initialize the summarization service if configured."""
+        if (
+            self.config.summarization
+            and self.config.summarization.summarize_immediately
+            and self.summarization_service is None
+        ):
+            try:
+                self.summarization_service = SummarizationService(
+                    use_tools=self.config.summarization.use_tools,
+                    model=self.config.summarization.model,
+                )
+                logger.info("Summarization service initialized")
+            except Exception as e:
+                logger.error(f"Failed to initialize summarization service: {e}")
+                # Don't fail the entire crawler if summarization fails
+
     async def _crawl_paper(self, identifier: str) -> Paper | None:
         """Crawl a single paper and store in database.
 
@@ -270,6 +314,17 @@ class ArxivCrawlerCore:
                         f"Stored paper {paper.arxiv_id} in database with ID {paper_id}"
                     )
 
+                    # Initialize summarization service if needed
+                    await self._initialize_summarization_service()
+
+                    # Summarize paper if configured
+                    if (
+                        self.summarization_service
+                        and self.config.summarization
+                        and self.config.summarization.summarize_immediately
+                    ):
+                        await self._summarize_paper(paper)
+
                     # Retrieve the stored paper to return
                     stored_paper = self.paper_repo.get_by_arxiv_id(paper.arxiv_id)
                     return stored_paper
@@ -302,3 +357,100 @@ class ArxivCrawlerCore:
 
         except Exception as e:
             logger.error(f"Failed to record crawl event: {e}")
+
+    async def _summarize_paper(self, paper: Paper) -> None:
+        """Summarize a paper and store the summary in the database.
+
+        Args:
+            paper: The paper to summarize
+        """
+        if not self.summarization_service or not self.config.summarization:
+            return
+
+        try:
+            # Get the abstract text
+            abstract = paper.abstract or ""
+            if not abstract.strip():
+                logger.warning(f"No abstract available for paper {paper.arxiv_id}")
+                return
+
+            # Summarize the paper
+            summary_response = await self.summarization_service.summarize_paper(
+                paper_id=paper.arxiv_id,
+                abstract=abstract,
+                language=self.config.summarization.language,
+                interest_section=self.config.summarization.interest_section,
+            )
+
+            if summary_response:
+                # Store the summary in the database
+                with self.db_manager:
+                    if self.summary_repo is None:
+                        raise RuntimeError("Summary repository not initialized")
+
+                    # Create summary record
+                    from crawler.database import Summary
+
+                    # Convert relevance string to integer score
+                    relevance_map = {
+                        "Must": 10,
+                        "High": 8,
+                        "Medium": 5,
+                        "Low": 2,
+                        "Irrelevant": 0,
+                    }
+
+                    # Get relevance value
+                    relevance_value = (
+                        summary_response.structured_summary.relevance
+                        if summary_response.structured_summary
+                        else "Medium"
+                    )
+
+                    # Handle both string and numeric relevance values
+                    if relevance_value.isdigit():
+                        relevance_score = int(relevance_value)
+                    else:
+                        relevance_score = relevance_map.get(relevance_value, 5)
+
+                    # Create overview from structured summary
+                    if summary_response.structured_summary:
+                        overview = summary_response.structured_summary.tldr
+                        motivation = summary_response.structured_summary.motivation
+                        method = summary_response.structured_summary.method
+                        result = summary_response.structured_summary.result
+                        conclusion = summary_response.structured_summary.conclusion
+                    else:
+                        overview = summary_response.summary or ""
+                        motivation = "Not available"
+                        method = "Not available"
+                        result = "Not available"
+                        conclusion = "Not available"
+
+                    summary = Summary(
+                        paper_id=paper.paper_id or 0,
+                        version=1,
+                        overview=overview,
+                        motivation=motivation,
+                        method=method,
+                        result=result,
+                        conclusion=conclusion,
+                        language=self.config.summarization.language,
+                        interests=self.config.summarization.interest_section,
+                        relevance=relevance_score,
+                        model=(
+                            summary_response.metadata.get("model")
+                            if summary_response.metadata
+                            else None
+                        ),
+                    )
+
+                    summary_id = self.summary_repo.create(summary)
+                    logger.info(
+                        f"Stored summary for paper {paper.arxiv_id} "
+                        f"with ID {summary_id}"
+                    )
+
+        except Exception as e:
+            logger.error(f"Failed to summarize paper {paper.arxiv_id}: {e}")
+            # Don't fail the entire crawling process if summarization fails

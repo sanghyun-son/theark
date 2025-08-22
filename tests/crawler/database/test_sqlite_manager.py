@@ -90,9 +90,7 @@ class TestSQLiteManager:
         # Update paper
         updated_title = "Updated Test Paper"
         query = "UPDATE paper SET title = ? WHERE arxiv_id = ?"
-        cursor = db_manager.execute(
-            query, (updated_title, sample_paper.arxiv_id)
-        )
+        cursor = db_manager.execute(query, (updated_title, sample_paper.arxiv_id))
         assert cursor.rowcount == 1
 
         # Verify update
@@ -139,9 +137,7 @@ class TestSQLiteManager:
     def test_constraints(self, db_manager) -> None:
         """Test database constraints."""
         # Test foreign key constraint
-        with pytest.raises(
-            Exception
-        ):  # Should raise foreign key constraint error
+        with pytest.raises(Exception):  # Should raise foreign key constraint error
             db_manager.execute(
                 "INSERT INTO summary (paper_id, version, overview, motivation, method, result, conclusion, language, interests, relevance) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (

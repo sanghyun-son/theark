@@ -1,6 +1,7 @@
-"""Demo script for ArxivCrawler functionality."""
+"""Demo script for ArxivCrawler functionality with summarization."""
 
 import asyncio
+import os
 
 from core import setup_logging
 from crawler.arxiv import (
@@ -9,12 +10,17 @@ from crawler.arxiv import (
     OnDemandCrawlConfig,
     PeriodicCrawlConfig,
 )
+from crawler.arxiv.core import SummarizationConfig
 from crawler.database import SQLiteManager, setup_database_environment
 
 
 async def on_paper_crawled(paper):
     """Callback when a paper is successfully crawled."""
     print(f"✅ Paper crawled: {paper.arxiv_id} - {paper.title}")
+
+    # Check if paper has a summary
+    if hasattr(paper, "summary") and paper.summary:
+        print(f"   📝 Summary available: {paper.summary.overview[:100]}...")
 
 
 async def on_error(error):
@@ -26,7 +32,7 @@ async def demo_crawler():
     """Demonstrate ArxivCrawler functionality."""
     setup_logging()
 
-    print("🚀 ArxivCrawler Demo")
+    print("🚀 ArxivCrawler Demo with Summarization")
     print("=" * 50)
 
     # Setup database environment
@@ -39,15 +45,32 @@ async def demo_crawler():
         db_manager.create_tables()
         print(f"📊 Database initialized: {db_path}")
 
+    # Check if OpenAI API key is available
+    if not os.environ.get("OPENAI_API_KEY"):
+        print("⚠️  Warning: OPENAI_API_KEY not set. Summarization will be disabled.")
+        print("   Set OPENAI_API_KEY environment variable to enable summarization.")
+        summarization_config = None
+    else:
+        print("🔑 OpenAI API key found. Summarization enabled!")
+        summarization_config = SummarizationConfig(
+            summarize_immediately=True,
+            use_tools=True,
+            model="gpt-4o-mini",
+            language="English",
+            interest_section="machine learning, artificial intelligence, natural language processing",
+        )
+
     # Create crawler with custom config
     config = CrawlConfig(
         on_demand=OnDemandCrawlConfig(
             recent_papers_limit=10,
             monthly_papers_limit=50,
+            summarization=summarization_config,
         ),
         periodic=PeriodicCrawlConfig(
             background_interval=5,  # 5 seconds for demo
             recent_papers_limit=10,
+            summarization=summarization_config,
         ),
     )
 
@@ -71,8 +94,9 @@ async def demo_crawler():
 
         # Test papers to crawl
         test_papers = [
-            "1706.03762",  # Attention Is All You Need
-            "http://arxiv.org/abs/1706.03762",  # Same paper as URL
+            "1706.03762",  # Attention Is All You Need (already exists)
+            "http://arxiv.org/abs/1706.03762",  # Same paper as URL (already exists)
+            "2403.03190",  # A newer paper to test summarization
             "9999.99999",  # Non-existent paper
         ]
 
@@ -82,6 +106,28 @@ async def demo_crawler():
                 paper = await crawler.crawl_single_paper(paper_id)
                 if paper:
                     print(f"   ✅ Success: {paper.arxiv_id}")
+
+                    # Check if summarization was enabled and show summary info
+                    if (
+                        summarization_config
+                        and summarization_config.summarize_immediately
+                    ):
+                        # Get summary from database
+                        from crawler.database import SummaryRepository
+
+                        summary_repo = SummaryRepository(db_manager)
+                        with db_manager:
+                            summary = summary_repo.get_by_paper_and_language(
+                                paper.paper_id, summarization_config.language
+                            )
+                            if summary:
+                                print(f"   📝 Summary: {summary.overview[:100]}...")
+                                print(f"   🎯 Relevance: {summary.relevance}/10")
+                                print(f"   🔍 Motivation: {summary.motivation[:80]}...")
+                            else:
+                                print(
+                                    f"   ⏳ Summary not yet available (may be processing or failed)"
+                                )
                 else:
                     print(f"   ❌ Not found or failed")
             except Exception as e:
@@ -125,6 +171,60 @@ async def demo_crawler():
 
         monthly_papers = await crawler.crawl_monthly_papers(2024, 1, limit=10)
         print(f"Monthly Papers: {len(monthly_papers)} (placeholder)")
+
+        print(f"\n🔍 Testing Summarization Service:")
+        print("-" * 30)
+
+        if summarization_config and summarization_config.summarize_immediately:
+            from crawler.summarizer.service import SummarizationService
+
+            # Test summarization service directly
+            print("🧠 Testing direct summarization service...")
+            try:
+                service = SummarizationService(
+                    use_tools=summarization_config.use_tools,
+                    model=summarization_config.model,
+                )
+
+                # Test with a sample abstract
+                test_abstract = """
+                This paper presents a novel approach to machine learning using transformer architectures. 
+                We demonstrate improved performance on natural language processing tasks through 
+                attention mechanisms and self-supervised learning techniques.
+                """
+
+                response = await service.summarize_paper(
+                    paper_id="demo-test-001",
+                    abstract=test_abstract,
+                    language=summarization_config.language,
+                    interest_section=summarization_config.interest_section,
+                )
+
+                if response:
+                    print(f"   ✅ Summarization successful!")
+                    if response.structured_summary:
+                        print(f"   📝 TLDR: {response.structured_summary.tldr}")
+                        print(
+                            f"   🎯 Relevance: {response.structured_summary.relevance}"
+                        )
+                        print(
+                            f"   🔍 Motivation: {response.structured_summary.motivation[:80]}..."
+                        )
+                    else:
+                        print(f"   📝 Summary: {response.summary[:100]}...")
+                else:
+                    print(f"   ❌ Summarization failed - no response received")
+
+                await service.close()
+
+            except Exception as e:
+                print(f"   ❌ Summarization service error: {e}")
+                print(f"   💡 This might be due to:")
+                print(f"      - Invalid or missing OpenAI API key")
+                print(f"      - Network connectivity issues")
+                print(f"      - OpenAI API rate limits or errors")
+        else:
+            print("   ⏭️  Summarization disabled (no API key)")
 
         print(f"\n✅ Demo completed successfully!")
 

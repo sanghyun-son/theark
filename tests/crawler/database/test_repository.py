@@ -126,18 +126,14 @@ class TestUserRepository:
         user_id = user_repo.create_user(user)
 
         interests = [
-            UserInterest(
-                user_id=user_id, kind="category", value="cs.CL", weight=2.0
-            ),
+            UserInterest(user_id=user_id, kind="category", value="cs.CL", weight=2.0),
             UserInterest(
                 user_id=user_id,
                 kind="keyword",
                 value="machine learning",
                 weight=1.5,
             ),
-            UserInterest(
-                user_id=user_id, kind="author", value="John Doe", weight=1.0
-            ),
+            UserInterest(user_id=user_id, kind="author", value="John Doe", weight=1.0),
         ]
 
         for interest in interests:
@@ -156,9 +152,7 @@ class TestUserRepository:
         user_id = user_repo.create_user(user)
         paper_id = paper_repo.create(sample_paper)
 
-        star = UserStar(
-            user_id=user_id, paper_id=paper_id, note="Interesting paper"
-        )
+        star = UserStar(user_id=user_id, paper_id=paper_id, note="Interesting paper")
         user_repo.add_star(star)
 
         stars = user_repo.get_user_stars(user_id)
@@ -200,9 +194,7 @@ class TestCrawlEventRepository:
     def test_crawl_event_operations(self, event_repo) -> None:
         """Test crawl event operations."""
         events = [
-            CrawlEvent(
-                arxiv_id="2101.00001", event_type="FOUND", detail="Paper found"
-            ),
+            CrawlEvent(arxiv_id="2101.00001", event_type="FOUND", detail="Paper found"),
             CrawlEvent(
                 arxiv_id="2101.00002",
                 event_type="UPDATED",

@@ -42,16 +42,12 @@ class TestArxivClient:
 
         # Test abstract URLs
         assert (
-            client._extract_arxiv_id("http://arxiv.org/abs/1706.03762")
-            == "1706.03762"
+            client._extract_arxiv_id("http://arxiv.org/abs/1706.03762") == "1706.03762"
         )
         assert (
-            client._extract_arxiv_id("https://arxiv.org/abs/2401.00123")
-            == "2401.00123"
+            client._extract_arxiv_id("https://arxiv.org/abs/2401.00123") == "2401.00123"
         )
-        assert (
-            client._extract_arxiv_id("arxiv.org/abs/1706.03762") == "1706.03762"
-        )
+        assert client._extract_arxiv_id("arxiv.org/abs/1706.03762") == "1706.03762"
 
     def test_extract_arxiv_id_pdf_url(self):
         """Test extracting arXiv ID from PDF URLs."""
@@ -59,16 +55,12 @@ class TestArxivClient:
 
         # Test PDF URLs
         assert (
-            client._extract_arxiv_id("http://arxiv.org/pdf/1706.03762")
-            == "1706.03762"
+            client._extract_arxiv_id("http://arxiv.org/pdf/1706.03762") == "1706.03762"
         )
         assert (
-            client._extract_arxiv_id("https://arxiv.org/pdf/2401.00123")
-            == "2401.00123"
+            client._extract_arxiv_id("https://arxiv.org/pdf/2401.00123") == "2401.00123"
         )
-        assert (
-            client._extract_arxiv_id("arxiv.org/pdf/1706.03762") == "1706.03762"
-        )
+        assert client._extract_arxiv_id("arxiv.org/pdf/1706.03762") == "1706.03762"
 
     def test_extract_arxiv_id_with_version(self):
         """Test extracting arXiv ID from URLs with version numbers."""
@@ -140,9 +132,7 @@ class TestArxivClient:
         base_url = f"http://localhost:{mock_arxiv_server.port}/api/query"
 
         async with ArxivClient(base_url=base_url) as client:
-            response = await client.get_paper_by_url(
-                "http://arxiv.org/abs/1706.03762"
-            )
+            response = await client.get_paper_by_url("http://arxiv.org/abs/1706.03762")
             assert "Attention Is All You Need" in response
 
     @pytest.mark.asyncio
@@ -154,10 +144,7 @@ class TestArxivClient:
             # arXiv API returns 200 with empty results for not found papers
             response = await client.get_paper("9999.99999")
             # Should return empty feed with totalResults=0
-            assert (
-                "<opensearch:totalResults>0</opensearch:totalResults>"
-                in response
-            )
+            assert "<opensearch:totalResults>0</opensearch:totalResults>" in response
 
     @pytest.mark.asyncio
     async def test_get_paper_server_error(self, mock_arxiv_server):
@@ -205,4 +192,5 @@ class TestArxivClient:
         async with ArxivClient(base_url=base_url) as client:
             # The mock server doesn't validate headers, but we can verify the client is configured
             from crawler.arxiv.constants import DEFAULT_USER_AGENT
+
             assert client.client.headers["User-Agent"] == DEFAULT_USER_AGENT

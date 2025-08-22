@@ -1,0 +1,97 @@
+"""Summarization service for paper abstracts."""
+
+import os
+
+from core import get_logger
+from crawler.summarizer import (
+    OpenAISummarizer,
+    SummaryRequest,
+    SummaryResponse,
+)
+
+logger = get_logger(__name__)
+
+
+class SummarizationService:
+    """Service for managing paper summarization."""
+
+    def __init__(
+        self,
+        api_key: str | None = None,
+        base_url: str | None = None,
+        use_tools: bool = True,
+        model: str = "gpt-4o-mini",
+    ):
+        """Initialize the summarization service.
+
+        Args:
+            api_key: OpenAI API key (defaults to OPENAI_API_KEY env var)
+            base_url: OpenAI API base URL (for testing with mock server)
+            use_tools: Whether to use function calling for structured output
+            model: OpenAI model to use for summarization
+        """
+        self.api_key = api_key or os.environ.get("OPENAI_API_KEY")
+        self.base_url = base_url or "https://api.openai.com/v1"
+        self.use_tools = use_tools
+        self.model = model
+
+        if not self.api_key:
+            raise ValueError(
+                "OpenAI API key not provided and OPENAI_API_KEY environment "
+                "variable not set"
+            )
+
+        # Initialize the summarizer
+        self.summarizer = OpenAISummarizer(api_key=self.api_key, base_url=self.base_url)
+
+        logger.info(
+            f"SummarizationService initialized with model={model}, "
+            f"use_tools={use_tools}, base_url={self.base_url}"
+        )
+
+    async def summarize_paper(
+        self,
+        paper_id: str,
+        abstract: str,
+        language: str = "English",
+        interest_section: str = "",
+    ) -> SummaryResponse | None:
+        """Summarize a paper's abstract.
+
+        Args:
+            paper_id: Unique identifier for the paper
+            abstract: The paper's abstract text
+            language: Language for the summary
+            interest_section: User's interest section for relevance scoring
+
+        Returns:
+            SummaryResponse with structured or text summary, or None if failed
+        """
+        try:
+            logger.info(f"Summarizing paper {paper_id}")
+
+            # Create summary request
+            request = SummaryRequest(
+                custom_id=paper_id,
+                content=abstract,
+                language=language,
+                interest_section=interest_section,
+                use_tools=self.use_tools,
+                model=self.model,
+            )
+
+            # Get summary from OpenAI
+            response = await self.summarizer.summarize(request)
+
+            logger.info(f"Successfully summarized paper {paper_id}")
+            return response
+
+        except Exception as e:
+            logger.error(f"Failed to summarize paper {paper_id}: {e}")
+            return None
+
+    async def close(self) -> None:
+        """Close the summarization service and cleanup resources."""
+        if hasattr(self.summarizer, "close"):
+            await self.summarizer.close()
+        logger.info("SummarizationService closed")
