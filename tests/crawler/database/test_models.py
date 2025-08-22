@@ -36,8 +36,9 @@ class TestPaper:
         assert paper.title == "Test Paper"
         assert paper.latest_version == 1
 
-    def test_invalid_arxiv_id(self) -> None:
-        """Test invalid arXiv ID validation."""
+    def test_invalid_validation(self) -> None:
+        """Test invalid field validation."""
+        # Test invalid arXiv ID
         with pytest.raises(ValidationError, match="Invalid arXiv ID format"):
             Paper(
                 arxiv_id="invalid",
@@ -51,8 +52,7 @@ class TestPaper:
                 updated_at="2021-01-01T00:00:00Z",
             )
 
-    def test_invalid_category(self) -> None:
-        """Test invalid category validation."""
+        # Test invalid category
         with pytest.raises(ValidationError, match="Invalid category format"):
             Paper(
                 arxiv_id="2101.00001",
@@ -66,8 +66,7 @@ class TestPaper:
                 updated_at="2021-01-01T00:00:00Z",
             )
 
-    def test_invalid_datetime(self) -> None:
-        """Test invalid datetime validation."""
+        # Test invalid datetime
         with pytest.raises(
             ValidationError, match="Invalid ISO8601 datetime format"
         ):
@@ -108,8 +107,9 @@ class TestSummary:
         assert summary.relevance == 8
         assert summary.model == "gpt-4"
 
-    def test_invalid_language(self) -> None:
-        """Test invalid language validation."""
+    def test_invalid_validation(self) -> None:
+        """Test invalid field validation."""
+        # Test invalid language
         with pytest.raises(ValidationError, match="Invalid language"):
             Summary(
                 paper_id=1,
@@ -124,8 +124,7 @@ class TestSummary:
                 relevance=5,
             )
 
-    def test_invalid_relevance(self) -> None:
-        """Test invalid relevance validation."""
+        # Test invalid relevance
         with pytest.raises(ValidationError):
             Summary(
                 paper_id=1,
@@ -181,8 +180,9 @@ class TestUserInterest:
         assert interest.kind == "category"
         assert interest.weight == 2.5
 
-    def test_invalid_kind(self) -> None:
-        """Test invalid kind validation."""
+    def test_invalid_validation(self) -> None:
+        """Test invalid field validation."""
+        # Test invalid kind
         with pytest.raises(ValidationError, match="Invalid kind"):
             UserInterest(
                 user_id=1,
@@ -190,21 +190,17 @@ class TestUserInterest:
                 value="test",
             )
 
-    def test_weight_bounds(self) -> None:
-        """Test weight bounds validation."""
-        # Test minimum weight
+        # Test weight bounds
         interest = UserInterest(
             user_id=1, kind="category", value="test", weight=0.0
         )
         assert interest.weight == 0.0
 
-        # Test maximum weight
         interest = UserInterest(
             user_id=1, kind="category", value="test", weight=10.0
         )
         assert interest.weight == 10.0
 
-        # Test invalid weight
         with pytest.raises(ValidationError):
             UserInterest(user_id=1, kind="category", value="test", weight=11.0)
 

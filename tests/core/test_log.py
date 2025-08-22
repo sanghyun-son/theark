@@ -1,4 +1,4 @@
-"""Unit tests for core functionality."""
+"""Unit tests for core logging functionality."""
 
 import logging
 

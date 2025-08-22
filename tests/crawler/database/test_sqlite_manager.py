@@ -1,31 +1,17 @@
 """Unit tests for SQLite database manager."""
 
-from pathlib import Path
-
 import pytest
 
-from crawler.database import SQLiteManager
 from crawler.database.models import Paper
 
 
 class TestSQLiteManager:
     """Test SQLite database manager."""
 
-    @pytest.fixture
-    def temp_db_path(self, tmp_path: Path) -> Path:
-        """Create a temporary database path using pytest's tmp_path."""
-        return tmp_path / "test.db"
-
-    @pytest.fixture
-    def db_manager(self, temp_db_path: Path) -> SQLiteManager:
-        """Create a database manager with temporary database."""
-        manager = SQLiteManager(temp_db_path)
-        with manager:
-            manager.create_tables()
-            yield manager
-
-    def test_connection_and_disconnect(self, temp_db_path: Path) -> None:
+    def test_connection_and_disconnect(self, temp_db_path) -> None:
         """Test database connection and disconnection."""
+        from crawler.database import SQLiteManager
+
         manager = SQLiteManager(temp_db_path)
 
         # Test connection
@@ -37,8 +23,10 @@ class TestSQLiteManager:
         manager.disconnect()
         assert manager.connection is None
 
-    def test_context_manager(self, temp_db_path: Path) -> None:
+    def test_context_manager(self, temp_db_path) -> None:
         """Test context manager functionality."""
+        from crawler.database import SQLiteManager
+
         with SQLiteManager(temp_db_path) as manager:
             assert manager.connection is not None
             manager.create_tables()
@@ -46,7 +34,7 @@ class TestSQLiteManager:
         # Should be disconnected after context exit
         assert manager.connection is None
 
-    def test_create_tables(self, db_manager: SQLiteManager) -> None:
+    def test_create_tables(self, db_manager) -> None:
         """Test table creation."""
         # Check if tables exist by querying them
         tables = [
@@ -65,22 +53,8 @@ class TestSQLiteManager:
             )
             assert result is not None, f"Table {table} was not created"
 
-    def test_paper_crud_operations(self, db_manager: SQLiteManager) -> None:
-        """Test paper CRUD operations."""
-        # Create a test paper
-        paper = Paper(
-            arxiv_id="2101.00001",
-            title="Test Paper",
-            abstract="This is a test abstract",
-            primary_category="cs.CL",
-            categories="cs.CL,cs.LG",
-            authors="John Doe;Jane Smith",
-            url_abs="https://arxiv.org/abs/2101.00001",
-            url_pdf="https://arxiv.org/pdf/2101.00001",
-            published_at="2021-01-01T00:00:00Z",
-            updated_at="2021-01-01T00:00:00Z",
-        )
-
+    def test_basic_crud_operations(self, db_manager, sample_paper) -> None:
+        """Test basic CRUD operations."""
         # Insert paper
         query = """
         INSERT INTO paper (
@@ -89,17 +63,17 @@ class TestSQLiteManager:
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """
         params = (
-            paper.arxiv_id,
-            paper.latest_version,
-            paper.title,
-            paper.abstract,
-            paper.primary_category,
-            paper.categories,
-            paper.authors,
-            paper.url_abs,
-            paper.url_pdf,
-            paper.published_at,
-            paper.updated_at,
+            sample_paper.arxiv_id,
+            sample_paper.latest_version,
+            sample_paper.title,
+            sample_paper.abstract,
+            sample_paper.primary_category,
+            sample_paper.categories,
+            sample_paper.authors,
+            sample_paper.url_abs,
+            sample_paper.url_pdf,
+            sample_paper.published_at,
+            sample_paper.updated_at,
         )
 
         cursor = db_manager.execute(query, params)
@@ -108,45 +82,30 @@ class TestSQLiteManager:
 
         # Read paper
         query = "SELECT * FROM paper WHERE arxiv_id = ?"
-        row = db_manager.fetch_one(query, (paper.arxiv_id,))
+        row = db_manager.fetch_one(query, (sample_paper.arxiv_id,))
         assert row is not None
-        assert row[1] == paper.arxiv_id  # arxiv_id column
-        assert row[3] == paper.title  # title column
+        assert row[1] == sample_paper.arxiv_id  # arxiv_id column
+        assert row[3] == sample_paper.title  # title column
 
         # Update paper
         updated_title = "Updated Test Paper"
         query = "UPDATE paper SET title = ? WHERE arxiv_id = ?"
-        cursor = db_manager.execute(query, (updated_title, paper.arxiv_id))
+        cursor = db_manager.execute(
+            query, (updated_title, sample_paper.arxiv_id)
+        )
         assert cursor.rowcount == 1
 
         # Verify update
         row = db_manager.fetch_one(
-            "SELECT title FROM paper WHERE arxiv_id = ?", (paper.arxiv_id,)
+            "SELECT title FROM paper WHERE arxiv_id = ?",
+            (sample_paper.arxiv_id,),
         )
         assert row[0] == updated_title
 
-    def test_fts_search(self, db_manager: SQLiteManager) -> None:
-        """Test full-text search functionality."""
+    def test_search_functionality(self, db_manager, sample_papers) -> None:
+        """Test search functionality."""
         # Insert test papers
-        papers = [
-            (
-                "2101.00001",
-                "Machine Learning Paper",
-                "This paper is about machine learning",
-            ),
-            (
-                "2101.00002",
-                "Deep Learning Research",
-                "Deep learning techniques and applications",
-            ),
-            (
-                "2101.00003",
-                "Computer Vision Study",
-                "Computer vision and image processing",
-            ),
-        ]
-
-        for arxiv_id, title, abstract in papers:
+        for paper in sample_papers:
             query = """
             INSERT INTO paper (
                 arxiv_id, latest_version, title, abstract, primary_category,
@@ -154,20 +113,20 @@ class TestSQLiteManager:
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """
             params = (
-                arxiv_id,
-                1,
-                title,
-                abstract,
-                "cs.AI",
-                "cs.AI",
-                "Test Author",
-                "https://arxiv.org/abs/" + arxiv_id,
-                "2021-01-01T00:00:00Z",
-                "2021-01-01T00:00:00Z",
+                paper.arxiv_id,
+                paper.latest_version,
+                paper.title,
+                paper.abstract,
+                paper.primary_category,
+                paper.categories,
+                paper.authors,
+                paper.url_abs,
+                paper.published_at,
+                paper.updated_at,
             )
             db_manager.execute(query, params)
 
-        # Test simple search instead of FTS
+        # Test simple search
         query = """
         SELECT title FROM paper 
         WHERE title LIKE '%machine learning%' OR abstract LIKE '%machine learning%'
@@ -177,20 +136,29 @@ class TestSQLiteManager:
         assert len(results) >= 1
         assert "Machine Learning" in results[0][0]
 
-    def test_foreign_key_constraints(self, db_manager: SQLiteManager) -> None:
-        """Test foreign key constraints."""
-        # Try to insert a summary for non-existent paper
-        query = """
-        INSERT INTO summary (paper_id, version, style, content)
-        VALUES (?, ?, ?, ?)
-        """
+    def test_constraints(self, db_manager) -> None:
+        """Test database constraints."""
+        # Test foreign key constraint
+        with pytest.raises(
+            Exception
+        ):  # Should raise foreign key constraint error
+            db_manager.execute(
+                "INSERT INTO summary (paper_id, version, overview, motivation, method, result, conclusion, language, interests, relevance) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    999,
+                    1,
+                    "overview",
+                    "motivation",
+                    "method",
+                    "result",
+                    "conclusion",
+                    "English",
+                    "interests",
+                    5,
+                ),
+            )
 
-        with pytest.raises(Exception):  # Should raise foreign key constraint error
-            db_manager.execute(query, (999, 1, "tldr", "Test summary"))
-
-    def test_unique_constraints(self, db_manager: SQLiteManager) -> None:
-        """Test unique constraints."""
-        # Insert first paper
+        # Test unique constraint
         paper1 = Paper(
             arxiv_id="2101.00001",
             title="Test Paper 1",
@@ -252,7 +220,7 @@ class TestSQLiteManager:
         with pytest.raises(Exception):  # Should raise unique constraint error
             db_manager.execute(query, params)
 
-    def test_batch_operations(self, db_manager: SQLiteManager) -> None:
+    def test_batch_operations(self, db_manager) -> None:
         """Test batch operations."""
         # Prepare batch data
         papers_data = [
