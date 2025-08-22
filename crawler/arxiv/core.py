@@ -314,19 +314,20 @@ class ArxivCrawlerCore:
                         f"Stored paper {paper.arxiv_id} in database with ID {paper_id}"
                     )
 
+                    # Retrieve the stored paper to get the database ID
+                    stored_paper = self.paper_repo.get_by_arxiv_id(paper.arxiv_id)
+
                     # Initialize summarization service if needed
                     await self._initialize_summarization_service()
 
-                    # Summarize paper if configured
                     if (
                         self.summarization_service
                         and self.config.summarization
                         and self.config.summarization.summarize_immediately
+                        and stored_paper
                     ):
-                        await self._summarize_paper(paper)
+                        await self._summarize_paper(stored_paper)
 
-                    # Retrieve the stored paper to return
-                    stored_paper = self.paper_repo.get_by_arxiv_id(paper.arxiv_id)
                     return stored_paper
 
             except ArxivNotFoundError:
@@ -383,6 +384,14 @@ class ArxivCrawlerCore:
             )
 
             if summary_response:
+                # Check if we have a valid paper_id before creating summary
+                if not paper.paper_id or paper.paper_id <= 0:
+                    logger.warning(
+                        f"Cannot create summary for paper {paper.arxiv_id}: "
+                        f"invalid paper_id {paper.paper_id}"
+                    )
+                    return
+
                 # Store the summary in the database
                 with self.db_manager:
                     if self.summary_repo is None:
@@ -428,7 +437,7 @@ class ArxivCrawlerCore:
                         conclusion = "Not available"
 
                     summary = Summary(
-                        paper_id=paper.paper_id or 0,
+                        paper_id=paper.paper_id,
                         version=1,
                         overview=overview,
                         motivation=motivation,
