@@ -1,27 +1,26 @@
 """Core ArXiv crawling functionality shared between on-demand and periodic crawlers."""
 
 import asyncio
-from datetime import datetime
-from typing import Any, Callable, Awaitable
 from dataclasses import dataclass
+from datetime import datetime
+from typing import Any, Awaitable, Callable
 
-from core import get_logger, AsyncRateLimiter
+from core import AsyncRateLimiter, get_logger
 from crawler.arxiv.client import ArxivClient
-from crawler.arxiv.parser import ArxivParser
 from crawler.arxiv.constants import (
-    DEFAULT_RATE_LIMIT,
     DEFAULT_MAX_RETRIES,
+    DEFAULT_RATE_LIMIT,
     DEFAULT_RETRY_DELAY,
 )
-from crawler.arxiv.exceptions import ArxivError, ArxivNotFoundError
+from crawler.arxiv.exceptions import ArxivNotFoundError
+from crawler.arxiv.parser import ArxivParser
 from crawler.database import (
+    CrawlEvent,
+    CrawlEventRepository,
     DatabaseManager,
     Paper,
-    Summary,
-    CrawlEvent,
     PaperRepository,
     SummaryRepository,
-    CrawlEventRepository,
 )
 
 logger = get_logger(__name__)
@@ -190,9 +189,7 @@ class ArxivCrawlerCore:
             return await self.crawl_single_paper(identifier)
 
         # Crawl papers concurrently
-        tasks = [
-            crawl_with_rate_limit(identifier) for identifier in identifiers
-        ]
+        tasks = [crawl_with_rate_limit(identifier) for identifier in identifiers]
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
         # Process results
@@ -205,7 +202,8 @@ class ArxivCrawlerCore:
                 crawled_papers.append(result)
 
         logger.info(
-            f"Successfully crawled {len(crawled_papers)} out of {len(identifiers)} papers"
+            f"Successfully crawled {len(crawled_papers)} out of "
+            f"{len(identifiers)} papers"
         )
         return crawled_papers
 
@@ -251,9 +249,7 @@ class ArxivCrawlerCore:
                 # Parse XML response and extract paper metadata
                 paper = self.parser.parse_paper(xml_response)
                 if not paper:
-                    logger.warning(
-                        f"Failed to parse paper from XML: {identifier}"
-                    )
+                    logger.warning(f"Failed to parse paper from XML: {identifier}")
                     return None
 
                 # Check if paper already exists
@@ -261,9 +257,7 @@ class ArxivCrawlerCore:
                     if self.paper_repo is None:
                         raise RuntimeError("Paper repository not initialized")
 
-                    existing_paper = self.paper_repo.get_by_arxiv_id(
-                        paper.arxiv_id
-                    )
+                    existing_paper = self.paper_repo.get_by_arxiv_id(paper.arxiv_id)
                     if existing_paper:
                         logger.info(
                             f"Paper {paper.arxiv_id} already exists in database"
@@ -277,9 +271,7 @@ class ArxivCrawlerCore:
                     )
 
                     # Retrieve the stored paper to return
-                    stored_paper = self.paper_repo.get_by_arxiv_id(
-                        paper.arxiv_id
-                    )
+                    stored_paper = self.paper_repo.get_by_arxiv_id(paper.arxiv_id)
                     return stored_paper
 
             except ArxivNotFoundError:
@@ -289,9 +281,7 @@ class ArxivCrawlerCore:
                 logger.error(f"Error crawling paper {identifier}: {e}")
                 raise
 
-    async def _record_crawl_event(
-        self, event_type: str, identifier: str
-    ) -> None:
+    async def _record_crawl_event(self, event_type: str, identifier: str) -> None:
         """Record a crawl event in the database.
 
         Args:

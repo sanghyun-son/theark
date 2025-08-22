@@ -1,22 +1,22 @@
 #!/usr/bin/env python3
 """Demonstration of the arXiv crawler database system."""
 
-from core.log import setup_test_logging, get_logger
+from core.log import get_logger, setup_test_logging
 from crawler.database import (
-    SQLiteManager,
-    setup_database_environment,
-    Paper,
-    Summary,
     AppUser,
-    UserInterest,
-    UserStar,
-    FeedItem,
     CrawlEvent,
-    PaperRepository,
-    SummaryRepository,
-    UserRepository,
-    FeedRepository,
     CrawlEventRepository,
+    FeedItem,
+    FeedRepository,
+    Paper,
+    PaperRepository,
+    SQLiteManager,
+    Summary,
+    SummaryRepository,
+    UserInterest,
+    UserRepository,
+    UserStar,
+    setup_database_environment,
 )
 
 
@@ -172,9 +172,7 @@ def main() -> None:
 
             for event in events:
                 event_id = event_repo.log_event(event)
-                logger.info(
-                    f"Logged event {event.event_type} with ID: {event_id}"
-                )
+                logger.info(f"Logged event {event.event_type} with ID: {event_id}")
 
             # Demo 6: Search functionality
             logger.info("=== Demo 6: Search Functionality ===")
@@ -210,9 +208,7 @@ def main() -> None:
 
             # Search for transformer-related papers
             search_results = paper_repo.search_by_keywords("transformer")
-            logger.info(
-                f"Found {len(search_results)} papers matching 'transformer'"
-            )
+            logger.info(f"Found {len(search_results)} papers matching 'transformer'")
             for result in search_results:
                 logger.info(f"  - {result.title}")
 

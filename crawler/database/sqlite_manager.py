@@ -189,7 +189,7 @@ class SQLiteManager(DatabaseManager):
                 model         TEXT,
                 created_at    TEXT NOT NULL DEFAULT (datetime('now')),
                 UNIQUE (paper_id, version, language)
-            )""",
+            )""",  # noqa: E501
             # 3) 사용자
             """CREATE TABLE IF NOT EXISTS app_user (
                 user_id      INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -203,7 +203,7 @@ class SQLiteManager(DatabaseManager):
                 value     TEXT NOT NULL,
                 weight    REAL NOT NULL DEFAULT 1.0,
                 PRIMARY KEY (user_id, kind, value)
-            )""",
+            )""",  # noqa: E501
             # 5) 사용자 즐겨찾기
             """CREATE TABLE IF NOT EXISTS user_star (
                 user_id     INTEGER NOT NULL REFERENCES app_user(user_id) ON DELETE CASCADE,
@@ -211,7 +211,7 @@ class SQLiteManager(DatabaseManager):
                 note        TEXT,
                 created_at  TEXT NOT NULL DEFAULT (datetime('now')),
                 PRIMARY KEY (user_id, paper_id)
-            )""",
+            )""",  # noqa: E501
             # 6) 피드 아이템
             """CREATE TABLE IF NOT EXISTS feed_item (
                 feed_item_id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -221,7 +221,7 @@ class SQLiteManager(DatabaseManager):
                 feed_date    TEXT NOT NULL,
                 created_at   TEXT NOT NULL DEFAULT (datetime('now')),
                 UNIQUE (user_id, paper_id, feed_date)
-            )""",
+            )""",  # noqa: E501
             # 7) 크롤 이벤트
             """CREATE TABLE IF NOT EXISTS crawl_event (
                 event_id     INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -229,25 +229,16 @@ class SQLiteManager(DatabaseManager):
                 event_type   TEXT NOT NULL,
                 detail       TEXT,
                 created_at   TEXT NOT NULL DEFAULT (datetime('now'))
-            )""",
-            # 8) FTS5 가상 테이블 (commented out for testing)
-            # """CREATE VIRTUAL TABLE IF NOT EXISTS paper_fts
-            # USING fts5(title, abstract, content='paper', content_rowid='paper_id')""",
-            # 9) FTS 트리거들 (commented out for testing)
-            # """CREATE TRIGGER IF NOT EXISTS paper_ai AFTER INSERT ON paper BEGIN
-            #     INSERT INTO paper_fts(rowid, title, abstract) VALUES (new.paper_id, new.title, new.abstract);
-            # END""",
-            # """CREATE TRIGGER IF NOT EXISTS paper_au AFTER UPDATE ON paper BEGIN
-            #     UPDATE paper_fts SET title=new.title, abstract=new.abstract WHERE rowid=new.paper_id;
-            # END""",
-            # """CREATE TRIGGER IF NOT EXISTS paper_ad AFTER DELETE ON paper BEGIN
-            #     DELETE FROM paper_fts WHERE rowid=old.paper_id;
-            # END""",
-            # 10) 인덱스들
-            """CREATE INDEX IF NOT EXISTS idx_paper_published_at ON paper(published_at DESC)""",
-            """CREATE INDEX IF NOT EXISTS idx_paper_primary_category ON paper(primary_category)""",
-            """CREATE INDEX IF NOT EXISTS idx_user_star_user ON user_star(user_id, created_at DESC)""",
-            """CREATE INDEX IF NOT EXISTS idx_summary_paper ON summary(paper_id, language)""",
+            )""",  # noqa: E501
+            # 8) 인덱스들
+            """CREATE INDEX IF NOT EXISTS idx_paper_published_at
+                ON paper(published_at DESC)""",
+            """CREATE INDEX IF NOT EXISTS idx_paper_primary_category
+                ON paper(primary_category)""",
+            """CREATE INDEX IF NOT EXISTS idx_user_star_user
+                ON user_star(user_id, created_at DESC)""",
+            """CREATE INDEX IF NOT EXISTS idx_summary_paper
+                ON summary(paper_id, language)""",
         ]
 
         try:

@@ -1,12 +1,11 @@
 """Generic periodic task manager for background operations."""
 
 import asyncio
-import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
-from typing import Callable, Awaitable, Any
+from typing import Any, Awaitable, Callable
 
 from core.log import get_logger
 
@@ -115,7 +114,7 @@ class PeriodicTaskManager:
 
         # State management
         self.status = TaskStatus.IDLE
-        self._background_task: asyncio.Task | None = None
+        self._background_task: asyncio.Task[None] | None = None
         self._stop_event = asyncio.Event()
 
         # Statistics
@@ -289,7 +288,8 @@ class PeriodicTaskManager:
                 # Check if we should stop due to too many consecutive errors
                 if self.stats.consecutive_errors >= self.max_retries:
                     logger.error(
-                        f"Too many consecutive errors ({self.max_retries}), stopping periodic loop"
+                        f"Too many consecutive errors ({self.max_retries}), "
+                        f"stopping periodic loop"
                     )
                     await self._set_status(TaskStatus.ERROR)
                     break

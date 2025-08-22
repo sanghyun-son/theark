@@ -2,21 +2,21 @@
 
 import re
 from datetime import datetime
-from typing import Any
 from xml.etree import ElementTree
 
 from core import get_logger
 from crawler.database import Paper
+
 from .constants import (
-    ARXIV_NAMESPACES,
     ARXIV_ABS_BASE_URL,
+    ARXIV_NAMESPACES,
     ARXIV_PDF_BASE_URL,
     DEFAULT_PRIMARY_CATEGORY,
-    ISO8601_DATE_FORMAT,
-    ERROR_NO_PAPERS_FOUND,
-    ERROR_FAILED_TO_PARSE_XML,
     ERROR_EXTRACTING_ARXIV_ID,
+    ERROR_FAILED_TO_PARSE_XML,
     ERROR_INVALID_DATE_FORMAT,
+    ERROR_NO_PAPERS_FOUND,
+    ISO8601_DATE_FORMAT,
     LOG_SUCCESSFULLY_PARSED,
 )
 
@@ -117,7 +117,9 @@ class ArxivParser:
         # Try to get from id element
         id_elem = entry.find("atom:id", self.namespace)
         if id_elem is not None and id_elem.text:
-            # Extract ID from URL like "http://arxiv.org/abs/1706.03762v7" or "http://arxiv.org/abs/1706.03762"
+            # Extract ID from URL like
+            # "http://arxiv.org/abs/1706.03762v7" or
+            # "http://arxiv.org/abs/1706.03762"
             match = re.search(r"/(\d+\.\d+)(?:v\d+)?$", id_elem.text)
             if match:
                 return match.group(1)

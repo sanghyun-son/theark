@@ -1,5 +1,10 @@
 # TheArk
 
+[![CI](https://github.com/sanghyun-son/theark/actions/workflows/ci.yml/badge.svg)](https://github.com/sanghyun-son/theark/actions/workflows/ci.yml)
+[![Codecov](https://codecov.io/gh/sanghyun-son/theark/branch/main/graph/badge.svg)](https://codecov.io/gh/sanghyun-son/theark)
+[![Python 3.11](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 A web crawling and data processing system focused on arXiv paper crawling and analysis.
 
 ## 🚀 Quick Start

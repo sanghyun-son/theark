@@ -18,6 +18,7 @@ test/*
 
 # Tests
 .coverage
+bandit-report.json
 
 # Logs and DB
 logs/

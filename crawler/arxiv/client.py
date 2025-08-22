@@ -6,6 +6,7 @@ from typing import Any
 import httpx
 
 from core import AsyncRateLimiter, get_logger
+
 from .constants import (
     ARXIV_API_BASE_URL,
     DEFAULT_RATE_LIMIT,
@@ -13,9 +14,9 @@ from .constants import (
     DEFAULT_USER_AGENT,
 )
 from .exceptions import (
+    ArxivAPIError,
     ArxivError,
     ArxivNotFoundError,
-    ArxivAPIError,
     ArxivTimeoutError,
 )
 

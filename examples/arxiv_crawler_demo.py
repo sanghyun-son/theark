@@ -1,6 +1,7 @@
 """Demo script for ArxivCrawler functionality."""
 
 import asyncio
+
 from core import setup_logging
 from crawler.arxiv import (
     ArxivCrawler,
@@ -8,7 +9,7 @@ from crawler.arxiv import (
     OnDemandCrawlConfig,
     PeriodicCrawlConfig,
 )
-from crawler.database import setup_database_environment, SQLiteManager
+from crawler.database import SQLiteManager, setup_database_environment
 
 
 async def on_paper_crawled(paper):

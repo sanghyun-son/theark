@@ -21,7 +21,7 @@ class PaperRepository:
         """Initialize repository with database manager."""
         self.db = db_manager
 
-    def _row_to_paper(self, row: tuple) -> Paper:
+    def _row_to_paper(self, row: tuple[Any, ...]) -> Paper:
         """Convert database row to Paper model.
 
         Args:
@@ -138,7 +138,7 @@ class PaperRepository:
             List of matching papers
         """
         query = """
-        SELECT * FROM paper 
+        SELECT * FROM paper
         WHERE title LIKE ? OR abstract LIKE ?
         ORDER BY published_at DESC
         LIMIT ?
@@ -184,7 +184,7 @@ class SummaryRepository:
         """Initialize repository with database manager."""
         self.db = db_manager
 
-    def _row_to_summary(self, row: tuple) -> Summary:
+    def _row_to_summary(self, row: tuple[Any, ...]) -> Summary:
         """Convert database row to Summary model.
 
         Args:
@@ -220,7 +220,7 @@ class SummaryRepository:
         """
         query = """
         INSERT INTO summary (
-            paper_id, version, overview, motivation, method, result, 
+            paper_id, version, overview, motivation, method, result,
             conclusion, language, interests, relevance, model
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """
@@ -252,7 +252,7 @@ class SummaryRepository:
             Summary model or None if not found
         """
         query = """
-        SELECT * FROM summary 
+        SELECT * FROM summary
         WHERE paper_id = ? AND language = ?
         ORDER BY version DESC
         LIMIT 1
@@ -272,7 +272,7 @@ class UserRepository:
         """Initialize repository with database manager."""
         self.db = db_manager
 
-    def _row_to_user(self, row: tuple) -> AppUser:
+    def _row_to_user(self, row: tuple[Any, ...]) -> AppUser:
         """Convert database row to AppUser model.
 
         Args:
@@ -287,7 +287,7 @@ class UserRepository:
             display_name=row[2],
         )
 
-    def _row_to_interest(self, row: tuple) -> UserInterest:
+    def _row_to_interest(self, row: tuple[Any, ...]) -> UserInterest:
         """Convert database row to UserInterest model.
 
         Args:
@@ -303,7 +303,7 @@ class UserRepository:
             weight=row[3],
         )
 
-    def _row_to_star(self, row: tuple) -> UserStar:
+    def _row_to_star(self, row: tuple[Any, ...]) -> UserStar:
         """Convert database row to UserStar model.
 
         Args:
@@ -410,7 +410,7 @@ class UserRepository:
             List of user stars
         """
         query = """
-        SELECT * FROM user_star 
+        SELECT * FROM user_star
         WHERE user_id = ?
         ORDER BY created_at DESC
         LIMIT ?
@@ -432,7 +432,7 @@ class FeedRepository:
         """Initialize repository with database manager."""
         self.db = db_manager
 
-    def _row_to_feed_item(self, row: tuple) -> FeedItem:
+    def _row_to_feed_item(self, row: tuple[Any, ...]) -> FeedItem:
         """Convert database row to FeedItem model.
 
         Args:
@@ -487,7 +487,7 @@ class FeedRepository:
             List of feed items
         """
         query = """
-        SELECT * FROM feed_item 
+        SELECT * FROM feed_item
         WHERE user_id = ? AND feed_date = ?
         ORDER BY score DESC
         LIMIT ?
@@ -509,7 +509,7 @@ class CrawlEventRepository:
         """Initialize repository with database manager."""
         self.db = db_manager
 
-    def _row_to_crawl_event(self, row: tuple) -> CrawlEvent:
+    def _row_to_crawl_event(self, row: tuple[Any, ...]) -> CrawlEvent:
         """Convert database row to CrawlEvent model.
 
         Args:

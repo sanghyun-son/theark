@@ -2,7 +2,7 @@
 
 import asyncio
 import time
-from typing import TypeVar, Callable, Awaitable
+from typing import Awaitable, Callable, TypeVar
 
 from core.log import get_logger
 
