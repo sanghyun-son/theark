@@ -67,21 +67,17 @@ class ArxivClient:
         Raises:
             ArxivError: If arXiv ID cannot be extracted
         """
-        # Handle direct arXiv ID
         if re.match(r"^\d{4}\.\d{4,5}$", identifier):
             return identifier
 
-        # Handle abstract URLs
         abs_match = re.search(r"arxiv\.org/abs/(\d{4}\.\d{4,5})", identifier)
         if abs_match:
             return abs_match.group(1)
 
-        # Handle PDF URLs
         pdf_match = re.search(r"arxiv\.org/pdf/(\d{4}\.\d{4,5})", identifier)
         if pdf_match:
             return pdf_match.group(1)
 
-        # Handle full URLs with version numbers
         version_match = re.search(r"arxiv\.org/abs/(\d{4}\.\d{4,5})v\d+", identifier)
         if version_match:
             return version_match.group(1)

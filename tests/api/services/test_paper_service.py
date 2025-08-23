@@ -19,9 +19,7 @@ class TestPaperService:
         self.mock_summary_repo = MagicMock()  # Use MagicMock for sync methods
 
         # Configure mock database manager
-        self.mock_db_manager.get_paper_repository.return_value = (
-            self.mock_paper_repo
-        )
+        self.mock_db_manager.get_paper_repository.return_value = self.mock_paper_repo
         self.mock_db_manager.get_summary_repository.return_value = (
             self.mock_summary_repo
         )
@@ -73,9 +71,7 @@ class TestPaperService:
 
         # Mock crawler
         mock_crawler = AsyncMock()
-        mock_crawler.crawl_single_paper.return_value = (
-            self._create_mock_crawler_paper()
-        )
+        mock_crawler.crawl_single_paper.return_value = self._create_mock_crawler_paper()
         mock_crawler_class.return_value.__aenter__.return_value = mock_crawler
 
         paper_data = PaperCreate(arxiv_id="2508.01234")
@@ -98,9 +94,7 @@ class TestPaperService:
 
         # Mock crawler
         mock_crawler = AsyncMock()
-        mock_crawler.crawl_single_paper.return_value = (
-            self._create_mock_crawler_paper()
-        )
+        mock_crawler.crawl_single_paper.return_value = self._create_mock_crawler_paper()
         mock_crawler_class.return_value.__aenter__.return_value = mock_crawler
 
         paper_data = PaperCreate(url="https://arxiv.org/abs/2508.01234")

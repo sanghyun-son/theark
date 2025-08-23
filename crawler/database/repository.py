@@ -125,7 +125,7 @@ class PaperRepository:
         )
 
         cursor = self.db.execute(query, params)
-        return cursor.rowcount > 0  # type: ignore
+        return bool(cursor.rowcount > 0)
 
     def search_by_keywords(self, keywords: str, limit: int = 50) -> list[Paper]:
         """Search papers by keywords using simple LIKE search.

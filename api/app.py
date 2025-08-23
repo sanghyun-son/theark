@@ -1,5 +1,6 @@
 """Main FastAPI application."""
 
+import logging
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
@@ -7,10 +8,15 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from core import get_logger
+from core import get_logger, setup_logging
 from core.config import load_settings
 
 from .routers import common_router, main_router, papers_router
+
+# Setup logging based on environment
+settings = load_settings()
+log_level = getattr(logging, settings.log_level.upper(), logging.INFO)
+setup_logging(level=log_level, use_colors=True)
 
 logger = get_logger(__name__)
 

@@ -46,23 +46,17 @@ class ArxivParser:
 
         try:
             root = ElementTree.fromstring(xml_content)
-
-            # Check if there are any entries (papers)
-            entries = root.findall("atom:entry", self.namespace)
-            if not entries:
-                logger.warning(ERROR_NO_PAPERS_FOUND)
-                return None
-
-            # Parse the first entry (single paper response)
-            entry = entries[0]
-            return self._parse_entry(entry)
-
         except ElementTree.ParseError as e:
             logger.error(ERROR_FAILED_TO_PARSE_XML.format(e))
             return None
-        except Exception as e:
-            logger.error(f"Error parsing paper: {e}")
+
+        entries = root.findall("atom:entry", self.namespace)
+        if not entries:
+            logger.warning(ERROR_NO_PAPERS_FOUND)
             return None
+
+        entry = entries[0]
+        return self._parse_entry(entry)
 
     def _parse_entry(self, entry: ElementTree.Element) -> Paper:
         """Parse a single entry element into a Paper object.

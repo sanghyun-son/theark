@@ -37,8 +37,8 @@ def test_root_endpoint():
     """Test root endpoint."""
     response = client.get("/")
     assert response.status_code == 200
-    assert "TheArk API" in response.text
-    assert "Health Check" in response.text
+    assert "TheArk" in response.text
+    assert "Paper Management" in response.text
 
 
 def test_favicon_endpoint():
