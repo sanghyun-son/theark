@@ -1,14 +1,8 @@
 """API response models."""
 
-from typing import TYPE_CHECKING
-
 from pydantic import BaseModel, Field
 
-from core.models.domain.paper import Paper
-from core.models.domain.summary import SummaryContent
-
-if TYPE_CHECKING:
-    from crawler.database import Paper as CrawlerPaper
+from core.models.database.entities import PaperEntity, SummaryEntity
 
 
 class PaperResponse(BaseModel):
@@ -22,26 +16,11 @@ class PaperResponse(BaseModel):
     categories: list[str]
     pdf_url: str
     published_date: str | None = None
-    summary: SummaryContent | None = None
-
-    @classmethod
-    def from_domain_paper(cls, paper: Paper, paper_id: int = 0) -> "PaperResponse":
-        """Create PaperResponse from domain Paper model."""
-        return cls(
-            paper_id=paper_id,
-            arxiv_id=paper.metadata.arxiv_id,
-            title=paper.metadata.title,
-            authors=paper.metadata.authors,
-            abstract=paper.metadata.abstract,
-            categories=paper.metadata.categories,
-            pdf_url=paper.metadata.pdf_url or "",
-            published_date=paper.metadata.published_date,
-            summary=paper.summary.content if paper.summary else None,
-        )
+    summary: SummaryEntity | None = None
 
     @classmethod
     def from_crawler_paper(
-        cls, paper: "CrawlerPaper", summary: SummaryContent | None = None
+        cls, paper: "PaperEntity", summary: SummaryEntity | None = None
     ) -> "PaperResponse":
         """Create PaperResponse from crawler Paper model (legacy compatibility)."""
         return cls(
@@ -79,6 +58,15 @@ class CategoriesResponse(BaseModel):
 
     categories: list[str]
     count: int
+
+
+class SummaryReadResponse(BaseModel):
+    """Response model for marking summary as read."""
+
+    success: bool
+    message: str
+    summary_id: int
+    is_read: bool
 
 
 class AuthError(BaseModel):

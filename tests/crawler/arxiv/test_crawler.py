@@ -12,7 +12,7 @@ from crawler.arxiv.crawler import (
     CrawlStatus,
 )
 from crawler.arxiv.exceptions import ArxivNotFoundError
-from crawler.database import Paper
+from core.models.database.entities import PaperEntity as Paper
 
 
 class TestCrawlStatus:

@@ -26,6 +26,12 @@ class UIService {
         const paperDiv = document.createElement('div');
         paperDiv.className = 'paper-item';
         
+        // Add 'unread' class if summary exists and hasn't been read
+        // or paper.summary is null
+        if ((paper.summary && !paper.summary.is_read) || !paper.summary) {
+            paperDiv.classList.add('unread');
+        }
+        
         // Title with links on the left
         const titleRow = document.createElement('div');
         titleRow.style.display = 'flex';
@@ -82,8 +88,7 @@ class UIService {
         // Meta
         const metaDiv = document.createElement('div');
         metaDiv.className = 'paper-meta';
-        const publishedDate = paper.published_date ? new Date(paper.published_date).toLocaleDateString() : 'N/A';
-        metaDiv.innerHTML = `📅 ${publishedDate} | 👥 ${paper.authors.join(', ')}`;
+        metaDiv.innerHTML = `👥 ${paper.authors.join(', ')}`;
         metaDiv.title = paper.authors.join(', ');
         
         // Create container for meta and delete button
@@ -96,13 +101,25 @@ class UIService {
         
         paperDiv.appendChild(metaContainer);
         
-        // TLDR Summary
+        // TLDR Summary with relevance tag
         if (paper.summary) {
+            const tldrContainer = document.createElement('div');
+            tldrContainer.className = 'tldr-container';
+            tldrContainer.style.position = 'relative';
+            
+            // Add relevance tag if exists
+            if (paper.summary.relevance !== undefined && paper.summary.relevance !== null) {
+                const relevanceTag = this.createRelevanceTag(paper.summary.relevance, true);
+                tldrContainer.appendChild(relevanceTag);
+            }
+            
             const tldrDiv = document.createElement('div');
             tldrDiv.className = 'paper-tldr korean-text';
             tldrDiv.textContent = this.createTLDR(paper.summary);
             tldrDiv.onclick = () => this.showSummaryModal(paper);
-            paperDiv.appendChild(tldrDiv);
+            tldrContainer.appendChild(tldrDiv);
+            
+            paperDiv.appendChild(tldrContainer);
         }
         
         // Categories and delete button container
@@ -165,82 +182,37 @@ class UIService {
     }
 
     showSummaryModal(paper) {
-        // Create modal overlay
-        const overlay = document.createElement('div');
-        overlay.className = 'modal-overlay';
+        const modal = new SummaryModal(paper);
+        modal.show();
+    }
+
+    createRelevanceTag(score, isPaper = false) {
+        const tagContainer = document.createElement('div');
+        const tag = document.createElement('div');
         
-        // Create modal content
-        const modal = document.createElement('div');
-        modal.className = 'modal-content';
+        // Set CSS classes based on type
+        const containerClass = isPaper ? 'paper-relevance-tag-container' : 'relevance-tag-container';
+        const tagClass = isPaper ? 'paper-relevance-tag' : 'relevance-tag';
         
-        // Modal header
-        const header = document.createElement('div');
-        header.className = 'modal-header';
+        tagContainer.className = containerClass;
         
-        const title = document.createElement('div');
-        title.className = 'modal-title';
-        title.textContent = paper.title;
-        
-        const closeBtn = document.createElement('button');
-        closeBtn.className = 'modal-close';
-        closeBtn.textContent = '×';
-        closeBtn.onclick = () => document.body.removeChild(overlay);
-        
-        header.appendChild(title);
-        header.appendChild(closeBtn);
-        
-        // Modal body
-        const body = document.createElement('div');
-        body.className = 'modal-body';
-        
-        if (paper.summary) {
-            const summary = paper.summary;
-            body.innerHTML = `
-                <h3>📋 Overview</h3>
-                <p>${summary.overview || 'Not available'}</p>
-                
-                <h3>🎯 Motivation</h3>
-                <p>${summary.motivation || 'Not available'}</p>
-                
-                <h3>🔬 Method</h3>
-                <p>${summary.method || 'Not available'}</p>
-                
-                <h3>📊 Results</h3>
-                <p>${summary.result || 'Not available'}</p>
-                
-                <h3>💡 Conclusion</h3>
-                <p>${summary.conclusion || 'Not available'}</p>
-                
-                <h3>⭐ Relevance</h3>
-                <p>${summary.relevance || 'Not available'}</p>
-                
-                ${summary.relevance_score ? `<p><strong>Relevance Score:</strong> ${summary.relevance_score}/10</p>` : ''}
-            `;
+        // Handle score 0 (error case)
+        if (score === 0 || score === null || score === undefined) {
+            tag.className = `${tagClass} score-0`;
+            const scoreText = document.createElement('span');
+            scoreText.textContent = '-';
+            tag.appendChild(scoreText);
         } else {
-            body.innerHTML = '<p>No summary available for this paper.</p>';
+            // Add CSS class based on score
+            tag.className = `${tagClass} score-${score}`;
+            const scoreText = document.createElement('span');
+            scoreText.textContent = score.toString();
+            tag.appendChild(scoreText);
         }
         
-        modal.appendChild(header);
-        modal.appendChild(body);
-        overlay.appendChild(modal);
+        tagContainer.appendChild(tag);
         
-        // Close on overlay click
-        overlay.onclick = (e) => {
-            if (e.target === overlay) {
-                document.body.removeChild(overlay);
-            }
-        };
-        
-        // Close on Escape key
-        const handleEscape = (e) => {
-            if (e.key === 'Escape') {
-                document.body.removeChild(overlay);
-                document.removeEventListener('keydown', handleEscape);
-            }
-        };
-        document.addEventListener('keydown', handleEscape);
-        
-        document.body.appendChild(overlay);
+        return tagContainer;
     }
 
     renderCategories(categories) {
@@ -295,20 +267,19 @@ class UIService {
                 summarizeBtn.innerHTML = '⚡';
             }, 2000);
             
-            // Update the specific paper's summary immediately
-            if (result && result.arxiv_id) {
-                this.updatePaperElement(result.arxiv_id, result);
-            }
+            // For streaming, the paper handling is done in handleStreamingData
+            // This is just for button state update
+            console.log('Streaming success for paper:', result?.arxiv_id);
         } else {
             queueBtn.innerHTML = '✅ Queued!';
             setTimeout(() => {
                 queueBtn.innerHTML = '📋';
             }, 2000);
-        }
-        
-        // Reload papers after successful submission
-        if (window.paperManager) {
-            window.paperManager.loadPapers();
+            
+            // For queued papers, reload the list to show the new paper
+            if (window.paperManager) {
+                window.paperManager.loadPapers();
+            }
         }
     }
 
@@ -360,12 +331,7 @@ class UIService {
         }
     }
 
-    updateButtonStatus(message) {
-        const summarizeBtn = document.getElementById('summarize-btn');
-        if (summarizeBtn) {
-            summarizeBtn.innerHTML = `⏳ ${message}`;
-        }
-    }
+    // updateButtonStatus method removed - no longer needed for concurrent submissions
 
     removePaperElement(arxivId) {
         const paperElements = document.querySelectorAll('.paper-item');
@@ -378,18 +344,47 @@ class UIService {
         }
     }
 
+    addPaperElement(paperData) {
+        // Ensure DOM is ready
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', () => {
+                this.addPaperElement(paperData);
+            });
+            return;
+        }
+        
+        // Create the paper element
+        const paperElement = this.createPaperElement(paperData);
+        
+        // Add it to the beginning of the papers container
+        const papersContainer = document.getElementById('paper-list');
+        
+        if (papersContainer && paperElement) {
+            // Insert at the beginning
+            papersContainer.insertBefore(paperElement, papersContainer.firstChild);
+        }
+    }
+
     updatePaperElement(arxivId, paperData) {
         // Find the paper element by arXiv ID
         const paperElements = document.querySelectorAll('.paper-item');
         
         for (const paperElement of paperElements) {
-            // Find the arXiv ID in the title (it's in the format [arxivId] title)
-            const titleElement = paperElement.querySelector('.paper-title');
-            if (titleElement && titleElement.textContent.includes(`[${arxivId}]`)) {
+            // Find the arXiv ID in the idSpan within the title
+            const idSpan = paperElement.querySelector('.paper-title span');
+            
+            if (idSpan && idSpan.textContent === `[${arxivId}]`) {
                 // Remove loading indicator if exists
                 const loadingElement = paperElement.querySelector('.summary-loading');
                 if (loadingElement) {
                     loadingElement.remove();
+                }
+                
+                // Update 'unread' class on the paper item based on is_read status
+                if (paperData.summary && !paperData.summary.is_read) {
+                    paperElement.classList.add('unread');
+                } else {
+                    paperElement.classList.remove('unread');
                 }
                 
                 // Update the TLDR summary if it exists
@@ -402,7 +397,7 @@ class UIService {
                     } else {
                         // Create new TLDR element
                         tldrElement = document.createElement('div');
-                        tldrElement.className = 'paper-tldr';
+                        tldrElement.className = 'paper-tldr korean-text';
                         tldrElement.textContent = this.createTLDR(paperData.summary);
                         tldrElement.onclick = () => this.showSummaryModal(paperData);
                         
@@ -417,5 +412,160 @@ class UIService {
     }
 }
 
+// SummaryModal class for object-based modal management
+class SummaryModal {
+    constructor(paper) {
+        this.paper = paper;
+        this.overlay = null;
+        this.modal = null;
+        this.handleEscape = this.handleEscape.bind(this);
+    }
+
+    show() {
+        this.createModal();
+        this.setupEventListeners();
+        document.body.appendChild(this.overlay);
+    }
+
+    createModal() {
+        // Create modal overlay
+        this.overlay = document.createElement('div');
+        this.overlay.className = 'modal-overlay';
+        
+        // Create modal content
+        this.modal = document.createElement('div');
+        this.modal.className = 'modal-content';
+        
+        // Create header
+        const header = this.createHeader();
+        
+        // Create body
+        const body = this.createBody();
+        
+        this.modal.appendChild(header);
+        this.modal.appendChild(body);
+        this.overlay.appendChild(this.modal);
+    }
+
+    createHeader() {
+        const header = document.createElement('div');
+        header.className = 'modal-header';
+        
+        const title = document.createElement('div');
+        title.className = 'modal-title';
+        title.textContent = this.paper.title;
+        
+        const closeBtn = document.createElement('button');
+        closeBtn.className = 'modal-close';
+        closeBtn.textContent = '×';
+        closeBtn.onclick = () => this.close();
+        
+        header.appendChild(title);
+        header.appendChild(closeBtn);
+        
+        return header;
+    }
+
+    createBody() {
+        const body = document.createElement('div');
+        body.className = 'modal-body';
+        
+        if (this.paper.summary) {
+            const summary = this.paper.summary;
+            
+            // Add relevance tag at the top
+            if (summary.relevance !== undefined && summary.relevance !== null) {
+                const relevanceTag = window.UIService.prototype.createRelevanceTag(summary.relevance);
+                body.appendChild(relevanceTag);
+            }
+            
+            const summaryContent = this.createSummaryContent(summary);
+            body.appendChild(summaryContent);
+            
+            // Add AI model info at the bottom
+            if (summary.model) {
+                const modelInfo = this.createModelInfo(summary.model);
+                body.appendChild(modelInfo);
+            }
+        } else {
+            const noSummaryMsg = document.createElement('p');
+            noSummaryMsg.textContent = 'No summary available for this paper.';
+            body.appendChild(noSummaryMsg);
+        }
+        
+        return body;
+    }
+
+    createSummaryContent(summary) {
+        const sections = [
+            { title: '📋 Overview', content: summary.overview },
+            { title: '🎯 Motivation', content: summary.motivation },
+            { title: '🔬 Method', content: summary.method },
+            { title: '📊 Results', content: summary.result },
+            { title: '💡 Conclusion', content: summary.conclusion }
+        ];
+
+        const container = document.createElement('div');
+        
+        sections.forEach(section => {
+            const sectionDiv = document.createElement('div');
+            sectionDiv.className = 'summary-section';
+            
+            const title = document.createElement('h3');
+            title.textContent = section.title;
+            
+            const content = document.createElement('p');
+            content.textContent = section.content || 'Not available';
+            
+            sectionDiv.appendChild(title);
+            sectionDiv.appendChild(content);
+            container.appendChild(sectionDiv);
+        });
+
+        return container;
+    }
+
+
+
+    createModelInfo(model) {
+        const modelContainer = document.createElement('div');
+        modelContainer.className = 'model-info-container';
+        
+        const modelText = document.createElement('p');
+        modelText.className = 'model-info';
+        modelText.innerHTML = `by 🤖 ${model}`;
+        
+        modelContainer.appendChild(modelText);
+        
+        return modelContainer;
+    }
+
+    setupEventListeners() {
+        // Close on overlay click
+        this.overlay.onclick = (e) => {
+            if (e.target === this.overlay) {
+                this.close();
+            }
+        };
+        
+        // Close on Escape key
+        document.addEventListener('keydown', this.handleEscape);
+    }
+
+    handleEscape(e) {
+        if (e.key === 'Escape') {
+            this.close();
+        }
+    }
+
+    close() {
+        if (this.overlay && this.overlay.parentNode) {
+            document.body.removeChild(this.overlay);
+        }
+        document.removeEventListener('keydown', this.handleEscape);
+    }
+}
+
 // Export for use in other modules
 window.UIService = UIService;
+window.SummaryModal = SummaryModal;

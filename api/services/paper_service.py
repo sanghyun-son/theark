@@ -11,11 +11,11 @@ from core.models import (
     PaperDeleteResponse,
     PaperListResponse,
     PaperResponse,
+    SummaryEntity,
+    SummaryReadResponse,
 )
-from core.models import SummaryContent as PaperSummary
-from core.models import SummaryEntity as Summary
+from core.models.database.entities import PaperEntity
 from crawler.arxiv.on_demand_crawler import OnDemandCrawlConfig, OnDemandCrawler
-from crawler.database import Paper as CrawlerPaper
 from crawler.database import (
     PaperRepository,
     SummaryRepository,
@@ -72,7 +72,9 @@ class PaperService:
                 exc_info=True,
             )
 
-    async def create_paper(self, paper_data: PaperCreate) -> PaperResponse:
+    async def create_paper(
+        self, paper_data: PaperCreate, skip_auto_summarization: bool = False
+    ) -> PaperResponse:
         """Create a new paper."""
         arxiv_id = self._extract_arxiv_id(paper_data)
 
@@ -83,12 +85,13 @@ class PaperService:
 
         crawled_paper = await self._crawl_paper(arxiv_id)
 
-        if paper_data.summarize_now:
+        # Only start summarization if not skipped (e.g., when using streaming)
+        if paper_data.summarize_now and not skip_auto_summarization:
             self._start_summarization(crawled_paper, paper_data)
 
         return PaperResponse.from_crawler_paper(crawled_paper, None)
 
-    async def _crawl_paper(self, arxiv_id: str) -> CrawlerPaper:
+    async def _crawl_paper(self, arxiv_id: str) -> PaperEntity:
         """Crawl a single paper from arXiv."""
         if not self.db_manager:
             raise ValueError("Database manager not available")
@@ -105,7 +108,7 @@ class PaperService:
             return crawled_paper
 
     def _start_summarization(
-        self, crawled_paper: CrawlerPaper, paper_data: PaperCreate
+        self, crawled_paper: PaperEntity, paper_data: PaperCreate
     ) -> None:
         """Start background summarization for a paper."""
         if not self.summarization_service:
@@ -138,8 +141,8 @@ class PaperService:
         return PaperResponse.from_crawler_paper(paper, summary)
 
     def _get_paper_summary(
-        self, paper: CrawlerPaper, language: str = "Korean"
-    ) -> Optional[PaperSummary]:
+        self, paper: PaperEntity, language: str = "Korean"
+    ) -> Optional[SummaryEntity]:
         """Get summary for a paper in specified language."""
         if not paper.paper_id:
             return None
@@ -160,20 +163,12 @@ class PaperService:
             if not summary_obj:
                 return None
 
-            return PaperSummary(
-                overview=summary_obj.overview,
-                motivation=summary_obj.motivation,
-                method=summary_obj.method,
-                result=summary_obj.result,
-                conclusion=summary_obj.conclusion,
-                relevance=str(summary_obj.relevance),
-                relevance_score=summary_obj.relevance,
-            )
+            return summary_obj
         except Exception as e:
             logger.error(f"Error getting paper summary for {paper.arxiv_id}: {e}")
             return None
 
-    def _format_summary(self, summary_obj: Summary) -> str:
+    def _format_summary(self, summary_obj: SummaryEntity) -> str:
         """Format summary object into readable text."""
         summary_parts = []
         if summary_obj.overview:
@@ -268,7 +263,7 @@ class PaperService:
 
         raise ValueError("No URL provided")
 
-    def _get_paper_by_arxiv_id(self, arxiv_id: str) -> CrawlerPaper | None:
+    def _get_paper_by_arxiv_id(self, arxiv_id: str) -> PaperEntity | None:
         """Get paper by arXiv ID.
 
         Args:
@@ -286,7 +281,7 @@ class PaperService:
             logger.error(f"Error getting paper by arXiv ID {arxiv_id}: {e}")
             return None
 
-    def _get_paper_by_identifier(self, identifier: str) -> CrawlerPaper | None:
+    def _get_paper_by_identifier(self, identifier: str) -> PaperEntity | None:
         """Get paper by ID or arXiv ID."""
         try:
             self._ensure_db_connection(identifier)
@@ -308,7 +303,7 @@ class PaperService:
 
     async def _summarize_paper_async(
         self,
-        paper: CrawlerPaper,
+        paper: PaperEntity,
         force_resummarize: bool = False,
         language: str = "Korean",
     ) -> None:
@@ -355,7 +350,7 @@ class PaperService:
                 raise ValueError(f"Database connection failed: {e}")
 
     def _summary_exists(
-        self, paper: CrawlerPaper, language: str, force_resummarize: bool
+        self, paper: PaperEntity, language: str, force_resummarize: bool
     ) -> bool:
         """Check if summary already exists."""
         if not paper.paper_id:
@@ -387,7 +382,7 @@ class PaperService:
             return False
 
     async def _generate_summary(
-        self, paper: CrawlerPaper, language: str
+        self, paper: PaperEntity, language: str
     ) -> Optional[Any]:
         """Generate summary using the summarization service."""
         logger.info(f"Calling summarization service for paper {paper.arxiv_id}")
@@ -423,7 +418,7 @@ class PaperService:
             return None
 
     async def _save_summary(
-        self, paper: CrawlerPaper, summary_response: Any, language: str
+        self, paper: PaperEntity, summary_response: Any, language: str
     ) -> None:
         """Save summary to database."""
         if not paper.paper_id:
@@ -462,14 +457,14 @@ class PaperService:
             raise
 
     def _create_summary_model(
-        self, paper: CrawlerPaper, summary_response: Any, language: str
-    ) -> Summary:
+        self, paper: PaperEntity, summary_response: Any, language: str
+    ) -> SummaryEntity:
         """Create Summary model from response."""
         structured_data = summary_response.structured_summary
 
         if structured_data:
             logger.info(f"Using structured summary data for paper {paper.arxiv_id}")
-            return Summary(
+            return SummaryEntity(
                 paper_id=paper.paper_id or 0,
                 version=1,
                 overview=structured_data.tldr or "",
@@ -490,10 +485,11 @@ class PaperService:
                     if summary_response.metadata
                     else "unknown"
                 ),
+                is_read=False,  # New summaries are unread by default
             )
         else:
             logger.info(f"Using simple summary data for paper {paper.arxiv_id}")
-            return Summary(
+            return SummaryEntity(
                 paper_id=paper.paper_id or 0,
                 version=1,
                 overview=summary_response.summary or "",
@@ -509,7 +505,77 @@ class PaperService:
                     if summary_response.metadata
                     else "unknown"
                 ),
+                is_read=False,  # New summaries are unread by default
             )
+
+    async def get_summary(self, paper_id: int, summary_id: int) -> SummaryEntity:
+        """Get a specific summary by ID.
+
+        Args:
+            paper_id: Paper ID
+            summary_id: Summary ID
+
+        Returns:
+            Summary details
+
+        Raises:
+            ValueError: If summary not found or doesn't belong to the paper
+        """
+        self._ensure_db_connection(f"paper_{paper_id}")
+
+        if not self.summary_repo:
+            raise ValueError("Summary repository not available")
+
+        summary = self.summary_repo.get_by_id(summary_id)
+        if not summary:
+            raise ValueError(f"Summary {summary_id} not found")
+
+        if summary.paper_id != paper_id:
+            raise ValueError(
+                f"Summary {summary_id} does not belong to paper {paper_id}"
+            )
+
+        return summary
+
+    async def mark_summary_as_read(
+        self, paper_id: int, summary_id: int
+    ) -> "SummaryReadResponse":
+        """Mark a summary as read.
+
+        Args:
+            paper_id: Paper ID
+            summary_id: Summary ID
+
+        Returns:
+            Success status and updated read status
+
+        Raises:
+            ValueError: If summary not found or doesn't belong to the paper
+        """
+        self._ensure_db_connection(f"paper_{paper_id}")
+
+        if not self.summary_repo:
+            raise ValueError("Summary repository not available")
+
+        summary = self.summary_repo.get_by_id(summary_id)
+        if not summary:
+            raise ValueError(f"Summary {summary_id} not found")
+
+        if summary.paper_id != paper_id:
+            raise ValueError(
+                f"Summary {summary_id} does not belong to paper {paper_id}"
+            )
+
+        # Update the summary to mark it as read
+        summary.is_read = True
+        self.summary_repo.update(summary)
+
+        return SummaryReadResponse(
+            success=True,
+            message=f"Summary {summary_id} marked as read",
+            summary_id=summary_id,
+            is_read=True,
+        )
 
     async def close(self) -> None:
         """Close the service and cleanup resources."""

@@ -4,12 +4,13 @@ from dataclasses import dataclass
 from typing import Any, Awaitable, Callable
 
 from core import PeriodicTask, PeriodicTaskManager, get_logger
+from core.models.database.entities import PaperEntity
 from crawler.arxiv.constants import (
     DEFAULT_BACKGROUND_INTERVAL,
     DEFAULT_RECENT_PAPERS_LIMIT,
 )
 from crawler.arxiv.core import ArxivCrawlerCore, CrawlConfig, CrawlerStatus
-from crawler.database import DatabaseManager, Paper
+from crawler.database import DatabaseManager
 
 logger = get_logger(__name__)
 
@@ -87,7 +88,7 @@ class PeriodicCrawler:
         self,
         db_manager: DatabaseManager,
         config: PeriodicCrawlConfig | None = None,
-        on_paper_crawled: Callable[[Paper], Awaitable[None]] | None = None,
+        on_paper_crawled: Callable[[PaperEntity], Awaitable[None]] | None = None,
         on_error: Callable[[Exception], Awaitable[None]] | None = None,
     ):
         """Initialize the periodic crawler.
@@ -213,7 +214,7 @@ class PeriodicCrawler:
 
         await self._task_manager.start()
 
-    async def _on_paper_crawled(self, paper: Paper) -> None:
+    async def _on_paper_crawled(self, paper: PaperEntity) -> None:
         """Internal callback when paper is crawled.
 
         Args:

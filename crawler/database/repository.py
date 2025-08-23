@@ -6,12 +6,12 @@ from core.database import DatabaseManager
 from core.models import (
     CrawlEvent,
     FeedItem,
+    PaperEntity,
+    SummaryEntity,
+    UserEntity,
+    UserInterestEntity,
+    UserStarEntity,
 )
-from core.models import PaperEntity as Paper
-from core.models import SummaryEntity as Summary
-from core.models import UserEntity as AppUser
-from core.models import UserInterestEntity as UserInterest
-from core.models import UserStarEntity as UserStar
 
 
 class PaperRepository:
@@ -21,7 +21,7 @@ class PaperRepository:
         """Initialize repository with database manager."""
         self.db = db_manager
 
-    def _row_to_paper(self, row: tuple[Any, ...]) -> Paper:
+    def _row_to_paper(self, row: tuple[Any, ...]) -> PaperEntity:
         """Convert database row to Paper model.
 
         Args:
@@ -30,7 +30,7 @@ class PaperRepository:
         Returns:
             Paper model instance
         """
-        return Paper(
+        return PaperEntity(
             paper_id=row[0],
             arxiv_id=row[1],
             latest_version=row[2],
@@ -45,7 +45,7 @@ class PaperRepository:
             updated_at=row[11],
         )
 
-    def create(self, paper: Paper) -> int:
+    def create(self, paper: PaperEntity) -> int:
         """Create a new paper record.
 
         Args:
@@ -77,7 +77,7 @@ class PaperRepository:
         cursor = self.db.execute(query, params)
         return cursor.lastrowid  # type: ignore
 
-    def get_by_arxiv_id(self, arxiv_id: str) -> Paper | None:
+    def get_by_arxiv_id(self, arxiv_id: str) -> PaperEntity | None:
         """Get paper by arXiv ID.
 
         Args:
@@ -93,7 +93,7 @@ class PaperRepository:
             return self._row_to_paper(row)
         return None
 
-    def update(self, paper: Paper) -> bool:
+    def update(self, paper: PaperEntity) -> bool:
         """Update an existing paper.
 
         Args:
@@ -140,7 +140,7 @@ class PaperRepository:
         cursor = self.db.execute(query, (paper_id,))
         return bool(cursor.rowcount > 0)
 
-    def search_by_keywords(self, keywords: str, limit: int = 50) -> list[Paper]:
+    def search_by_keywords(self, keywords: str, limit: int = 50) -> list[PaperEntity]:
         """Search papers by keywords using simple LIKE search.
 
         Args:
@@ -166,7 +166,7 @@ class PaperRepository:
 
         return papers
 
-    def get_recent_papers(self, limit: int = 100) -> list[Paper]:
+    def get_recent_papers(self, limit: int = 100) -> list[PaperEntity]:
         """Get recent papers ordered by publication date.
 
         Args:
@@ -191,7 +191,7 @@ class PaperRepository:
 
     def get_papers_paginated(
         self, limit: int = 20, offset: int = 0
-    ) -> tuple[list[Paper], int]:
+    ) -> tuple[list[PaperEntity], int]:
         """Get papers with pagination, ordered by latest first.
 
         Args:
@@ -232,7 +232,7 @@ class SummaryRepository:
         """Initialize repository with database manager."""
         self.db = db_manager
 
-    def _row_to_summary(self, row: tuple[Any, ...]) -> Summary:
+    def _row_to_summary(self, row: tuple[Any, ...]) -> SummaryEntity:
         """Convert database row to Summary model.
 
         Args:
@@ -241,7 +241,7 @@ class SummaryRepository:
         Returns:
             Summary model instance
         """
-        return Summary(
+        return SummaryEntity(
             summary_id=row[0],
             paper_id=row[1],
             version=row[2],
@@ -254,10 +254,11 @@ class SummaryRepository:
             interests=row[9],
             relevance=row[10],
             model=row[11],
-            created_at=row[12],
+            is_read=bool(row[12]),
+            created_at=row[13],
         )
 
-    def create(self, summary: Summary) -> int:
+    def create(self, summary: SummaryEntity) -> int:
         """Create a new summary record.
 
         Args:
@@ -269,8 +270,8 @@ class SummaryRepository:
         query = """
         INSERT INTO summary (
             paper_id, version, overview, motivation, method, result,
-            conclusion, language, interests, relevance, model
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            conclusion, language, interests, relevance, model, is_read
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """
         params = (
             summary.paper_id,
@@ -284,12 +285,15 @@ class SummaryRepository:
             summary.interests,
             summary.relevance,
             summary.model,
+            summary.is_read,
         )
 
         cursor = self.db.execute(query, params)
         return cursor.lastrowid  # type: ignore
 
-    def get_by_paper_and_language(self, paper_id: int, language: str) -> Summary | None:
+    def get_by_paper_and_language(
+        self, paper_id: int, language: str
+    ) -> SummaryEntity | None:
         """Get summary by paper ID and language.
 
         Args:
@@ -312,7 +316,7 @@ class SummaryRepository:
             return self._row_to_summary(row)
         return None
 
-    def get_by_paper_id(self, paper_id: int) -> list[Summary]:
+    def get_by_paper_id(self, paper_id: int) -> list[SummaryEntity]:
         """Get all summaries for a paper.
 
         Args:
@@ -329,6 +333,58 @@ class SummaryRepository:
             summaries.append(self._row_to_summary(row))
 
         return summaries
+
+    def get_by_id(self, summary_id: int) -> SummaryEntity | None:
+        """Get summary by ID.
+
+        Args:
+            summary_id: Summary ID
+
+        Returns:
+            Summary model or None if not found
+        """
+        query = "SELECT * FROM summary WHERE summary_id = ?"
+        row = self.db.fetch_one(query, (summary_id,))
+
+        if row:
+            return self._row_to_summary(row)
+        return None
+
+    def update(self, summary: SummaryEntity) -> bool:
+        """Update a summary.
+
+        Args:
+            summary: Summary model with updated data
+
+        Returns:
+            True if updated, False if not found
+        """
+        if not summary.summary_id:
+            return False
+
+        query = """
+        UPDATE summary SET
+            overview = ?, motivation = ?, method = ?, result = ?,
+            conclusion = ?, language = ?, interests = ?, relevance = ?,
+            model = ?, is_read = ?
+        WHERE summary_id = ?
+        """
+        params = (
+            summary.overview,
+            summary.motivation,
+            summary.method,
+            summary.result,
+            summary.conclusion,
+            summary.language,
+            summary.interests,
+            summary.relevance,
+            summary.model,
+            summary.is_read,
+            summary.summary_id,
+        )
+
+        cursor = self.db.execute(query, params)
+        return bool(cursor.rowcount > 0)
 
     def delete(self, summary_id: int) -> bool:
         """Delete a summary by ID.
@@ -351,7 +407,7 @@ class UserRepository:
         """Initialize repository with database manager."""
         self.db = db_manager
 
-    def _row_to_user(self, row: tuple[Any, ...]) -> AppUser:
+    def _row_to_user(self, row: tuple[Any, ...]) -> UserEntity:
         """Convert database row to AppUser model.
 
         Args:
@@ -360,13 +416,13 @@ class UserRepository:
         Returns:
             AppUser model instance
         """
-        return AppUser(
+        return UserEntity(
             user_id=row[0],
             email=row[1],
             display_name=row[2],
         )
 
-    def _row_to_interest(self, row: tuple[Any, ...]) -> UserInterest:
+    def _row_to_interest(self, row: tuple[Any, ...]) -> UserInterestEntity:
         """Convert database row to UserInterest model.
 
         Args:
@@ -375,14 +431,14 @@ class UserRepository:
         Returns:
             UserInterest model instance
         """
-        return UserInterest(
+        return UserInterestEntity(
             user_id=row[0],
             kind=row[1],
             value=row[2],
             weight=row[3],
         )
 
-    def _row_to_star(self, row: tuple[Any, ...]) -> UserStar:
+    def _row_to_star(self, row: tuple[Any, ...]) -> UserStarEntity:
         """Convert database row to UserStar model.
 
         Args:
@@ -391,14 +447,14 @@ class UserRepository:
         Returns:
             UserStar model instance
         """
-        return UserStar(
+        return UserStarEntity(
             user_id=row[0],
             paper_id=row[1],
             note=row[2],
             created_at=row[3],
         )
 
-    def create_user(self, user: AppUser) -> int:
+    def create_user(self, user: UserEntity) -> int:
         """Create a new user.
 
         Args:
@@ -413,7 +469,7 @@ class UserRepository:
         cursor = self.db.execute(query, params)
         return cursor.lastrowid  # type: ignore
 
-    def get_user_by_email(self, email: str) -> AppUser | None:
+    def get_user_by_email(self, email: str) -> UserEntity | None:
         """Get user by email.
 
         Args:
@@ -429,7 +485,7 @@ class UserRepository:
             return self._row_to_user(row)
         return None
 
-    def add_interest(self, interest: UserInterest) -> None:
+    def add_interest(self, interest: UserInterestEntity) -> None:
         """Add or update user interest.
 
         Args:
@@ -447,7 +503,7 @@ class UserRepository:
         )
         self.db.execute(query, params)
 
-    def get_user_interests(self, user_id: int) -> list[UserInterest]:
+    def get_user_interests(self, user_id: int) -> list[UserInterestEntity]:
         """Get all interests for a user.
 
         Args:
@@ -465,7 +521,7 @@ class UserRepository:
 
         return interests
 
-    def add_star(self, star: UserStar) -> None:
+    def add_star(self, star: UserStarEntity) -> None:
         """Add a star/bookmark for a user.
 
         Args:
@@ -478,7 +534,7 @@ class UserRepository:
         params = (star.user_id, star.paper_id, star.note)
         self.db.execute(query, params)
 
-    def get_user_stars(self, user_id: int, limit: int = 100) -> list[UserStar]:
+    def get_user_stars(self, user_id: int, limit: int = 100) -> list[UserStarEntity]:
         """Get all stars for a user.
 
         Args:

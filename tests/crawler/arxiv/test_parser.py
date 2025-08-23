@@ -5,7 +5,7 @@ from xml.etree import ElementTree
 import pytest
 
 from crawler.arxiv.parser import ArxivParser
-from crawler.database import Paper
+from core.models.database.entities import PaperEntity as Paper
 
 
 class TestArxivParser:

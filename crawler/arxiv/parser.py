@@ -5,7 +5,7 @@ from datetime import datetime
 from xml.etree import ElementTree
 
 from core import get_logger
-from crawler.database import Paper
+from core.models.database.entities import PaperEntity
 
 from .constants import (
     ARXIV_ABS_BASE_URL,
@@ -31,7 +31,7 @@ class ArxivParser:
         # Register the arXiv namespace
         self.namespace = ARXIV_NAMESPACES
 
-    def parse_paper(self, xml_content: str) -> Paper | None:
+    def parse_paper(self, xml_content: str) -> PaperEntity | None:
         """Parse XML content and extract paper metadata.
 
         Args:
@@ -58,7 +58,7 @@ class ArxivParser:
         entry = entries[0]
         return self._parse_entry(entry)
 
-    def _parse_entry(self, entry: ElementTree.Element) -> Paper:
+    def _parse_entry(self, entry: ElementTree.Element) -> PaperEntity:
         """Parse a single entry element into a Paper object.
 
         Args:
@@ -90,7 +90,7 @@ class ArxivParser:
         url_pdf = f"{ARXIV_PDF_BASE_URL}/{arxiv_id}"
 
         # Create Paper object
-        paper = Paper(
+        paper = PaperEntity(
             arxiv_id=arxiv_id,
             title=title,
             abstract=abstract,

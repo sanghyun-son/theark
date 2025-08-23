@@ -5,9 +5,9 @@ import json
 from typing import AsyncGenerator
 
 from api.services.paper_service import PaperService
-from core.models import PaperCreateRequest as PaperCreate
-from core.models import PaperEntity as Paper
 from core.models import (
+    PaperCreateRequest,
+    PaperEntity,
     PaperResponse,
     StreamingCompleteEvent,
     StreamingErrorEvent,
@@ -23,16 +23,20 @@ class StreamingService:
         self.paper_service = paper_service
 
     async def stream_paper_creation(
-        self, paper_data: PaperCreate
+        self, paper_data: PaperCreateRequest
     ) -> AsyncGenerator[str, None]:
         """Stream paper creation and summarization process."""
         try:
             yield self._create_event(StreamingStatusEvent(message="Creating paper..."))
 
-            paper_response = await self.paper_service.create_paper(paper_data)
+            # Skip auto-summarization since we'll handle it explicitly in streaming
+            paper_response = await self.paper_service.create_paper(
+                paper_data, skip_auto_summarization=True
+            )
             yield self._create_event(
                 StreamingStatusEvent(message="Paper created successfully")
             )
+            yield self._create_event(StreamingCompleteEvent(paper=paper_response))
 
             paper = self.paper_service._get_paper_by_identifier(paper_response.arxiv_id)
             if not paper:
@@ -46,16 +50,15 @@ class StreamingService:
                     paper, paper_data, paper_response
                 ):
                     yield event
-            else:
-                yield self._create_event(
-                    StreamingCompleteEvent(paper=paper_response.model_dump())
-                )
 
         except Exception as e:
             yield self._create_event(StreamingErrorEvent(message=str(e)))
 
     async def _stream_summarization(
-        self, paper: Paper, paper_data: PaperCreate, paper_response: PaperResponse
+        self,
+        paper: PaperEntity,
+        paper_data: PaperCreateRequest,
+        paper_response: PaperResponse,
     ) -> AsyncGenerator[str, None]:
         """Stream the summarization process."""
         try:
@@ -83,9 +86,7 @@ class StreamingService:
             yield self._create_event(
                 StreamingErrorEvent(message=f"Summarization failed: {str(e)}")
             )
-            yield self._create_event(
-                StreamingCompleteEvent(paper=paper_response.model_dump())
-            )
+            yield self._create_event(StreamingCompleteEvent(paper=paper_response))
 
     async def _monitor_summarization_progress(
         self, summary_task: asyncio.Task[None]
@@ -100,7 +101,7 @@ class StreamingService:
     async def _handle_summarization_completion(
         self,
         summary_task: asyncio.Task[None],
-        paper: Paper,
+        paper: PaperEntity,
         paper_response: PaperResponse,
     ) -> AsyncGenerator[str, None]:
         """Handle summarization task completion."""
@@ -109,9 +110,7 @@ class StreamingService:
             yield self._create_event(StreamingStatusEvent(message="Summary completed!"))
 
             updated_paper = await self.paper_service.get_paper(paper.arxiv_id)
-            yield self._create_event(
-                StreamingCompleteEvent(paper=updated_paper.model_dump())
-            )
+            yield self._create_event(StreamingCompleteEvent(paper=updated_paper))
 
         except Exception as e:
             yield self._create_event(

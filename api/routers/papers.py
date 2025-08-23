@@ -13,7 +13,9 @@ from core.models import (
     PaperDeleteResponse,
     PaperListResponse,
     PaperResponse,
+    SummaryEntity,
 )
+from core.models.api.responses import SummaryReadResponse
 
 router = APIRouter(prefix="/v1/papers", tags=["papers"])
 
@@ -151,4 +153,62 @@ async def get_paper(request: Request, paper_identifier: str) -> PaperResponse:
         get_paper_operation,
         error_message="Failed to get paper",
         not_found_message="Paper not found",
+    )
+
+
+@router.get("/{paper_id}/summary/{summary_id}", response_model=SummaryEntity)
+async def get_summary(
+    request: Request, paper_id: int, summary_id: int
+) -> SummaryEntity:
+    """Get a specific summary by ID.
+
+    Args:
+        paper_id: Paper ID
+        summary_id: Summary ID
+
+    Returns:
+        Summary details
+
+    Raises:
+        HTTPException: If summary not found
+    """
+    paper_service: PaperService = request.app.state.paper_service
+
+    async def get_summary_operation() -> SummaryEntity:
+        return await paper_service.get_summary(paper_id, summary_id)
+
+    return await handle_async_api_operation(
+        get_summary_operation,
+        error_message="Failed to get summary",
+        not_found_message="Summary not found",
+    )
+
+
+@router.post(
+    "/{paper_id}/summary/{summary_id}/read", response_model=SummaryReadResponse
+)
+async def mark_summary_as_read(
+    request: Request, paper_id: int, summary_id: int
+) -> SummaryReadResponse:
+    """Mark a summary as read.
+
+    Args:
+        paper_id: Paper ID
+        summary_id: Summary ID
+
+    Returns:
+        Success status and updated read status
+
+    Raises:
+        HTTPException: If summary not found
+    """
+    paper_service: PaperService = request.app.state.paper_service
+
+    async def mark_read_operation() -> SummaryReadResponse:
+        return await paper_service.mark_summary_as_read(paper_id, summary_id)
+
+    return await handle_async_api_operation(
+        mark_read_operation,
+        error_message="Failed to mark summary as read",
+        not_found_message="Summary not found",
     )

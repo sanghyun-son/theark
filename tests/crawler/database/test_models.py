@@ -102,6 +102,26 @@ class TestSummary:
         assert summary.language == "English"
         assert summary.relevance == 8
         assert summary.model == "gpt-4"
+        assert summary.is_read is False  # Default value
+
+    def test_summary_with_read_status(self) -> None:
+        """Test creating a summary with read status."""
+        summary = SummaryEntity(
+            paper_id=1,
+            version=1,
+            overview="This paper presents a novel approach",
+            motivation="Current methods have limitations",
+            method="We propose a new neural network",
+            result="Our method achieves state-of-the-art results",
+            conclusion="This work opens new research directions",
+            language="English",
+            interests="machine learning,neural networks,nlp",
+            relevance=8,
+            model="gpt-4",
+            is_read=True,
+        )
+
+        assert summary.is_read is True
 
     def test_invalid_validation(self) -> None:
         """Test invalid field validation."""

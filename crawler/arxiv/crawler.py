@@ -5,6 +5,7 @@ from enum import Enum
 from typing import Any, Awaitable, Callable
 
 from core import get_logger
+from core.models.database.entities import PaperEntity
 from crawler.arxiv.core import SummarizationConfig
 from crawler.arxiv.on_demand_crawler import (
     OnDemandCrawlConfig,
@@ -16,7 +17,7 @@ from crawler.arxiv.periodic_crawler import (
     PeriodicCrawler,
     PeriodicCrawlerStatus,
 )
-from crawler.database import DatabaseManager, Paper
+from crawler.database import DatabaseManager
 
 logger = get_logger(__name__)
 
@@ -72,7 +73,7 @@ class ArxivCrawler:
         self,
         db_manager: DatabaseManager,
         config: CrawlConfig | None = None,
-        on_paper_crawled: Callable[[Paper], Awaitable[None]] | None = None,
+        on_paper_crawled: Callable[[PaperEntity], Awaitable[None]] | None = None,
         on_error: Callable[[Exception], Awaitable[None]] | None = None,
     ):
         """Initialize ArXiv crawler.
@@ -170,7 +171,7 @@ class ArxivCrawler:
         self.status = CrawlStatus.PAUSED
         logger.info("Background crawling loop stopped")
 
-    async def crawl_single_paper(self, identifier: str) -> Paper | None:
+    async def crawl_single_paper(self, identifier: str) -> PaperEntity | None:
         """Crawl a single paper by ID or URL.
 
         Args:
@@ -181,7 +182,7 @@ class ArxivCrawler:
         """
         return await self.on_demand_crawler.crawl_single_paper(identifier)
 
-    async def crawl_recent_papers(self, limit: int | None = None) -> list[Paper]:
+    async def crawl_recent_papers(self, limit: int | None = None) -> list[PaperEntity]:
         """Crawl the most recent papers.
 
         Args:
@@ -194,7 +195,7 @@ class ArxivCrawler:
 
     async def crawl_monthly_papers(
         self, year: int, month: int, limit: int | None = None
-    ) -> list[Paper]:
+    ) -> list[PaperEntity]:
         """Crawl papers from a specific month.
 
         Args:
@@ -209,7 +210,7 @@ class ArxivCrawler:
 
     async def crawl_yearly_papers(
         self, year: int, limit: int | None = None
-    ) -> list[Paper]:
+    ) -> list[PaperEntity]:
         """Crawl papers from a specific year.
 
         Args:
@@ -237,7 +238,7 @@ class ArxivCrawler:
             background_task_running=periodic_status.monitoring_active,
         )
 
-    async def _on_paper_crawled(self, paper: Paper) -> None:
+    async def _on_paper_crawled(self, paper: PaperEntity) -> None:
         """Internal callback when paper is crawled.
 
         Args:

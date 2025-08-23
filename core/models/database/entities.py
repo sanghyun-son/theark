@@ -63,6 +63,9 @@ class SummaryEntity(BaseModel):
     interests: str = Field(..., description="Comma-separated interests")
     relevance: int = Field(..., ge=0, le=10, description="Relevance score (0-10)")
     model: str | None = None
+    is_read: bool = Field(
+        default=False, description="Whether the summary has been read"
+    )
     created_at: str | None = None
 
     @field_validator("language")

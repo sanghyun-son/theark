@@ -35,9 +35,9 @@ class BaseSQLiteManager(DatabaseManager):
             )
             self.connection.row_factory = sqlite3.Row
             self._configure_connection()
-            self.logger.info(f"Connected to SQLite database: {self.db_path}")
+            logger.info(f"Connected to SQLite database: {self.db_path}")
         except sqlite3.Error as e:
-            self.logger.error(f"Failed to connect to SQLite database: {e}")
+            logger.error(f"Failed to connect to SQLite database: {e}")
             raise
 
     def disconnect(self) -> None:
@@ -45,7 +45,7 @@ class BaseSQLiteManager(DatabaseManager):
         if self.connection:
             self.connection.close()
             self.connection = None
-            self.logger.info("Disconnected from SQLite database")
+            logger.info("Disconnected from SQLite database")
 
     def _configure_connection(self) -> None:
         """Configure SQLite connection settings."""
@@ -87,7 +87,7 @@ class BaseSQLiteManager(DatabaseManager):
             self.connection.commit()
             return cursor
         except sqlite3.Error as e:
-            self.logger.error(f"Query execution failed: {e}")
+            logger.error(f"Query execution failed: {e}")
             self.connection.rollback()
             raise
 
@@ -106,7 +106,7 @@ class BaseSQLiteManager(DatabaseManager):
             cursor.executemany(query, params_list)
             self.connection.commit()
         except sqlite3.Error as e:
-            self.logger.error(f"Batch query execution failed: {e}")
+            logger.error(f"Batch query execution failed: {e}")
             self.connection.rollback()
             raise
 
@@ -133,7 +133,7 @@ class BaseSQLiteManager(DatabaseManager):
                 cursor.execute(query)
             return cursor.fetchone()  # type: ignore
         except sqlite3.Error as e:
-            self.logger.error(f"Fetch one failed: {e}")
+            logger.error(f"Fetch one failed: {e}")
             raise
 
     def fetch_all(
@@ -159,7 +159,7 @@ class BaseSQLiteManager(DatabaseManager):
                 cursor.execute(query)
             return cursor.fetchall()
         except sqlite3.Error as e:
-            self.logger.error(f"Fetch all failed: {e}")
+            logger.error(f"Fetch all failed: {e}")
             raise
 
     def __enter__(self) -> "BaseSQLiteManager":

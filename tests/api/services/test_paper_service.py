@@ -7,7 +7,7 @@ import pytest
 from api.services.paper_service import PaperService
 from core.models import PaperCreateRequest as PaperCreate
 from core.models import PaperDeleteResponse, PaperResponse
-from crawler.database import Paper as CrawlerPaper
+from core.models.database.entities import PaperEntity as CrawlerPaper
 
 
 class TestPaperService:

@@ -6,6 +6,7 @@ from datetime import datetime
 from typing import Any, Awaitable, Callable
 
 from core import AsyncRateLimiter, get_logger
+from core.models.database.entities import PaperEntity
 from crawler.arxiv.client import ArxivClient
 from crawler.arxiv.constants import (
     DEFAULT_MAX_RETRIES,
@@ -18,7 +19,6 @@ from crawler.database import (
     CrawlEvent,
     CrawlEventRepository,
     DatabaseManager,
-    Paper,
     PaperRepository,
     SummaryRepository,
 )
@@ -90,7 +90,7 @@ class ArxivCrawlerCore:
         self,
         db_manager: DatabaseManager,
         config: CrawlConfig | None = None,
-        on_paper_crawled: Callable[[Paper], Awaitable[None]] | None = None,
+        on_paper_crawled: Callable[[PaperEntity], Awaitable[None]] | None = None,
         on_error: Callable[[Exception], Awaitable[None]] | None = None,
     ):
         """Initialize the core crawler.
@@ -161,7 +161,7 @@ class ArxivCrawlerCore:
         logger.info("Stopping ArxivCrawlerCore...")
         logger.info("ArxivCrawlerCore stopped")
 
-    async def crawl_single_paper(self, identifier: str) -> Paper | None:
+    async def crawl_single_paper(self, identifier: str) -> PaperEntity | None:
         """Crawl a single paper by ID or URL.
 
         Args:
@@ -197,7 +197,7 @@ class ArxivCrawlerCore:
                 await self.on_error(e)
             return None
 
-    async def crawl_papers_batch(self, identifiers: list[str]) -> list[Paper]:
+    async def crawl_papers_batch(self, identifiers: list[str]) -> list[PaperEntity]:
         """Crawl multiple papers in a batch.
 
         Args:
@@ -211,7 +211,7 @@ class ArxivCrawlerCore:
         crawled_papers = []
 
         # Use rate limiter for concurrent crawling
-        async def crawl_with_rate_limit(identifier: str) -> Paper | None:
+        async def crawl_with_rate_limit(identifier: str) -> PaperEntity | None:
             await self.rate_limiter.wait()
             return await self.crawl_single_paper(identifier)
 
@@ -225,7 +225,7 @@ class ArxivCrawlerCore:
                 logger.error(f"Error crawling paper {identifiers[i]}: {result}")
                 if self.on_error:
                     await self.on_error(result)
-            elif isinstance(result, Paper):
+            elif isinstance(result, PaperEntity):
                 crawled_papers.append(result)
 
         logger.info(
@@ -272,7 +272,7 @@ class ArxivCrawlerCore:
                 logger.error(f"Failed to initialize summarization service: {e}")
                 # Don't fail the entire crawler if summarization fails
 
-    async def _crawl_paper(self, identifier: str) -> Paper | None:
+    async def _crawl_paper(self, identifier: str) -> PaperEntity | None:
         """Crawl a single paper and store in database.
 
         Args:
@@ -359,7 +359,7 @@ class ArxivCrawlerCore:
         except Exception as e:
             logger.error(f"Failed to record crawl event: {e}")
 
-    async def _summarize_paper(self, paper: Paper) -> None:
+    async def _summarize_paper(self, paper: PaperEntity) -> None:
         """Summarize a paper and store the summary in the database.
 
         Args:
@@ -398,7 +398,7 @@ class ArxivCrawlerCore:
                         raise RuntimeError("Summary repository not initialized")
 
                     # Create summary record
-                    from crawler.database import Summary
+                    from core.models.database.entities import SummaryEntity
 
                     # Convert relevance string to integer score
                     relevance_map = {
@@ -436,7 +436,7 @@ class ArxivCrawlerCore:
                         result = "Not available"
                         conclusion = "Not available"
 
-                    summary = Summary(
+                    summary = SummaryEntity(
                         paper_id=paper.paper_id,
                         version=1,
                         overview=overview,

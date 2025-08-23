@@ -124,12 +124,15 @@ class PaperManager {
     async submitPaperWithStreaming(requestData) {
         try {
             const responseBody = await this.apiService.createPaperWithStreaming(requestData);
+            
             const reader = responseBody.getReader();
             const decoder = new TextDecoder();
 
             while (true) {
                 const { done, value } = await reader.read();
-                if (done) break;
+                if (done) {
+                    break;
+                }
 
                 const chunk = decoder.decode(value);
                 const lines = chunk.split('\n');
@@ -153,10 +156,34 @@ class PaperManager {
     handleStreamingData(data) {
         switch (data.type) {
             case 'status':
-                this.uiService.updateButtonStatus(data.message);
+                // Button status updates removed - allow concurrent submissions
                 break;
             case 'complete':
-                this.uiService.showSuccess(true, data.paper);
+                // Add the paper to the list if it's not already there
+                if (data.paper && data.paper.arxiv_id) {
+                    const papers = this.infiniteScrollService.getPapers();
+                    const existingPaper = papers.find(p => p.arxiv_id === data.paper.arxiv_id);
+                    
+                    if (!existingPaper) {
+                        // Add new paper to the beginning of the list
+                        papers.unshift(data.paper);
+                        this.infiniteScrollService.setPapers(papers);
+                        
+                        // Add the paper element to the UI
+                        this.uiService.addPaperElement(data.paper);
+                    } else {
+                        // Update existing paper
+                        const paperIndex = papers.findIndex(p => p.arxiv_id === data.paper.arxiv_id);
+                        papers[paperIndex] = data.paper;
+                        this.infiniteScrollService.setPapers(papers);
+                        
+                        // Update the paper element in the UI
+                        this.uiService.updatePaperElement(data.paper.arxiv_id, data.paper);
+                        
+                        // Show success only for the final complete event (summary completion)
+                        this.uiService.showSuccess(true, data.paper);
+                    }
+                }
                 break;
             case 'error':
                 this.uiService.showError(data.message, true);

@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import Any, Awaitable, Callable
 
 from core import get_logger
+from core.models.database.entities import PaperEntity
 from crawler.arxiv.constants import (
     DEFAULT_MONTHLY_PAPERS_LIMIT,
     DEFAULT_RECENT_PAPERS_LIMIT,
@@ -14,7 +15,7 @@ from crawler.arxiv.core import (
     CrawlerStatus,
     SummarizationConfig,
 )
-from crawler.database import DatabaseManager, Paper
+from crawler.database import DatabaseManager
 
 logger = get_logger(__name__)
 
@@ -50,7 +51,7 @@ class OnDemandCrawler:
         self,
         db_manager: DatabaseManager,
         config: OnDemandCrawlConfig | None = None,
-        on_paper_crawled: Callable[[Paper], Awaitable[None]] | None = None,
+        on_paper_crawled: Callable[[PaperEntity], Awaitable[None]] | None = None,
         on_error: Callable[[Exception], Awaitable[None]] | None = None,
     ):
         """Initialize the on-demand crawler.
@@ -99,7 +100,7 @@ class OnDemandCrawler:
         await self.core.stop()
         logger.info("OnDemandCrawler stopped")
 
-    async def crawl_single_paper(self, identifier: str) -> Paper | None:
+    async def crawl_single_paper(self, identifier: str) -> PaperEntity | None:
         """Crawl a single paper by ID or URL.
 
         Args:
@@ -111,7 +112,7 @@ class OnDemandCrawler:
         logger.info(f"On-demand crawling single paper: {identifier}")
         return await self.core.crawl_single_paper(identifier)
 
-    async def crawl_papers_batch(self, identifiers: list[str]) -> list[Paper]:
+    async def crawl_papers_batch(self, identifiers: list[str]) -> list[PaperEntity]:
         """Crawl multiple papers in a batch.
 
         Args:
@@ -123,7 +124,7 @@ class OnDemandCrawler:
         logger.info(f"On-demand crawling batch of {len(identifiers)} papers")
         return await self.core.crawl_papers_batch(identifiers)
 
-    async def crawl_recent_papers(self, limit: int | None = None) -> list[Paper]:
+    async def crawl_recent_papers(self, limit: int | None = None) -> list[PaperEntity]:
         """Crawl the most recent papers (placeholder for future implementation).
 
         Args:
@@ -142,7 +143,7 @@ class OnDemandCrawler:
 
     async def crawl_monthly_papers(
         self, year: int, month: int, limit: int | None = None
-    ) -> list[Paper]:
+    ) -> list[PaperEntity]:
         """Crawl papers from a specific month (placeholder for future implementation).
 
         Args:
@@ -165,7 +166,7 @@ class OnDemandCrawler:
 
     async def crawl_yearly_papers(
         self, year: int, limit: int | None = None
-    ) -> list[Paper]:
+    ) -> list[PaperEntity]:
         """Crawl papers from a specific year.
 
         Args:
@@ -217,7 +218,7 @@ class OnDemandCrawler:
             },
         )
 
-    async def _on_paper_crawled(self, paper: Paper) -> None:
+    async def _on_paper_crawled(self, paper: PaperEntity) -> None:
         """Internal callback when paper is crawled.
 
         Args:

@@ -7,7 +7,6 @@ from core.models import (
     LLMRequest,
     LLMUsageStats,
 )
-from core.models import PaperEntity as Paper
 from core.models import SummaryEntity as Summary
 from core.models import UserEntity as AppUser
 from core.models import UserInterestEntity as UserInterest
@@ -41,7 +40,6 @@ __all__ = [
     "get_database_dir",
     "get_llm_database_path",
     "setup_database_environment",
-    "Paper",
     "Summary",
     "AppUser",
     "UserInterest",

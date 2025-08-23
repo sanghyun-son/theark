@@ -42,6 +42,7 @@ class SQLiteManager(BaseSQLiteManager):
                 interests     TEXT NOT NULL,
                 relevance     INTEGER NOT NULL,
                 model         TEXT,
+                is_read       BOOLEAN NOT NULL DEFAULT 0,
                 created_at    TEXT NOT NULL DEFAULT (datetime('now')),
                 UNIQUE (paper_id, version, language)
             )""",  # noqa: E501

@@ -95,15 +95,18 @@ class TestStreamingService:
         async for event in streaming_service.stream_paper_creation(sample_paper_data):
             events.append(event)
 
-        # Verify events - should get error when paper not found after creation
-        assert len(events) == 3  # status + status + error
+        # Verify events - should get complete first, then error when paper not found after creation
+        assert len(events) == 4  # status + status + complete + error
         assert "Creating paper..." in events[0]
         assert "Paper created successfully" in events[1]
-        assert "error" in events[2]
-        assert "Paper not found after creation" in events[2]
+        assert "complete" in events[2]
+        assert "error" in events[3]
+        assert "Paper not found after creation" in events[3]
 
         # Verify service calls
-        mock_paper_service.create_paper.assert_called_once_with(sample_paper_data)
+        mock_paper_service.create_paper.assert_called_once_with(
+            sample_paper_data, skip_auto_summarization=True
+        )
 
     @pytest.mark.asyncio
     async def test_stream_paper_creation_no_summarization_success(
@@ -132,7 +135,9 @@ class TestStreamingService:
         assert "1706.02677" in events[2]
 
         # Verify service calls
-        mock_paper_service.create_paper.assert_called_once_with(sample_paper_data)
+        mock_paper_service.create_paper.assert_called_once_with(
+            sample_paper_data, skip_auto_summarization=True
+        )
 
     @pytest.mark.asyncio
     async def test_stream_paper_creation_with_summarization(
@@ -176,7 +181,9 @@ class TestStreamingService:
         assert "complete" in events[-1]
 
         # Verify service calls
-        mock_paper_service.create_paper.assert_called_once_with(sample_paper_data)
+        mock_paper_service.create_paper.assert_called_once_with(
+            sample_paper_data, skip_auto_summarization=True
+        )
         mock_paper_service._summarize_paper_async.assert_called_once()
 
     @pytest.mark.asyncio
@@ -198,7 +205,7 @@ class TestStreamingService:
         assert "error" in events[1]
         assert "Service error" in events[1]
 
-    def test_create_event(self, streaming_service):
+    def test_create_event(self, streaming_service, sample_paper_response):
         """Test event creation."""
         status_event = StreamingStatusEvent(message="Test message")
         event_str = streaming_service._create_event(status_event)
@@ -207,8 +214,8 @@ class TestStreamingService:
         assert "Test message" in event_str
         assert event_str.endswith("\n\n")
 
-        complete_event = StreamingCompleteEvent(paper={"test": "data"})
+        complete_event = StreamingCompleteEvent(paper=sample_paper_response)
         event_str = streaming_service._create_event(complete_event)
 
         assert "complete" in event_str
-        assert "test" in event_str
+        assert "1706.02677" in event_str

@@ -4,9 +4,15 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from fastapi.testclient import TestClient
+from httpx import AsyncClient
 
 from api.app import app
-from core.models import PaperListResponse, PaperResponse
+from core.models import (
+    PaperListResponse,
+    PaperResponse,
+    SummaryEntity,
+    SummaryReadResponse,
+)
 
 
 @pytest.fixture
@@ -23,6 +29,8 @@ def mock_paper_service():
     service.create_paper = AsyncMock()
     service.get_paper = AsyncMock()
     service.delete_paper = AsyncMock()
+    service.get_summary = AsyncMock()
+    service.mark_summary_as_read = AsyncMock()
     return service
 
 
@@ -378,3 +386,78 @@ class TestStreamingEndpoints:
         # Should still return streaming response even on error
         assert response.status_code == 200
         assert response.headers["content-type"] == "text/plain; charset=utf-8"
+
+    def test_get_summary_success(self, client, mock_paper_service):
+        """Test successful summary retrieval."""
+        # Mock the paper service
+        app.state.paper_service = mock_paper_service
+
+        # Mock the get_summary method
+        mock_summary_response = SummaryEntity(
+            summary_id=1,
+            paper_id=1,
+            version=1,
+            overview="Test overview",
+            motivation="Test motivation",
+            method="Test method",
+            result="Test result",
+            conclusion="Test conclusion",
+            language="Korean",
+            interests="machine learning",
+            relevance=8,
+            model="gpt-4",
+            is_read=False,
+            created_at="2023-01-01T00:00:00Z",
+        )
+        mock_paper_service.get_summary.return_value = mock_summary_response
+
+        response = client.get("/v1/papers/1/summary/1")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["summary_id"] == 1
+        assert data["paper_id"] == 1
+        assert data["overview"] == "Test overview"
+        assert data["is_read"] is False
+
+    def test_get_summary_not_found(self, client, mock_paper_service):
+        """Test summary retrieval when summary not found."""
+        app.state.paper_service = mock_paper_service
+        mock_paper_service.get_summary.side_effect = ValueError("Summary 1 not found")
+
+        response = client.get("/v1/papers/1/summary/1")
+
+        assert response.status_code == 404
+        data = response.json()
+        assert "Summary 1 not found" in data["detail"]
+
+    def test_mark_summary_as_read_success(self, client, mock_paper_service):
+        """Test successful marking of summary as read."""
+        app.state.paper_service = mock_paper_service
+
+        mock_read_response = SummaryReadResponse(
+            success=True, message="Summary 1 marked as read", summary_id=1, is_read=True
+        )
+        mock_paper_service.mark_summary_as_read.return_value = mock_read_response
+
+        response = client.post("/v1/papers/1/summary/1/read")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["success"] is True
+        assert data["summary_id"] == 1
+        assert data["is_read"] is True
+        assert "marked as read" in data["message"]
+
+    def test_mark_summary_as_read_not_found(self, client, mock_paper_service):
+        """Test marking summary as read when summary not found."""
+        app.state.paper_service = mock_paper_service
+        mock_paper_service.mark_summary_as_read.side_effect = ValueError(
+            "Summary 1 not found"
+        )
+
+        response = client.post("/v1/papers/1/summary/1/read")
+
+        assert response.status_code == 404
+        data = response.json()
+        assert "Summary 1 not found" in data["detail"]
