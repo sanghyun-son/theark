@@ -1,9 +1,19 @@
 """Paper API endpoints router."""
 
-from fastapi import APIRouter, HTTPException, Request, status
+from typing import AsyncGenerator
 
-from api.models.paper import PaperCreate, PaperDeleteResponse, PaperResponse
+from fastapi import APIRouter, Query, Request
+from fastapi.responses import StreamingResponse
+
+from api.models.paper import (
+    PaperCreate,
+    PaperDeleteResponse,
+    PaperListResponse,
+    PaperResponse,
+)
 from api.services.paper_service import PaperService
+from api.services.streaming_service import StreamingService
+from api.utils.error_handler import handle_async_api_operation
 
 router = APIRouter(prefix="/v1/papers", tags=["papers"])
 
@@ -11,7 +21,40 @@ router = APIRouter(prefix="/v1/papers", tags=["papers"])
 # Database initialization will be handled in the main app startup
 
 
-@router.post("/", response_model=PaperResponse, status_code=status.HTTP_201_CREATED)
+@router.get("/", response_model=PaperListResponse)
+async def get_papers(
+    request: Request,
+    limit: int = Query(
+        default=20, ge=1, le=100, description="Number of papers to return"
+    ),
+    offset: int = Query(default=0, ge=0, description="Number of papers to skip"),
+    language: str = Query(default="Korean", description="Language for summaries"),
+) -> PaperListResponse:
+    """Get papers with pagination.
+
+    Args:
+        limit: Number of papers to return (1-100)
+        offset: Number of papers to skip
+
+    Returns:
+        List of papers with pagination metadata
+
+    Raises:
+        HTTPException: If retrieval fails
+    """
+    paper_service: PaperService = request.app.state.paper_service
+
+    async def get_papers_operation() -> PaperListResponse:
+        return await paper_service.get_papers(
+            limit=limit, offset=offset, language=language
+        )
+
+    return await handle_async_api_operation(
+        get_papers_operation, error_message="Failed to get papers"
+    )
+
+
+@router.post("/", response_model=PaperResponse, status_code=201)
 async def create_paper(request: Request, paper_data: PaperCreate) -> PaperResponse:
     """Create a new paper.
 
@@ -24,28 +67,69 @@ async def create_paper(request: Request, paper_data: PaperCreate) -> PaperRespon
     Raises:
         HTTPException: If paper creation fails
     """
-    try:
-        # TODO: Add validation logic here
-        # 1. Validate arXiv ID/URL format (handled by Pydantic model)
-        # 2. Check if paper already exists
-        # 3. Handle summarization queue logic
+    paper_service: PaperService = request.app.state.paper_service
 
-        # Get paper service from app state
-        paper_service: PaperService = request.app.state.paper_service
+    async def create_paper_operation() -> PaperResponse:
+        return await paper_service.create_paper(paper_data)
 
-        # Create paper using service
-        paper = await paper_service.create_paper(paper_data)
-        return paper
+    return await handle_async_api_operation(
+        create_paper_operation, error_message="Failed to create paper"
+    )
 
-    except ValueError as e:
-        # Handle validation errors
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
-    except Exception:
-        # Handle unexpected errors
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to create paper",
-        )
+
+@router.delete(
+    "/{paper_identifier}",
+    response_model=PaperDeleteResponse,
+    operation_id="delete_paper_by_identifier",
+)
+async def delete_paper(request: Request, paper_identifier: str) -> PaperDeleteResponse:
+    """Delete a paper by ID or arXiv ID.
+
+    Args:
+        paper_identifier: Paper ID or arXiv ID
+
+    Returns:
+        Deletion result with success status and message
+
+    Raises:
+        HTTPException: If deletion fails
+    """
+    paper_service: PaperService = request.app.state.paper_service
+
+    async def delete_paper_operation() -> PaperDeleteResponse:
+        return await paper_service.delete_paper(paper_identifier)
+
+    return await handle_async_api_operation(
+        delete_paper_operation,
+        error_message="Failed to delete paper",
+        not_found_message="Paper not found",
+    )
+
+
+@router.post("/stream-summary", status_code=200)
+async def stream_paper_summary(
+    request: Request, paper_data: PaperCreate
+) -> StreamingResponse:
+    """Create a paper and stream the summarization progress.
+
+    Args:
+        paper_data: Paper data to create
+
+    Returns:
+        Streaming response with summarization progress and final result
+    """
+    paper_service: PaperService = request.app.state.paper_service
+    streaming_service = StreamingService(paper_service)
+
+    async def generate_stream() -> AsyncGenerator[str, None]:
+        async for event in streaming_service.stream_paper_creation(paper_data):
+            yield event
+
+    return StreamingResponse(
+        generate_stream(),
+        media_type="text/plain",
+        headers={"Cache-Control": "no-cache", "Connection": "keep-alive"},
+    )
 
 
 @router.get("/{paper_identifier}", response_model=PaperResponse)
@@ -61,56 +145,13 @@ async def get_paper(request: Request, paper_identifier: str) -> PaperResponse:
     Raises:
         HTTPException: If paper not found
     """
-    try:
-        # Get paper service from app state
-        paper_service: PaperService = request.app.state.paper_service
+    paper_service: PaperService = request.app.state.paper_service
 
-        # Get paper using service
-        paper = await paper_service.get_paper(paper_identifier)
-        return paper
+    async def get_paper_operation() -> PaperResponse:
+        return await paper_service.get_paper(paper_identifier)
 
-    except ValueError as e:
-        # Handle not found errors
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
-    except Exception:
-        # Handle unexpected errors
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to get paper",
-        )
-
-
-@router.delete("/{paper_identifier}", response_model=PaperDeleteResponse)
-async def delete_paper(request: Request, paper_identifier: str) -> PaperDeleteResponse:
-    """Delete a paper by ID or arXiv ID.
-
-    Args:
-        paper_identifier: Paper ID or arXiv ID
-
-    Returns:
-        Deletion response with paper details
-
-    Raises:
-        HTTPException: If paper not found or deletion fails
-    """
-    try:
-        # TODO: Add validation logic here
-        # 1. Validate identifier format
-        # 2. Check if paper exists
-
-        # Get paper service from app state
-        paper_service: PaperService = request.app.state.paper_service
-
-        # Delete paper using service
-        result = await paper_service.delete_paper(paper_identifier)
-        return result
-
-    except ValueError as e:
-        # Handle not found errors
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
-    except Exception:
-        # Handle unexpected errors
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to delete paper",
-        )
+    return await handle_async_api_operation(
+        get_paper_operation,
+        error_message="Failed to get paper",
+        not_found_message="Paper not found",
+    )

@@ -1,6 +1,9 @@
 """Summarization service for paper abstracts."""
 
+import asyncio
 import os
+
+import httpx
 
 from core import get_logger
 from crawler.summarizer import (
@@ -80,14 +83,37 @@ class SummarizationService:
                 model=self.model,
             )
 
-            # Get summary from OpenAI
-            response = await self.summarizer.summarize(request)
+            # Get summary from OpenAI with retry logic
+            max_retries = 3
+            for attempt in range(max_retries):
+                try:
+                    response = await self.summarizer.summarize(request)
+                    logger.info(f"Successfully summarized paper {paper_id}")
+                    return response
+                except httpx.ReadTimeout as e:
+                    if attempt < max_retries - 1:
+                        wait_time = (attempt + 1) * 5  # 5, 10, 15 seconds
+                        logger.warning(
+                            f"Timeout on attempt {attempt + 1} for paper {paper_id}, "
+                            f"retrying in {wait_time} seconds: {e}"
+                        )
+                        await asyncio.sleep(wait_time)
+                    else:
+                        logger.error(
+                            f"All retry attempts failed for paper {paper_id}: {e}"
+                        )
+                        raise
+                except Exception as e:
+                    logger.error(
+                        f"Failed to summarize paper {paper_id}: {e}", exc_info=True
+                    )
+                    raise
 
-            logger.info(f"Successfully summarized paper {paper_id}")
-            return response
+            # This should never be reached, but mypy needs it
+            return None
 
         except Exception as e:
-            logger.error(f"Failed to summarize paper {paper_id}: {e}")
+            logger.error(f"Failed to summarize paper {paper_id}: {e}", exc_info=True)
             return None
 
     async def close(self) -> None:

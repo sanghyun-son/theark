@@ -130,6 +130,80 @@ class TestPaperService:
         mock_get_paper.assert_called_once_with("2508.01234")
 
     @pytest.mark.asyncio
+    async def test_get_papers_empty_db(self):
+        """Test getting papers from empty database."""
+        # Mock empty repository results
+        self.service.paper_repo.get_papers_paginated.return_value = ([], 0)
+
+        result = await self.service.get_papers(limit=10, offset=0)
+
+        assert result.total_count == 0
+        assert result.papers == []
+        assert result.limit == 10
+        assert result.offset == 0
+        assert result.has_more is False
+        self.service.paper_repo.get_papers_paginated.assert_called_once_with(10, 0)
+
+    @pytest.mark.asyncio
+    @patch("api.services.paper_service.PaperService._get_paper_summary")
+    async def test_get_papers_with_papers(self, mock_get_summary):
+        """Test getting papers with data."""
+        # Mock papers
+        mock_papers = [
+            self._create_mock_crawler_paper(),
+            self._create_mock_crawler_paper(),
+        ]
+        mock_papers[0].paper_id = 1
+        mock_papers[0].arxiv_id = "2508.01234"
+        mock_papers[1].paper_id = 2
+        mock_papers[1].arxiv_id = "2508.01235"
+
+        # Mock repository results
+        self.service.paper_repo.get_papers_paginated.return_value = (mock_papers, 2)
+
+        # Mock summary
+        mock_get_summary.return_value = None
+
+        result = await self.service.get_papers(limit=2, offset=0)
+
+        assert result.total_count == 2
+        assert len(result.papers) == 2
+        assert result.limit == 2
+        assert result.offset == 0
+        assert result.has_more is False
+        assert result.papers[0].arxiv_id == "2508.01234"
+        assert result.papers[1].arxiv_id == "2508.01235"
+
+    @pytest.mark.asyncio
+    @patch("api.services.paper_service.PaperService._get_paper_summary")
+    async def test_get_papers_with_more_available(self, mock_get_summary):
+        """Test getting papers when more are available."""
+        # Mock papers
+        mock_papers = [self._create_mock_crawler_paper()]
+
+        # Mock repository results (total_count > limit + offset)
+        self.service.paper_repo.get_papers_paginated.return_value = (mock_papers, 10)
+
+        # Mock summary
+        mock_get_summary.return_value = None
+
+        result = await self.service.get_papers(limit=5, offset=0)
+
+        assert result.total_count == 10
+        assert len(result.papers) == 1
+        assert result.limit == 5
+        assert result.offset == 0
+        assert result.has_more is True  # 10 > 5 + 0
+
+    @pytest.mark.asyncio
+    async def test_get_papers_no_repository(self):
+        """Test getting papers when repository is not available."""
+        self.service.paper_repo = None
+
+        with pytest.raises(ValueError, match="Paper repository not available"):
+            await self.service.get_papers()
+
+    @pytest.mark.asyncio
     @patch("api.services.paper_service.PaperService._get_paper_by_identifier")
     async def test_delete_paper_not_found(self, mock_get_paper) -> None:
         """Test deleting paper that doesn't exist."""

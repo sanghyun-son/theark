@@ -30,7 +30,8 @@ class OpenAISummarizer(AbstractSummarizer):
         """Initialize the OpenAI summarizer."""
         self.api_key = api_key
         self.base_url = base_url
-        self.client = httpx.AsyncClient()
+        # Increase timeout for OpenAI API calls (default is 5 seconds)
+        self.client = httpx.AsyncClient(timeout=httpx.Timeout(60.0))
 
     async def summarize(self, request: SummaryRequest) -> SummaryResponse:
         """Summarize the given abstract using OpenAI API."""

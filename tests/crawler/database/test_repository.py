@@ -70,6 +70,45 @@ class TestPaperRepository:
         assert recent[0].arxiv_id == "2101.00002"  # More recent
         assert recent[1].arxiv_id == "2101.00001"  # Less recent
 
+    def test_get_papers_paginated_empty_db(self, paper_repo) -> None:
+        """Test pagination with empty database."""
+        papers, total_count = paper_repo.get_papers_paginated(limit=10, offset=0)
+
+        assert papers == []
+        assert total_count == 0
+
+    def test_get_papers_paginated_with_papers(self, paper_repo, sample_papers) -> None:
+        """Test pagination with papers in database."""
+        # Create papers
+        for paper in sample_papers:
+            paper_repo.create(paper)
+
+        papers, total_count = paper_repo.get_papers_paginated(limit=2, offset=0)
+
+        assert len(papers) == 2
+        assert total_count == 2
+        # Should be ordered by paper_id DESC (latest first)
+        assert papers[0].paper_id > papers[1].paper_id
+
+    def test_get_papers_paginated_with_offset(self, paper_repo, sample_papers) -> None:
+        """Test pagination with offset."""
+        # Create papers
+        for paper in sample_papers:
+            paper_repo.create(paper)
+
+        papers, total_count = paper_repo.get_papers_paginated(limit=1, offset=1)
+
+        assert len(papers) == 1
+        assert total_count == 2
+        # Should get the second paper (offset=1)
+
+    def test_get_papers_paginated_default_values(self, paper_repo) -> None:
+        """Test pagination with default values."""
+        papers, total_count = paper_repo.get_papers_paginated()
+
+        assert papers == []
+        assert total_count == 0
+
 
 class TestSummaryRepository:
     """Test SummaryRepository."""

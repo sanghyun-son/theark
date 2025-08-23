@@ -127,6 +127,19 @@ class PaperRepository:
         cursor = self.db.execute(query, params)
         return bool(cursor.rowcount > 0)
 
+    def delete(self, paper_id: int) -> bool:
+        """Delete a paper by ID.
+
+        Args:
+            paper_id: Paper ID to delete
+
+        Returns:
+            True if deleted, False if not found
+        """
+        query = "DELETE FROM paper WHERE paper_id = ?"
+        cursor = self.db.execute(query, (paper_id,))
+        return bool(cursor.rowcount > 0)
+
     def search_by_keywords(self, keywords: str, limit: int = 50) -> list[Paper]:
         """Search papers by keywords using simple LIKE search.
 
@@ -175,6 +188,41 @@ class PaperRepository:
             papers.append(self._row_to_paper(row))
 
         return papers
+
+    def get_papers_paginated(
+        self, limit: int = 20, offset: int = 0
+    ) -> tuple[list[Paper], int]:
+        """Get papers with pagination, ordered by latest first.
+
+        Args:
+            limit: Number of papers to return
+            offset: Number of papers to skip
+
+        Returns:
+            Tuple of (papers list, total count)
+        """
+        # Get total count
+        count_query = "SELECT COUNT(*) FROM paper"
+        count_row = self.db.fetch_one(count_query, ())
+        if count_row is None:
+            total_count = 0
+        else:
+            total_count = count_row[0]
+
+        # Get papers with pagination
+        query = """
+        SELECT * FROM paper
+        ORDER BY paper_id DESC
+        LIMIT ? OFFSET ?
+        """
+
+        rows = self.db.fetch_all(query, (limit, offset))
+        papers = []
+
+        for row in rows:
+            papers.append(self._row_to_paper(row))
+
+        return papers, total_count
 
 
 class SummaryRepository:
@@ -263,6 +311,37 @@ class SummaryRepository:
         if row:
             return self._row_to_summary(row)
         return None
+
+    def get_by_paper_id(self, paper_id: int) -> list[Summary]:
+        """Get all summaries for a paper.
+
+        Args:
+            paper_id: Paper ID
+
+        Returns:
+            List of summaries for the paper
+        """
+        query = "SELECT * FROM summary WHERE paper_id = ? ORDER BY version DESC"
+        rows = self.db.fetch_all(query, (paper_id,))
+        summaries = []
+
+        for row in rows:
+            summaries.append(self._row_to_summary(row))
+
+        return summaries
+
+    def delete(self, summary_id: int) -> bool:
+        """Delete a summary by ID.
+
+        Args:
+            summary_id: Summary ID to delete
+
+        Returns:
+            True if deleted, False if not found
+        """
+        query = "DELETE FROM summary WHERE summary_id = ?"
+        cursor = self.db.execute(query, (summary_id,))
+        return bool(cursor.rowcount > 0)
 
 
 class UserRepository:

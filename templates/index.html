@@ -10,12 +10,9 @@
 </head>
 
 <body>
-    <!-- Main Content -->
-    <main class="main">
-        <div class="container">
-            <!-- Message Container -->
-            <div id="message-container"></div>
-
+    <div class="container">
+        <!-- Fixed Header -->
+        <header class="header">
             <!-- Input Form -->
             <form id="paper-form">
                 <div class="input-row">
@@ -29,11 +26,11 @@
                         title="Example: https://arxiv.org/abs/1706.03762" placeholder="arXiv URL" required>
                     <div class="btn-group">
                         <button type="button" id="summarize-btn" class="btn btn-primary">
-                            Summarize
+                            ⚡
                         </button>
                         <button type="button" id="queue-btn" class="btn btn-secondary"
                             title="The request will be batched and processed later.">
-                            Add to Queue
+                            📋
                         </button>
                     </div>
                 </div>
@@ -45,23 +42,30 @@
                     <!-- Category buttons will be dynamically loaded here -->
                 </div>
             </div>
+        </header>
 
-            <!-- Result Section -->
-            <section id="result-container" class="result-section hidden">
-                <h2 class="section-title">Paper Details</h2>
-                <!-- Results will be dynamically inserted here -->
-            </section>
-        </div>
-    </main>
+        <!-- Scrollable Content -->
+        <main class="content">
+            <div id="paper-list" class="paper-list">
+                <!-- Papers will be dynamically loaded here -->
+            </div>
+            <div id="pagination" class="pagination">
+                <!-- Pagination controls will be dynamically loaded here -->
+            </div>
+        </main>
 
-    <!-- Footer -->
-    <footer class="footer">
-        <div class="container">
+        <!-- Fixed Footer -->
+        <footer class="footer">
             <p>&copy; 2025 Sanghyun Son.</p>
-        </div>
-    </footer>
+        </footer>
+    </div>
 
-    <!-- JavaScript -->
+    <!-- JavaScript Modules -->
+    <script src="/static/js/api.js"></script>
+    <script src="/static/js/validation.js"></script>
+    <script src="/static/js/ui.js"></script>
+    <script src="/static/js/infinite-scroll.js"></script>
+    <script src="/static/js/paper-manager.js"></script>
     <script src="/static/js/main.js"></script>
 </body>
 

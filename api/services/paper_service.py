@@ -7,6 +7,7 @@ from typing import Any, Optional
 from api.models.paper import (
     PaperCreate,
     PaperDeleteResponse,
+    PaperListResponse,
     PaperResponse,
     PaperSummary,
 )
@@ -49,9 +50,14 @@ class PaperService:
         """Initialize summarization service."""
         try:
             self.summarization_service = SummarizationService()
-            logger.info("SummarizationService initialized")
+            logger.info("SummarizationService successfully initialized")
         except ValueError as e:
             logger.warning(f"SummarizationService not initialized: {e}")
+        except Exception as e:
+            logger.error(
+                f"Unexpected error initializing SummarizationService: {e}",
+                exc_info=True,
+            )
 
     async def create_paper(self, paper_data: PaperCreate) -> PaperResponse:
         """Create a new paper."""
@@ -118,14 +124,24 @@ class PaperService:
         summary = self._get_paper_summary(paper)
         return PaperResponse.from_crawler_paper(paper, summary)
 
-    def _get_paper_summary(self, paper: CrawlerPaper) -> Optional[PaperSummary]:
-        """Get summary for a paper."""
+    def _get_paper_summary(
+        self, paper: CrawlerPaper, language: str = "Korean"
+    ) -> Optional[PaperSummary]:
+        """Get summary for a paper in specified language."""
         if not self.summary_repo or not paper.paper_id:
             return None
 
+        # Try to get summary in the specified language first
         summary_obj = self.summary_repo.get_by_paper_and_language(
-            paper.paper_id, "English"
+            paper.paper_id, language
         )
+
+        # If not found, fall back to English
+        if not summary_obj and language != "English":
+            summary_obj = self.summary_repo.get_by_paper_and_language(
+                paper.paper_id, "English"
+            )
+
         if not summary_obj:
             return None
 
@@ -161,13 +177,65 @@ class PaperService:
         if not paper:
             raise ValueError(f"Paper not found: {paper_identifier}")
 
-        if self.paper_repo and paper.paper_id:
-            logger.info(f"Would delete paper {paper.arxiv_id} (ID: {paper.paper_id})")
+        if not self.paper_repo or not paper.paper_id:
+            raise ValueError("Paper repository not available")
 
-        return PaperDeleteResponse(
-            success=True,
-            message=f"Paper {paper.arxiv_id} deleted successfully",
-        )
+        try:
+            # Delete associated summaries first
+            if self.summary_repo:
+                summaries = self.summary_repo.get_by_paper_id(paper.paper_id)
+                for summary in summaries:
+                    if summary.summary_id is not None:
+                        self.summary_repo.delete(summary.summary_id)
+                logger.info(
+                    f"Deleted {len(summaries)} summaries for paper {paper.arxiv_id}"
+                )
+
+            # Delete the paper
+            self.paper_repo.delete(paper.paper_id)
+            logger.info(
+                f"Successfully deleted paper {paper.arxiv_id} (ID: {paper.paper_id})"
+            )
+
+            return PaperDeleteResponse(
+                success=True,
+                message=f"Paper {paper.arxiv_id} deleted successfully",
+            )
+        except Exception as e:
+            logger.error(f"Error deleting paper {paper.arxiv_id}: {e}")
+            raise ValueError(f"Failed to delete paper: {e}")
+
+    async def get_papers(
+        self, limit: int = 20, offset: int = 0, language: str = "Korean"
+    ) -> "PaperListResponse":
+        """Get papers with pagination."""
+        if not self.paper_repo:
+            raise ValueError("Paper repository not available")
+
+        try:
+            papers, total_count = self.paper_repo.get_papers_paginated(limit, offset)
+
+            # Convert to PaperResponse objects
+            paper_responses = []
+            for paper in papers:
+                summary = self._get_paper_summary(paper, language)
+                paper_response = PaperResponse.from_crawler_paper(paper, summary)
+                paper_responses.append(paper_response)
+
+            # Calculate has_more
+            has_more = (offset + limit) < total_count
+
+            return PaperListResponse(
+                papers=paper_responses,
+                total_count=total_count,
+                limit=limit,
+                offset=offset,
+                has_more=has_more,
+            )
+
+        except Exception as e:
+            logger.error(f"Error getting papers: {e}")
+            raise ValueError(f"Failed to get papers: {e}")
 
     def _extract_arxiv_id(self, paper_data: PaperCreate) -> str:
         """Extract arXiv ID from paper data."""
@@ -254,14 +322,24 @@ class PaperService:
 
     def _ensure_db_connection(self, arxiv_id: str) -> None:
         """Ensure database connection is active."""
+        if not self.db_manager:
+            logger.error(f"No database manager available for paper {arxiv_id}")
+            raise ValueError("Database manager not available")
+
         try:
-            if self.db_manager:
-                pass  # Database connection test removed to avoid test warnings
-        except Exception:
-            logger.info(f"Reconnecting database for paper {arxiv_id}")
-            if self.db_manager:
+            # Test database connection with a simple query
+            self.db_manager.execute("SELECT 1")
+        except Exception as e:
+            logger.info(f"Reconnecting database for paper {arxiv_id}: {e}")
+            try:
                 self.db_manager.connect()
                 self._initialize_repositories()
+            except Exception as reconnect_error:
+                logger.error(
+                    f"Failed to reconnect database for paper {arxiv_id}: "
+                    f"{reconnect_error}"
+                )
+                raise ValueError(f"Database connection failed: {reconnect_error}")
 
     def _summary_exists(
         self, paper: CrawlerPaper, language: str, force_resummarize: bool
@@ -287,20 +365,34 @@ class PaperService:
         logger.info(f"Calling summarization service for paper {paper.arxiv_id}")
 
         if not self.summarization_service:
+            logger.error(
+                f"No summarization service available for paper {paper.arxiv_id}"
+            )
             return None
 
-        summary_response = await self.summarization_service.summarize_paper(
-            paper_id=str(paper.paper_id),
-            abstract=paper.abstract,
-            language=language,
-            interest_section=self.settings.default_interests,
-        )
+        if not paper.abstract:
+            logger.error(f"No abstract available for paper {paper.arxiv_id}")
+            return None
 
-        logger.info(
-            f"Summary response received for paper {paper.arxiv_id}: "
-            f"{summary_response is not None}"
-        )
-        return summary_response
+        try:
+            summary_response = await self.summarization_service.summarize_paper(
+                paper_id=str(paper.paper_id),
+                abstract=paper.abstract,
+                language=language,
+                interest_section=self.settings.default_interests,
+            )
+
+            logger.info(
+                f"Summary response received for paper {paper.arxiv_id}: "
+                f"{summary_response is not None}"
+            )
+            return summary_response
+        except Exception as e:
+            logger.error(
+                f"Error generating summary for paper {paper.arxiv_id}: {e}",
+                exc_info=True,
+            )
+            return None
 
     async def _save_summary(
         self, paper: CrawlerPaper, summary_response: Any, language: str

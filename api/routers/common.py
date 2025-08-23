@@ -7,6 +7,7 @@ from fastapi import APIRouter, HTTPException, Request, status
 from fastapi.responses import FileResponse, HTMLResponse
 from pydantic import BaseModel
 
+from api.models.auth import AuthError
 from core import get_logger
 from core.config import load_settings
 
@@ -66,11 +67,11 @@ async def test_auth(request: Request) -> TestAuthResponse:
         if not auth_header or not auth_header.strip():
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail={
-                    "detail": "Authentication required",
-                    "error": "missing_auth_header",
-                    "environment": current_settings.environment.value,
-                },
+                detail=AuthError(
+                    detail="Authentication required",
+                    error="missing_auth_header",
+                    environment=current_settings.environment.value,
+                ).model_dump(),
             )
 
     auth_header = request.headers.get(current_settings.auth_header_name)
