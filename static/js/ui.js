@@ -99,7 +99,7 @@ class UIService {
         // TLDR Summary
         if (paper.summary) {
             const tldrDiv = document.createElement('div');
-            tldrDiv.className = 'paper-tldr';
+            tldrDiv.className = 'paper-tldr korean-text';
             tldrDiv.textContent = this.createTLDR(paper.summary);
             tldrDiv.onclick = () => this.showSummaryModal(paper);
             paperDiv.appendChild(tldrDiv);

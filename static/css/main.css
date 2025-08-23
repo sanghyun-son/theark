@@ -16,6 +16,16 @@ body {
     overflow: hidden;
 }
 
+/* Korean text font */
+.korean-text {
+    font-family:  'Consolas', 'Malgun Gothic', '맑은 고딕', 'Monaco', 'Courier New', monospace;
+}
+
+/* Modal content with Korean text */
+.modal-body p {
+    font-family:  'Consolas', 'Malgun Gothic', '맑은 고딕', 'Monaco', 'Courier New', monospace;
+}
+
 /* Container */
 .container {
     max-width: 1400px;
@@ -33,6 +43,7 @@ body {
     /* border-bottom: 1px solid #e1e5e9; */
     padding-top: 0.5rem;
     z-index: 100;
+    font-family:  'Consolas', 'Malgun Gothic', '맑은 고딕', 'Monaco', 'Courier New', monospace;
 }
 
 /* Scrollable content area */
@@ -66,6 +77,7 @@ body {
 /* Category filter */
 .category-filter {
     margin-bottom: 0.5rem;
+    font-family:  'Consolas', 'Malgun Gothic', '맑은 고딕', 'Monaco', 'Courier New', monospace;
 }
 
 /* Paper list */
@@ -101,6 +113,7 @@ body {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    font-family:  'Consolas', 'Malgun Gothic', '맑은 고딕', 'Monaco', 'Courier New', monospace;
 }
 
 .paper-meta {
@@ -110,6 +123,7 @@ body {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    font-family:  'Consolas', 'Malgun Gothic', '맑은 고딕', 'Monaco', 'Courier New', monospace;
 }
 
 .paper-abstract {
@@ -136,6 +150,7 @@ body {
     border-radius: 4px;
     font-size: 0.8rem;
     font-weight: 500;
+    font-family:  'Consolas', 'Malgun Gothic', '맑은 고딕', 'Monaco', 'Courier New', monospace;
 }
 
 .paper-links {
@@ -302,7 +317,7 @@ body {
     border-radius: 6px;
     background: #667eea;
     color: white;
-    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    font-family:  'Consolas', 'Malgun Gothic', '맑은 고딕', 'Monaco', 'Courier New', monospace;
     font-size: 0.9rem;
     cursor: pointer;
     transition: all 0.3s ease;
@@ -365,7 +380,7 @@ body {
     border-top: 1px solid #e1e5e9;
     text-align: right;
     color: #666;
-    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    font-family:  'Consolas', 'Malgun Gothic', '맑은 고딕', 'Monaco', 'Courier New', monospace;
     z-index: 100;
 }
 
@@ -384,6 +399,7 @@ body {
     gap: 1rem;
     align-items: center;
     flex-wrap: wrap;
+    font-family:  'Consolas', 'Malgun Gothic', '맑은 고딕', 'Monaco', 'Courier New', monospace;
 }
 
 .language-select {
@@ -392,7 +408,7 @@ body {
     border: 2px solid #e1e5e9;
     border-radius: 8px;
     font-size: 1rem;
-    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    font-family:  'Consolas', 'Malgun Gothic', '맑은 고딕', 'Monaco', 'Courier New', monospace;
     transition: border-color 0.3s ease, box-shadow 0.3s ease;
     cursor: pointer;
     background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e");
@@ -412,7 +428,7 @@ body {
     border: 2px solid #e1e5e9;
     border-radius: 8px;
     font-size: 1rem;
-    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    font-family:  'Consolas', 'Malgun Gothic', '맑은 고딕', 'Monaco', 'Courier New', monospace;
     transition: border-color 0.3s ease, box-shadow 0.3s ease;
 }
 
@@ -445,6 +461,7 @@ select.form-input {
     display: flex;
     gap: 0.5rem;
     flex-wrap: wrap;
+    font-family:  'Consolas', 'Malgun Gothic', '맑은 고딕', 'Monaco', 'Courier New', monospace;
 }
 
 .btn {
@@ -452,7 +469,7 @@ select.form-input {
     border: none;
     border-radius: 8px;
     font-size: 1rem;
-    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    font-family:  'Consolas', 'Malgun Gothic', '맑은 고딕', 'Monaco', 'Courier New', monospace;
     font-weight: 500;
     cursor: pointer;
     transition: all 0.3s ease;
@@ -574,7 +591,7 @@ select.form-input {
     border-radius: 8px;
     border: 1px solid #f5c6cb;
     margin-bottom: 1rem;
-    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    font-family:  'Consolas', 'Malgun Gothic', '맑은 고딕', 'Monaco', 'Courier New', monospace;
 }
 
 .success-message {
@@ -584,7 +601,7 @@ select.form-input {
     border-radius: 8px;
     border: 1px solid #c3e6cb;
     margin-bottom: 1rem;
-    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    font-family:  'Consolas', 'Malgun Gothic', '맑은 고딕', 'Monaco', 'Courier New', monospace;
 }
 
 /* Hidden class */

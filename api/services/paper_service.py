@@ -53,9 +53,17 @@ class PaperService:
         """Initialize summarization service."""
         try:
             self.summarization_service = SummarizationService(
-                db_manager=self.llm_db_manager
+                model=self.settings.llm_model,
+                base_url=self.settings.llm_api_base_url,
+                use_tools=self.settings.llm_use_tools,
+                db_manager=self.llm_db_manager,
             )
-            logger.info("SummarizationService successfully initialized")
+            logger.info(
+                f"SummarizationService successfully initialized with "
+                f"model={self.settings.llm_model}, "
+                f"base_url={self.settings.llm_api_base_url}, "
+                f"use_tools={self.settings.llm_use_tools}"
+            )
         except ValueError as e:
             logger.warning(f"SummarizationService not initialized: {e}")
         except Exception as e:

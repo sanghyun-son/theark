@@ -60,6 +60,18 @@ class Settings(BaseModel):
         description="Preset categories for paper filtering",
     )
 
+    # LLM Settings
+    llm_model: str = Field(
+        default="gpt-4o-mini", description="LLM model to use for summarization"
+    )
+    llm_api_base_url: str = Field(
+        default="https://api.openai.com/v1", description="LLM API base URL"
+    )
+    llm_use_tools: bool = Field(
+        default=True,
+        description="Whether to use function calling for structured output",
+    )
+
     def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         # Set auth_required based on environment
@@ -103,6 +115,9 @@ def load_settings() -> Settings:
     )
     preset_categories = [cat.strip() for cat in preset_categories_str.split(",")]
 
+    # Parse LLM use_tools from boolean string
+    llm_use_tools = os.getenv("THEARK_LLM_USE_TOOLS", "true").lower() == "true"
+
     return Settings(
         environment=Environment(os.getenv("THEARK_ENV", "development")),
         api_title=os.getenv("THEARK_API_TITLE", "TheArk API"),
@@ -116,6 +131,11 @@ def load_settings() -> Settings:
             "THEARK_DEFAULT_INTERESTS", "Machine Learning,Deep Learning"
         ),
         preset_categories=preset_categories,
+        llm_model=os.getenv("THEARK_LLM_MODEL", "gpt-4o-mini"),
+        llm_api_base_url=os.getenv(
+            "THEARK_LLM_API_BASE_URL", "https://api.openai.com/v1"
+        ),
+        llm_use_tools=llm_use_tools,
     )
 
 
