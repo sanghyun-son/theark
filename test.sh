@@ -55,6 +55,7 @@ echo "  core        Run core module tests"
 echo "  database    Run database module tests"
 echo "  arxiv       Run arXiv module tests"
 echo "  crawler     Run crawler module tests"
+echo "  api         Run API module tests"
 echo ""
 echo "Directory Examples:"
 echo "  tests/core/              # Run tests in core directory"
@@ -161,6 +162,10 @@ elif [[ -n "$TARGET" ]]; then
             print_info "Running crawler module tests..."
             $PYTEST_CMD tests/crawler/
             ;;
+        api)
+            print_info "Running API module tests..."
+            $PYTEST_CMD tests/api/
+            ;;
         *)
             # Check if it's a valid directory or file path
             if [[ -d "$TARGET" ]] || [[ -f "$TARGET" ]]; then
@@ -168,7 +173,7 @@ elif [[ -n "$TARGET" ]]; then
                 $PYTEST_CMD "$TARGET"
             else
                 print_error "Unknown target: $TARGET"
-                echo "Available predefined targets: core, database, arxiv, crawler"
+                echo "Available predefined targets: core, database, arxiv, crawler, api"
                 echo "Or use directory paths like: tests/core/, tests/crawler/database/"
                 exit 1
             fi

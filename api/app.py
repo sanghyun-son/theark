@@ -10,7 +10,7 @@ from fastapi.staticfiles import StaticFiles
 from core import get_logger
 from core.config import load_settings
 
-from .routers import common_router
+from .routers import common_router, papers_router
 
 logger = get_logger(__name__)
 
@@ -47,6 +47,7 @@ def create_app() -> FastAPI:
 
     app.mount("/static", StaticFiles(directory="static"), name="static")
     app.include_router(common_router)
+    app.include_router(papers_router)
     return app
 
 
