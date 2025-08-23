@@ -1,17 +1,15 @@
 #!/bin/bash
 
-# TheArk API Server Launcher
 set -e
 
 echo "🚀 Starting TheArk API Server..."
 
-# Default values
 HOST="0.0.0.0"
 PORT="8000"
 RELOAD="--reload"
 LOG_LEVEL="info"
+ENV="development"
 
-# Parse command line arguments
 while [[ $# -gt 0 ]]; do
     case $1 in
         --host)
@@ -30,9 +28,16 @@ while [[ $# -gt 0 ]]; do
             LOG_LEVEL="$2"
             shift 2
             ;;
-        --prod)
+        --prod|--production)
             RELOAD=""
             LOG_LEVEL="warning"
+            ENV="production"
+            shift
+            ;;
+        --dev|--development)
+            RELOAD="--reload"
+            LOG_LEVEL="info"
+            ENV="development"
             shift
             ;;
         -h|--help)
@@ -44,6 +49,7 @@ while [[ $# -gt 0 ]]; do
             echo "  --no-reload        Disable auto-reload"
             echo "  --log-level LEVEL  Log level (default: info)"
             echo "  --prod             Production mode (no reload, warning log level)"
+            echo "  --dev              Development mode (reload enabled, info log level)"
             echo "  -h, --help         Show this help message"
             echo ""
             echo "Examples:"
@@ -61,24 +67,23 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# Check if uv is available
 if ! command -v uv &> /dev/null; then
     echo "❌ Error: uv is not installed or not in PATH"
     echo "Please install uv: https://docs.astral.sh/uv/getting-started/installation/"
     exit 1
 fi
 
-# Set environment variables
 export PYTHONPATH="${PYTHONPATH:+${PYTHONPATH}:}$(pwd)"
+export THEARK_ENV="$ENV"
 
 echo "📊 Server Configuration:"
 echo "   Host: $HOST"
 echo "   Port: $PORT"
+echo "   Environment: $ENV"
 echo "   Reload: $([ -n "$RELOAD" ] && echo "enabled" || echo "disabled")"
 echo "   Log Level: $LOG_LEVEL"
 echo ""
 
-# Start the server
 echo "🔥 Launching uvicorn server..."
 uv run uvicorn api.app:app \
     --host "$HOST" \

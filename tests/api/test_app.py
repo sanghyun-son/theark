@@ -26,9 +26,7 @@ def test_openapi_schema():
 
 def test_cors_headers():
     """Test CORS headers are set."""
-    response = client.get(
-        "/health", headers={"Origin": "http://localhost:3000"}
-    )
+    response = client.get("/health", headers={"Origin": "http://localhost:3000"})
     assert response.status_code == 200
     # CORS headers should be present in the response
     assert "access-control-allow-origin" in response.headers

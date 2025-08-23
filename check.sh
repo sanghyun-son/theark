@@ -91,7 +91,8 @@ done
 
 # Function to run type checking
 run_typecheck() {
-    print_status "Running type checking with mypy..."
+    echo "[mypy]"
+    print_status "Running type checking..."
     if $VERBOSE; then
         if uv run mypy $SOURCE_DIRS --ignore-missing-imports --strict; then
             print_success "Type checking passed"
@@ -111,7 +112,8 @@ run_typecheck() {
 
 # Function to run linting
 run_linting() {
-    print_status "Running linting with flake8..."
+    echo "[flake8]"
+    print_status "Running linting..."
     if $VERBOSE; then
         if uv run flake8 $SOURCE_DIRS; then
             print_success "Linting passed"
@@ -126,7 +128,8 @@ run_linting() {
         fi
     fi
     
-    print_status "Running security checks with bandit..."
+    echo "[bandit]"
+    print_status "Running security checks..."
     if $VERBOSE; then
         uv run bandit -r $SOURCE_DIRS -f json -o bandit-report.json || true
     else
@@ -137,7 +140,8 @@ run_linting() {
 
 # Function to run formatting checks
 run_formatting() {
-    print_status "Checking code formatting with black..."
+    echo "[black]"  
+    print_status "Checking code formatting..."
     if $VERBOSE; then
         if uv run black --check $SOURCE_DIRS examples/; then
             print_success "Code formatting check passed"
@@ -154,7 +158,8 @@ run_formatting() {
         fi
     fi
     
-    print_status "Checking import sorting with isort..."
+    echo "[isort]"
+    print_status "Checking import sorting..."
     if $VERBOSE; then
         if uv run isort --check-only $SOURCE_DIRS examples/; then
             print_success "Import sorting check passed"

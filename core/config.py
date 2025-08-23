@@ -1,0 +1,96 @@
+"""Configuration management for the theark system."""
+
+import os
+from enum import Enum
+from typing import Any
+
+from dotenv import load_dotenv
+from pydantic import BaseModel, Field
+
+
+class Environment(str, Enum):
+    """Application environment types."""
+
+    DEVELOPMENT = "development"
+    PRODUCTION = "production"
+    TESTING = "testing"
+
+
+class Settings(BaseModel):
+    """Application settings."""
+
+    # Environment
+    environment: Environment = Field(
+        default=Environment.DEVELOPMENT,
+        description="Application environment (development/production/testing)",
+    )
+
+    # API Settings
+    api_title: str = Field(default="TheArk API", description="API title")
+    api_version: str = Field(default="1.0.0", description="API version")
+
+    # CORS Settings
+    cors_allow_origins: list[str] = Field(
+        default=["*"], description="Allowed CORS origins"
+    )
+
+    # Auth Settings
+    auth_required: bool = Field(
+        default=False, description="Whether authentication is required"
+    )
+    auth_header_name: str = Field(
+        default="Authorization", description="Authentication header name"
+    )
+
+    # Logging
+    log_level: str = Field(default="INFO", description="Logging level")
+
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+        # Set auth_required based on environment
+        if self.environment == Environment.PRODUCTION:
+            self.auth_required = True
+
+    @property
+    def is_development(self) -> bool:
+        """Check if running in development mode."""
+        return self.environment == Environment.DEVELOPMENT
+
+    @property
+    def is_production(self) -> bool:
+        """Check if running in production mode."""
+        return self.environment == Environment.PRODUCTION
+
+    @property
+    def is_testing(self) -> bool:
+        """Check if running in testing mode."""
+        return self.environment == Environment.TESTING
+
+
+def load_settings() -> Settings:
+    """Load settings from environment variables."""
+
+    # Load .env file if it exists
+    load_dotenv()
+
+    # Parse CORS origins from comma-separated string
+    cors_origins_str = os.getenv("THEARK_CORS_ORIGINS", "*")
+    if cors_origins_str == "*":
+        cors_origins = ["*"]
+    else:
+        cors_origins = [origin.strip() for origin in cors_origins_str.split(",")]
+
+    auth_required = os.getenv("THEARK_AUTH_REQUIRED", "false").lower() == "true"
+    return Settings(
+        environment=Environment(os.getenv("THEARK_ENV", "development")),
+        api_title=os.getenv("THEARK_API_TITLE", "TheArk API"),
+        api_version=os.getenv("THEARK_API_VERSION", "1.0.0"),
+        cors_allow_origins=cors_origins,
+        auth_required=auth_required,
+        auth_header_name=os.getenv("THEARK_AUTH_HEADER", "Authorization"),
+        log_level=os.getenv("THEARK_LOG_LEVEL", "INFO"),
+    )
+
+
+# Global settings instance
+settings = load_settings()
