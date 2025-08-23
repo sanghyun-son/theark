@@ -1,18 +1,18 @@
 """Paper API endpoints router."""
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Request, status
 
 from api.models.paper import PaperCreate, PaperDeleteResponse, PaperResponse
 from api.services.paper_service import PaperService
 
 router = APIRouter(prefix="/v1/papers", tags=["papers"])
 
-# Initialize paper service
-paper_service = PaperService()
+
+# Database initialization will be handled in the main app startup
 
 
 @router.post("/", response_model=PaperResponse, status_code=status.HTTP_201_CREATED)
-async def create_paper(paper_data: PaperCreate) -> PaperResponse:
+async def create_paper(request: Request, paper_data: PaperCreate) -> PaperResponse:
     """Create a new paper.
 
     Args:
@@ -30,6 +30,9 @@ async def create_paper(paper_data: PaperCreate) -> PaperResponse:
         # 2. Check if paper already exists
         # 3. Handle summarization queue logic
 
+        # Get paper service from app state
+        paper_service: PaperService = request.app.state.paper_service
+
         # Create paper using service
         paper = await paper_service.create_paper(paper_data)
         return paper
@@ -46,7 +49,7 @@ async def create_paper(paper_data: PaperCreate) -> PaperResponse:
 
 
 @router.delete("/{paper_identifier}", response_model=PaperDeleteResponse)
-async def delete_paper(paper_identifier: str) -> PaperDeleteResponse:
+async def delete_paper(request: Request, paper_identifier: str) -> PaperDeleteResponse:
     """Delete a paper by ID or arXiv ID.
 
     Args:
@@ -62,6 +65,9 @@ async def delete_paper(paper_identifier: str) -> PaperDeleteResponse:
         # TODO: Add validation logic here
         # 1. Validate identifier format
         # 2. Check if paper exists
+
+        # Get paper service from app state
+        paper_service: PaperService = request.app.state.paper_service
 
         # Delete paper using service
         result = await paper_service.delete_paper(paper_identifier)

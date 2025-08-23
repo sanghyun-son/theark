@@ -21,7 +21,28 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     current_settings = load_settings()
     logger.info(f"TheArk API server starting up in {current_settings.environment} mode")
     logger.info(f"Authentication required: {current_settings.auth_required}")
+
+    # Initialize database
+    from api.services.paper_service import PaperService
+    from crawler.database.config import get_database_path
+    from crawler.database.sqlite_manager import SQLiteManager
+
+    db_path = get_database_path()
+    db_manager = SQLiteManager(db_path)
+    db_manager.connect()
+    db_manager.create_tables()
+
+    # Store in app state for access in routers
+    app.state.db_manager = db_manager
+    app.state.paper_service = PaperService(db_manager=db_manager)
+
+    logger.info("Database initialized successfully")
+
     yield
+
+    # Cleanup
+    await app.state.paper_service.close()
+    db_manager.disconnect()
     logger.info("TheArk API server shutting down")
 
 

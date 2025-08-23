@@ -103,9 +103,7 @@ class TestPaperResponse:
             updated_at="2023-08-01T00:00:00Z",
         )
 
-        response = PaperResponse.from_crawler_paper(
-            crawler_paper, "Test summary"
-        )
+        response = PaperResponse.from_crawler_paper(crawler_paper, "Test summary")
 
         assert response.id == "1"
         assert response.arxiv_id == "2508.01234"
