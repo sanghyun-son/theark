@@ -13,24 +13,22 @@ class TestPaperService:
 
     def setup_method(self) -> None:
         """Set up test fixtures."""
-        # Create mock database manager
-        self.mock_db_manager = AsyncMock()
-        self.mock_paper_repo = MagicMock()  # Use MagicMock for sync methods
-        self.mock_summary_repo = MagicMock()  # Use MagicMock for sync methods
-
-        # Configure mock database manager
-        self.mock_db_manager.get_paper_repository.return_value = self.mock_paper_repo
-        self.mock_db_manager.get_summary_repository.return_value = (
-            self.mock_summary_repo
-        )
+        # Create mock database manager (SQLiteManager is sync, not async)
+        self.mock_db_manager = MagicMock()
+        self.mock_paper_repo = MagicMock()
+        self.mock_summary_repo = MagicMock()
 
         # Create service with mock database manager
         self.service = PaperService(db_manager=self.mock_db_manager)
 
+        # Mock repositories directly
+        self.service.paper_repo = self.mock_paper_repo
+        self.service.summary_repo = self.mock_summary_repo
+
         # Mock summarization service
         self.service.summarization_service = AsyncMock()
 
-        # Configure default mock behavior - ensure sync methods return actual values
+        # Configure default mock behavior
         self.mock_paper_repo.get_by_arxiv_id.return_value = None
 
     def test_extract_arxiv_id_from_arxiv_id(self) -> None:
