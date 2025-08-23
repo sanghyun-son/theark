@@ -28,10 +28,18 @@ class PaperManager {
             queueBtn.addEventListener('click', () => this.submitPaper(false));
         }
 
-        // URL input validation
+        // URL input validation and Enter key support
         const urlInput = document.getElementById('paper-url');
         if (urlInput) {
             urlInput.addEventListener('input', () => this.validateUrl());
+            
+            // Add Enter key support for URL input
+            urlInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    this.submitPaper(true);
+                }
+            });
         }
     }
 

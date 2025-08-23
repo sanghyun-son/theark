@@ -1,116 +1,99 @@
-"""Paper models for the API."""
+"""Pydantic models for paper-related API requests and responses."""
 
-from datetime import datetime
-from typing import Any
+from typing import TYPE_CHECKING
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
-from crawler.database.models import Paper as CrawlerPaper
+if TYPE_CHECKING:
+    from crawler.database.models import Paper as CrawlerPaper
+
+
+class PaperSummary(BaseModel):
+    """Model for paper summary data."""
+
+    overview: str | None = None
+    motivation: str | None = None
+    method: str | None = None
+    result: str | None = None
+    conclusion: str | None = None
+    relevance: str | None = None
+    relevance_score: int | None = None
 
 
 class PaperCreate(BaseModel):
-    """Paper creation model."""
+    """Request model for creating a new paper."""
 
-    arxiv_id: str | None = Field(None, description="arXiv ID (e.g., 2508.01234)")
-    url: str | None = Field(
-        None, description="arXiv URL (e.g., https://arxiv.org/abs/2508.01234)"
-    )
+    url: str = Field(..., description="arXiv paper URL")
     summarize_now: bool = Field(
-        True, description="Add to background queue for immediate summarization"
+        default=False, description="Whether to summarize immediately"
     )
     force_refresh_metadata: bool = Field(
-        False, description="Force refresh metadata even if same version exists"
+        default=False, description="Force refresh paper metadata"
     )
-    force_resummarize: bool = Field(
-        False, description="Force re-summarization even if summary exists"
+    force_resummarize: bool = Field(default=False, description="Force re-summarization")
+    summary_language: str = Field(default="Korean", description="Language for summary")
+
+    @field_validator("summary_language")
+    @classmethod
+    def validate_summary_language(cls, v: str) -> str:
+        """Validate summary language."""
+        if v not in ["Korean", "English"]:
+            raise ValueError("summary_language must be 'Korean' or 'English'")
+        return v
+
+
+class PaperListRequest(BaseModel):
+    """Request model for paper list query."""
+
+    limit: int = Field(
+        default=20, ge=1, le=100, description="Number of papers to return"
     )
-    summary_language: str = Field(
-        "Korean", description="Language for summary generation (Korean/English)"
-    )
+    offset: int = Field(default=0, ge=0, description="Number of papers to skip")
 
-    def model_post_init(self, __context: Any) -> None:
-        """Post-initialization validation."""
-        # Validate that at least one identifier is provided
-        if self.arxiv_id is None and self.url is None:
-            raise ValueError("Either arxiv_id or url must be provided")
 
-        # Validate arXiv ID format if provided
-        if self.arxiv_id is not None:
-            if "." not in self.arxiv_id:
-                raise ValueError(
-                    "Invalid arXiv ID format. Expected format: YYYY.MMDDNNNN "
-                    "(e.g., 2508.01234)"
-                )
+class PaperListResponse(BaseModel):
+    """Response model for paper list."""
 
-        # Validate arXiv URL format if provided
-        if self.url is not None:
-            if not self.url.startswith("https://arxiv.org/abs/"):
-                raise ValueError(
-                    "Invalid arXiv URL format. Expected format: "
-                    "https://arxiv.org/abs/YYYY.MMDDNNNN"
-                )
-
-        # Validate that arxiv_id and url match if both are provided
-        if self.arxiv_id is not None and self.url is not None:
-            # Extract arXiv ID from URL
-            import re
-
-            match = re.search(r"/abs/(\d{4}\.\d{5})$", self.url)
-            if match:
-                url_arxiv_id = match.group(1)
-                if url_arxiv_id != self.arxiv_id:
-                    raise ValueError(
-                        f"arXiv ID and URL do not match. "
-                        f"arXiv ID: {self.arxiv_id}, URL arXiv ID: {url_arxiv_id}"
-                    )
-            else:
-                raise ValueError("Could not extract arXiv ID from URL for comparison")
-
-        # Validate summary language
-        if self.summary_language not in ["Korean", "English"]:
-            raise ValueError("summary_language must be either 'Korean' or 'English'")
+    papers: list["PaperResponse"] = Field(..., description="List of papers")
+    total_count: int = Field(..., description="Total number of papers")
+    limit: int = Field(..., description="Number of papers returned")
+    offset: int = Field(..., description="Number of papers skipped")
+    has_more: bool = Field(..., description="Whether there are more papers available")
 
 
 class PaperResponse(BaseModel):
-    """Paper response model."""
+    """Response model for paper details."""
 
-    id: str = Field(..., description="Paper ID")
-    arxiv_id: str = Field(..., description="arXiv ID")
-    title: str = Field(..., description="Paper title")
-    abstract: str = Field(..., description="Paper abstract")
-    authors: list[str] = Field(..., description="List of authors")
-    categories: list[str] = Field(..., description="arXiv categories")
-    published_date: datetime = Field(..., description="Publication date")
-    pdf_url: str | None = Field(None, description="PDF URL")
-    summary: str | None = Field(None, description="Generated summary")
-    created_at: datetime = Field(..., description="Creation timestamp")
-    updated_at: datetime = Field(..., description="Last update timestamp")
+    paper_id: int
+    arxiv_id: str
+    title: str
+    authors: list[str]
+    abstract: str
+    categories: list[str]
+    pdf_url: str
+    published_date: str | None = None
+    summary: PaperSummary | None = None
 
     @classmethod
     def from_crawler_paper(
-        cls, paper: CrawlerPaper, summary: str | None = None
+        cls, paper: "CrawlerPaper", summary: PaperSummary | None = None
     ) -> "PaperResponse":
         """Create PaperResponse from crawler Paper model."""
         return cls(
-            id=str(paper.paper_id) if paper.paper_id else "unknown",
+            paper_id=paper.paper_id or 0,
             arxiv_id=paper.arxiv_id,
             title=paper.title,
-            abstract=paper.abstract,
             authors=paper.authors.split(";") if paper.authors else [],
+            abstract=paper.abstract,
             categories=paper.categories.split(",") if paper.categories else [],
-            published_date=datetime.fromisoformat(
-                paper.published_at.replace("Z", "+00:00")
-            ),
-            pdf_url=paper.url_pdf,
+            pdf_url=paper.url_pdf or "",
+            published_date=paper.published_at,
             summary=summary,
-            created_at=datetime.fromisoformat(paper.updated_at.replace("Z", "+00:00")),
-            updated_at=datetime.fromisoformat(paper.updated_at.replace("Z", "+00:00")),
         )
 
 
 class PaperDeleteResponse(BaseModel):
-    """Paper deletion response model."""
+    """Response model for paper deletion."""
 
-    id: str = Field(..., description="Deleted paper ID")
-    arxiv_id: str = Field(..., description="Deleted paper arXiv ID")
-    message: str = Field(..., description="Deletion message")
+    success: bool
+    message: str

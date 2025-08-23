@@ -1,118 +1,203 @@
-"""Tests for paper models."""
+"""Tests for paper API models."""
 
 import pytest
-from datetime import datetime
 from pydantic import ValidationError
 
-from api.models.paper import PaperCreate, PaperResponse
-from crawler.database.models import Paper as CrawlerPaper
+from api.models.paper import (
+    PaperCreate,
+    PaperDeleteResponse,
+    PaperListRequest,
+    PaperListResponse,
+    PaperResponse,
+    PaperSummary,
+)
 
 
 class TestPaperCreate:
-    """Test PaperCreate model validation."""
+    """Test PaperCreate model."""
 
-    def test_valid_arxiv_id(self) -> None:
-        """Test valid arXiv ID."""
-        paper_data = PaperCreate(arxiv_id="2508.01234")
-        assert paper_data.arxiv_id == "2508.01234"
-        assert paper_data.url is None
-        assert paper_data.summarize_now is True
-        assert paper_data.force_refresh_metadata is False
-        assert paper_data.force_resummarize is False
+    def test_valid_paper_create(self):
+        """Test valid paper creation."""
+        data = {
+            "url": "https://arxiv.org/abs/2508.01234",
+            "summarize_now": True,
+            "summary_language": "Korean",
+        }
+        paper = PaperCreate(**data)
+        assert paper.url == data["url"]
+        assert paper.summarize_now is True
+        assert paper.summary_language == "Korean"
 
-    def test_valid_url(self) -> None:
-        """Test valid arXiv URL."""
-        paper_data = PaperCreate(url="https://arxiv.org/abs/2508.01234")
-        assert paper_data.url == "https://arxiv.org/abs/2508.01234"
-        assert paper_data.arxiv_id is None
-        assert paper_data.summarize_now is True
+    def test_invalid_summary_language(self):
+        """Test invalid summary language."""
+        data = {
+            "url": "https://arxiv.org/abs/2508.01234",
+            "summary_language": "Invalid",
+        }
+        with pytest.raises(ValidationError):
+            PaperCreate(**data)
 
-    def test_both_arxiv_id_and_url_matching(self) -> None:
-        """Test when both arxiv_id and url are provided and match."""
-        paper_data = PaperCreate(
-            arxiv_id="2508.01234",
-            url="https://arxiv.org/abs/2508.01234",
-        )
-        assert paper_data.arxiv_id == "2508.01234"
-        assert paper_data.url == "https://arxiv.org/abs/2508.01234"
+    def test_default_values(self):
+        """Test default values."""
+        data = {"url": "https://arxiv.org/abs/2508.01234"}
+        paper = PaperCreate(**data)
+        assert paper.summarize_now is False
+        assert paper.force_refresh_metadata is False
+        assert paper.force_resummarize is False
+        assert paper.summary_language == "Korean"
 
-    def test_both_arxiv_id_and_url_conflict(self) -> None:
-        """Test error when arxiv_id and url don't match."""
-        with pytest.raises(ValidationError) as exc_info:
-            PaperCreate(
-                arxiv_id="2508.01234",
-                url="https://arxiv.org/abs/2023.12345",
-            )
 
-        error = exc_info.value
-        assert "arXiv ID and URL do not match" in str(error)
+class TestPaperListRequest:
+    """Test PaperListRequest model."""
 
-    def test_custom_flags(self) -> None:
-        """Test custom flag values."""
-        paper_data = PaperCreate(
-            arxiv_id="2508.01234",
-            summarize_now=False,
-            force_refresh_metadata=True,
-            force_resummarize=True,
-        )
-        assert paper_data.summarize_now is False
-        assert paper_data.force_refresh_metadata is True
-        assert paper_data.force_resummarize is True
+    def test_valid_request(self):
+        """Test valid list request."""
+        data = {"limit": 10, "offset": 5}
+        request = PaperListRequest(**data)
+        assert request.limit == 10
+        assert request.offset == 5
 
-    def test_missing_identifiers(self) -> None:
-        """Test error when no identifier is provided."""
-        with pytest.raises(ValidationError) as exc_info:
-            PaperCreate()
+    def test_default_values(self):
+        """Test default values."""
+        request = PaperListRequest()
+        assert request.limit == 20
+        assert request.offset == 0
 
-        error = exc_info.value
-        assert "Either arxiv_id or url must be provided" in str(error)
+    def test_limit_validation(self):
+        """Test limit validation."""
+        # Test minimum value
+        with pytest.raises(ValidationError):
+            PaperListRequest(limit=0)
 
-    def test_invalid_arxiv_id_format(self) -> None:
-        """Test error with invalid arXiv ID format."""
-        with pytest.raises(ValidationError) as exc_info:
-            PaperCreate(arxiv_id="invalid")
+        # Test maximum value
+        with pytest.raises(ValidationError):
+            PaperListRequest(limit=101)
 
-        error = exc_info.value
-        assert "Invalid arXiv ID format" in str(error)
+    def test_offset_validation(self):
+        """Test offset validation."""
+        with pytest.raises(ValidationError):
+            PaperListRequest(offset=-1)
 
-    def test_invalid_url_format(self) -> None:
-        """Test error with invalid URL format."""
-        with pytest.raises(ValidationError) as exc_info:
-            PaperCreate(url="https://example.com/paper")
 
-        error = exc_info.value
-        assert "Invalid arXiv URL format" in str(error)
+class TestPaperListResponse:
+    """Test PaperListResponse model."""
+
+    def test_valid_response(self):
+        """Test valid list response."""
+        paper_data = {
+            "paper_id": 1,
+            "arxiv_id": "2508.01234",
+            "title": "Test Paper",
+            "authors": ["Author 1", "Author 2"],
+            "abstract": "Test abstract",
+            "categories": ["cs.AI"],
+            "pdf_url": "https://arxiv.org/pdf/2508.01234",
+        }
+        data = {
+            "papers": [paper_data],
+            "total_count": 1,
+            "limit": 20,
+            "offset": 0,
+            "has_more": False,
+        }
+        response = PaperListResponse(**data)
+        assert response.total_count == 1
+        assert response.limit == 20
+        assert response.offset == 0
+        assert response.has_more is False
+        assert len(response.papers) == 1
+        assert response.papers[0].paper_id == 1
+        assert response.papers[0].arxiv_id == "2508.01234"
+
+    def test_empty_papers(self):
+        """Test response with empty papers list."""
+        data = {
+            "papers": [],
+            "total_count": 0,
+            "limit": 20,
+            "offset": 0,
+            "has_more": False,
+        }
+        response = PaperListResponse(**data)
+        assert response.total_count == 0
+        assert len(response.papers) == 0
+        assert response.has_more is False
 
 
 class TestPaperResponse:
     """Test PaperResponse model."""
 
-    def test_from_crawler_paper(self) -> None:
-        """Test creating PaperResponse from CrawlerPaper."""
-        crawler_paper = CrawlerPaper(
-            paper_id=1,
-            arxiv_id="2508.01234",
-            title="Test Paper Title",
-            abstract="Test paper abstract",
-            primary_category="cs.AI",
-            categories="cs.AI,cs.LG",
-            authors="Author One;Author Two",
-            url_abs="https://arxiv.org/abs/2508.01234",
-            url_pdf="https://arxiv.org/pdf/2508.01234",
-            published_at="2023-08-01T00:00:00Z",
-            updated_at="2023-08-01T00:00:00Z",
-        )
-
-        response = PaperResponse.from_crawler_paper(crawler_paper, "Test summary")
-
-        assert response.id == "1"
+    def test_valid_response(self):
+        """Test valid paper response."""
+        summary_data = {
+            "overview": "Test summary",
+            "motivation": "Test motivation",
+            "relevance_score": 8,
+        }
+        data = {
+            "paper_id": 1,
+            "arxiv_id": "2508.01234",
+            "title": "Test Paper",
+            "authors": ["Author 1", "Author 2"],
+            "abstract": "Test abstract",
+            "categories": ["cs.AI"],
+            "pdf_url": "https://arxiv.org/pdf/2508.01234",
+            "published_date": "2025-01-01",
+            "summary": summary_data,
+        }
+        response = PaperResponse(**data)
+        assert response.paper_id == 1
         assert response.arxiv_id == "2508.01234"
-        assert response.title == "Test Paper Title"
-        assert response.abstract == "Test paper abstract"
-        assert response.authors == ["Author One", "Author Two"]
-        assert response.categories == ["cs.AI", "cs.LG"]
-        assert response.pdf_url == "https://arxiv.org/pdf/2508.01234"
-        assert response.summary == "Test summary"
-        assert isinstance(response.published_date, datetime)
-        assert isinstance(response.created_at, datetime)
-        assert isinstance(response.updated_at, datetime)
+        assert response.title == "Test Paper"
+        assert response.authors == ["Author 1", "Author 2"]
+        assert response.categories == ["cs.AI"]
+        assert response.summary is not None
+        assert response.summary.overview == "Test summary"
+        assert response.summary.relevance_score == 8
+
+
+class TestPaperSummary:
+    """Test PaperSummary model."""
+
+    def test_valid_summary(self):
+        """Test valid summary data."""
+        data = {
+            "overview": "Test overview",
+            "motivation": "Test motivation",
+            "method": "Test method",
+            "result": "Test result",
+            "conclusion": "Test conclusion",
+            "relevance": "High relevance",
+            "relevance_score": 9,
+        }
+        summary = PaperSummary(**data)
+        assert summary.overview == "Test overview"
+        assert summary.motivation == "Test motivation"
+        assert summary.relevance_score == 9
+
+    def test_partial_summary(self):
+        """Test summary with partial data."""
+        data = {"overview": "Test overview", "relevance_score": 7}
+        summary = PaperSummary(**data)
+        assert summary.overview == "Test overview"
+        assert summary.relevance_score == 7
+        assert summary.motivation is None
+        assert summary.method is None
+
+
+class TestPaperDeleteResponse:
+    """Test PaperDeleteResponse model."""
+
+    def test_successful_deletion(self):
+        """Test successful deletion response."""
+        data = {"success": True, "message": "Paper deleted successfully"}
+        response = PaperDeleteResponse(**data)
+        assert response.success is True
+        assert response.message == "Paper deleted successfully"
+
+    def test_failed_deletion(self):
+        """Test failed deletion response."""
+        data = {"success": False, "message": "Paper not found"}
+        response = PaperDeleteResponse(**data)
+        assert response.success is False
+        assert response.message == "Paper not found"

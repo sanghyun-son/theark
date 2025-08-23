@@ -4,7 +4,12 @@ import asyncio
 import re
 from typing import Any, Optional
 
-from api.models.paper import PaperCreate, PaperDeleteResponse, PaperResponse
+from api.models.paper import (
+    PaperCreate,
+    PaperDeleteResponse,
+    PaperResponse,
+    PaperSummary,
+)
 from core import get_logger
 from core.config import load_settings
 from crawler.arxiv.on_demand_crawler import OnDemandCrawlConfig, OnDemandCrawler
@@ -113,8 +118,8 @@ class PaperService:
         summary = self._get_paper_summary(paper)
         return PaperResponse.from_crawler_paper(paper, summary)
 
-    def _get_paper_summary(self, paper: CrawlerPaper) -> Optional[str]:
-        """Get formatted summary for a paper."""
+    def _get_paper_summary(self, paper: CrawlerPaper) -> Optional[PaperSummary]:
+        """Get summary for a paper."""
         if not self.summary_repo or not paper.paper_id:
             return None
 
@@ -124,7 +129,15 @@ class PaperService:
         if not summary_obj:
             return None
 
-        return self._format_summary(summary_obj)
+        return PaperSummary(
+            overview=summary_obj.overview,
+            motivation=summary_obj.motivation,
+            method=summary_obj.method,
+            result=summary_obj.result,
+            conclusion=summary_obj.conclusion,
+            relevance=str(summary_obj.relevance),
+            relevance_score=summary_obj.relevance,
+        )
 
     def _format_summary(self, summary_obj: Summary) -> str:
         """Format summary object into readable text."""
@@ -152,23 +165,19 @@ class PaperService:
             logger.info(f"Would delete paper {paper.arxiv_id} (ID: {paper.paper_id})")
 
         return PaperDeleteResponse(
-            id=str(paper.paper_id),
-            arxiv_id=paper.arxiv_id,
+            success=True,
             message=f"Paper {paper.arxiv_id} deleted successfully",
         )
 
     def _extract_arxiv_id(self, paper_data: PaperCreate) -> str:
         """Extract arXiv ID from paper data."""
-        if paper_data.arxiv_id:
-            return paper_data.arxiv_id
-
         if paper_data.url:
             match = re.search(r"/abs/(\d{4}\.\d{5})$", paper_data.url)
             if match:
                 return match.group(1)
             raise ValueError("Could not extract arXiv ID from URL")
 
-        raise ValueError("No arXiv ID or URL provided")
+        raise ValueError("No URL provided")
 
     def _get_paper_by_arxiv_id(self, arxiv_id: str) -> CrawlerPaper | None:
         """Get paper by arXiv ID.
