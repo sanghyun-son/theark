@@ -38,7 +38,8 @@ def test_get_preset_categories(client):
         assert category in data["categories"]
 
     # Validate response model structure
-    from api.models.config import CategoriesResponse
+    from core.models import CategoriesResponse
+
     response_model = CategoriesResponse(**data)
     assert response_model.categories == data["categories"]
     assert response_model.count == data["count"]

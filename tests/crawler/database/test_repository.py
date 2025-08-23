@@ -2,14 +2,8 @@
 
 import pytest
 
-from crawler.database.models import (
-    AppUser,
-    CrawlEvent,
-    FeedItem,
-    Summary,
-    UserInterest,
-    UserStar,
-)
+from core.models.database.entities import CrawlEvent, FeedItem, SummaryEntity
+from core.models.domain.user import User, UserInterest, UserStar
 
 
 class TestPaperRepository:
@@ -119,7 +113,7 @@ class TestSummaryRepository:
         """Test creating and retrieving a summary."""
         paper_id = paper_repo.create(sample_paper)
 
-        summary = Summary(
+        summary = SummaryEntity(
             paper_id=paper_id,
             version=1,
             overview="This paper presents a novel approach",
@@ -149,7 +143,7 @@ class TestUserRepository:
 
     def test_create_and_get_user(self, user_repo) -> None:
         """Test creating and retrieving a user."""
-        user = AppUser(email="test@example.com", display_name="Test User")
+        user = User(email="test@example.com", display_name="Test User")
         user_id = user_repo.create_user(user)
         assert user_id > 0
 
@@ -161,7 +155,7 @@ class TestUserRepository:
 
     def test_user_interests(self, user_repo) -> None:
         """Test user interest operations."""
-        user = AppUser(email="test@example.com", display_name="Test User")
+        user = User(email="test@example.com", display_name="Test User")
         user_id = user_repo.create_user(user)
 
         interests = [
@@ -187,7 +181,7 @@ class TestUserRepository:
 
     def test_user_stars(self, user_repo, paper_repo, sample_paper) -> None:
         """Test user star operations."""
-        user = AppUser(email="test@example.com", display_name="Test User")
+        user = User(email="test@example.com", display_name="Test User")
         user_id = user_repo.create_user(user)
         paper_id = paper_repo.create(sample_paper)
 
@@ -207,7 +201,7 @@ class TestFeedRepository:
         self, feed_repo, user_repo, paper_repo, sample_paper
     ) -> None:
         """Test feed operations."""
-        user = AppUser(email="test@example.com", display_name="Test User")
+        user = User(email="test@example.com", display_name="Test User")
         user_id = user_repo.create_user(user)
         paper_id = paper_repo.create(sample_paper)
 

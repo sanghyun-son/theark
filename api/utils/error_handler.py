@@ -16,13 +16,11 @@ def handle_api_operation(
     try:
         return operation()
     except ValueError as e:
-        # Handle validation errors (e.g., paper not found)
         if not_found_message:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
         else:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except Exception as e:
-        # Handle unexpected errors
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"{error_message}: {str(e)}",
@@ -38,13 +36,11 @@ async def handle_async_api_operation(
     try:
         return await operation()
     except ValueError as e:
-        # Handle validation errors (e.g., paper not found)
         if not_found_message:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
         else:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except Exception as e:
-        # Handle unexpected errors
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"{error_message}: {str(e)}",

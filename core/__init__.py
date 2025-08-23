@@ -7,11 +7,10 @@ from .log import (
     setup_production_logging,
     setup_test_logging,
 )
+from .models.domain.task import TaskManagerStatus, TaskStats
 from .periodic_task import (
     PeriodicTask,
     PeriodicTaskManager,
-    TaskManagerStatus,
-    TaskStats,
     TaskStatus,
 )
 from .rate_limiter import AsyncRateLimiter

@@ -123,9 +123,10 @@ class TestSummarizationIntegration:
     @pytest.mark.asyncio
     async def test_summarization_response_creation(self):
         """Test creating summarization responses."""
-        from crawler.summarizer import StructuredSummary, SummaryResponse
+        from core.models.external.openai import PaperAnalysis
+        from crawler.summarizer import SummaryResponse
 
-        structured = StructuredSummary(
+        structured = PaperAnalysis(
             tldr="Test summary",
             motivation="Test motivation",
             method="Test method",

@@ -3,9 +3,8 @@
 from typing import Any
 
 from core import get_logger
-
-from .base import DatabaseManager
-from .llm_models import LLMRequest, LLMUsageStats
+from core.database import DatabaseManager
+from core.models import LLMRequest, LLMUsageStats
 
 logger = get_logger(__name__)
 

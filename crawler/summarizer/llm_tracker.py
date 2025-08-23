@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import Any, Dict
 
 from core import get_logger
-from crawler.database import LLMRequest, get_llm_db_manager
+from crawler.database import LLMRequest
 
 logger = get_logger(__name__)
 
@@ -18,10 +18,12 @@ class LLMTracker:
 
         Args:
             custom_id: Custom ID for tracking related requests
-            db_manager: Optional LLM database manager instance
+            db_manager: LLM database manager instance (required)
         """
         self.custom_id = custom_id
-        self.db_manager = db_manager or get_llm_db_manager()
+        if db_manager is None:
+            raise ValueError("db_manager is required for LLMTracker")
+        self.db_manager = db_manager
 
     def start_request(
         self,
@@ -59,7 +61,7 @@ class LLMTracker:
 
         request_id = self.db_manager.repository.create(request)
         logger.debug(f"Started tracking LLM request {request_id}")
-        return request_id
+        return int(request_id)
 
     def complete_request(
         self,

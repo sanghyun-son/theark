@@ -2,16 +2,16 @@
 
 from typing import Any
 
-from .base import DatabaseManager
-from .models import (
-    AppUser,
+from core.database import DatabaseManager
+from core.models import (
     CrawlEvent,
     FeedItem,
-    Paper,
-    Summary,
-    UserInterest,
-    UserStar,
 )
+from core.models import PaperEntity as Paper
+from core.models import SummaryEntity as Summary
+from core.models import UserEntity as AppUser
+from core.models import UserInterestEntity as UserInterest
+from core.models import UserStarEntity as UserStar
 
 
 class PaperRepository:

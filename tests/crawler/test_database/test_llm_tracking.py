@@ -1,29 +1,25 @@
 """Tests for LLM request tracking."""
 
-import tempfile
-from pathlib import Path
-
 import pytest
 
-from crawler.database import LLMDatabaseManager, LLMRequest, LLMUsageStats
+from crawler.database import (
+    LLMSQLiteManager,
+    LLMRequest,
+    LLMUsageStats,
+)
 
 
 class TestLLMTracking:
     """Test LLM request tracking functionality."""
 
     @pytest.fixture
-    def temp_db_path(self):
-        """Create a temporary database path for testing."""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            yield str(Path(temp_dir) / "test_llm.db")
-
-    @pytest.fixture
-    def llm_db_manager(self, temp_db_path):
+    def llm_db_manager(self, tmp_path):
         """Create LLM database manager for testing."""
-        manager = LLMDatabaseManager(temp_db_path)
-        manager.start_sync()
+        temp_db_path = tmp_path / "test_llm.db"
+        manager = LLMSQLiteManager(temp_db_path)
+        manager.connect()
         yield manager
-        manager.stop_sync()
+        manager.disconnect()
 
     def test_create_llm_request(self, llm_db_manager):
         """Test creating LLM request records."""
@@ -38,15 +34,13 @@ class TestLLMTracking:
             metadata={"test": "data"},
         )
 
-        with llm_db_manager.db_manager:
-            request_id = llm_db_manager.repository.create(request)
+        request_id = llm_db_manager.repository.create(request)
 
         assert request_id is not None
         assert request_id > 0
 
         # Retrieve the request
-        with llm_db_manager.db_manager:
-            retrieved = llm_db_manager.repository.get_by_id(request_id)
+        retrieved = llm_db_manager.repository.get_by_id(request_id)
 
         assert retrieved is not None
         assert retrieved.model == "gpt-4o-mini"
@@ -60,24 +54,23 @@ class TestLLMTracking:
             model="gpt-4o-mini", custom_id="test-update", status="pending"
         )
 
-        with llm_db_manager.db_manager:
-            request_id = llm_db_manager.repository.create(request)
+        request_id = llm_db_manager.repository.create(request)
 
-            # Update with success status and tokens
-            llm_db_manager.repository.update_status(
-                request_id=request_id,
-                status="success",
-                response_time_ms=1500,
-                tokens={
-                    "prompt_tokens": 100,
-                    "completion_tokens": 50,
-                    "total_tokens": 150,
-                },
-                http_status_code=200,
-            )
+        # Update with success status and tokens
+        llm_db_manager.repository.update_status(
+            request_id=request_id,
+            status="success",
+            response_time_ms=1500,
+            tokens={
+                "prompt_tokens": 100,
+                "completion_tokens": 50,
+                "total_tokens": 150,
+            },
+            http_status_code=200,
+        )
 
-            # Retrieve updated request
-            updated = llm_db_manager.repository.get_by_id(request_id)
+        # Retrieve updated request
+        updated = llm_db_manager.repository.get_by_id(request_id)
 
         assert updated.status == "success"
         assert updated.response_time_ms == 1500
@@ -95,12 +88,10 @@ class TestLLMTracking:
             request = LLMRequest(
                 model=f"gpt-{i}", custom_id=custom_id, status="success"
             )
-            with llm_db_manager.db_manager:
-                llm_db_manager.repository.create(request)
+            llm_db_manager.repository.create(request)
 
         # Retrieve by custom ID
-        with llm_db_manager.db_manager:
-            requests = llm_db_manager.repository.get_by_custom_id(custom_id)
+        requests = llm_db_manager.repository.get_by_custom_id(custom_id)
 
         assert len(requests) == 3
         for request in requests:
@@ -130,11 +121,10 @@ class TestLLMTracking:
             ),
         ]
 
-        with llm_db_manager.db_manager:
-            for request in test_requests:
-                llm_db_manager.repository.create(request)
+        for request in test_requests:
+            llm_db_manager.repository.create(request)
 
-            stats = llm_db_manager.repository.get_usage_stats()
+        stats = llm_db_manager.repository.get_usage_stats()
 
         assert stats.total_requests == 3
         assert stats.successful_requests == 2
@@ -150,12 +140,10 @@ class TestLLMTracking:
             request = LLMRequest(
                 model=f"model-{i}", custom_id=f"test-{i}", status="success"
             )
-            with llm_db_manager.db_manager:
-                llm_db_manager.repository.create(request)
+            llm_db_manager.repository.create(request)
 
         # Get recent requests (limit 3)
-        with llm_db_manager.db_manager:
-            recent = llm_db_manager.repository.get_recent(limit=3)
+        recent = llm_db_manager.repository.get_recent(limit=3)
 
         assert len(recent) == 3
         # Should be ordered by timestamp DESC, so most recent first
@@ -252,17 +240,3 @@ class TestLLMTracking:
         assert (
             abs(gpt41_cost - calculated_cost) > 0.000001
         )  # GPT-4.1-mini should cost more than GPT-4o-mini
-
-    def test_database_path_handling(self):
-        """Test database path handling for different environments."""
-        # Test with custom path
-        with tempfile.TemporaryDirectory() as temp_dir:
-            custom_path = str(Path(temp_dir) / "custom_llm.db")
-            manager = LLMDatabaseManager(custom_path)
-            assert str(manager.db_path) == custom_path
-
-        # Test default path (should use appropriate directory based on environment)
-        manager = LLMDatabaseManager()
-        assert manager.db_path.name == "llm_requests.db"
-        # In test environment, uses /tmp/theark_test; in dev/prod, uses ./db
-        assert "theark_test" in str(manager.db_path) or "db" in str(manager.db_path)

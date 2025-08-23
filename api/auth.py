@@ -5,9 +5,9 @@ from typing import Any, Callable
 from fastapi import Request, status
 from fastapi.responses import JSONResponse
 
-from api.models.auth import AuthError
 from core.config import settings
 from core.log import get_logger
+from core.models import AuthError
 
 logger = get_logger(__name__)
 
@@ -25,7 +25,6 @@ class AuthMiddleware:
         send: Callable[..., Any],
     ) -> None:
         """Process the request through authentication middleware."""
-        # Early exit for non-HTTP requests
         if scope["type"] != "http":
             await self.app(scope, receive, send)
             return

@@ -2,7 +2,7 @@
 
 import pytest
 
-from crawler.database.models import Paper
+from core.models.database.entities import PaperEntity
 
 
 class TestSQLiteManager:
@@ -155,7 +155,7 @@ class TestSQLiteManager:
             )
 
         # Test unique constraint
-        paper1 = Paper(
+        paper1 = PaperEntity(
             arxiv_id="2101.00001",
             title="Test Paper 1",
             abstract="Test abstract 1",
@@ -188,7 +188,7 @@ class TestSQLiteManager:
         db_manager.execute(query, params)
 
         # Try to insert duplicate arxiv_id
-        paper2 = Paper(
+        paper2 = PaperEntity(
             arxiv_id="2101.00001",  # Same arxiv_id
             title="Test Paper 2",
             abstract="Test abstract 2",

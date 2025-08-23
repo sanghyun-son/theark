@@ -4,8 +4,8 @@ from pathlib import Path
 
 import pytest
 
+from core.models.database.entities import PaperEntity
 from crawler.database import SQLiteManager
-from crawler.database.models import Paper
 from crawler.database.repository import (
     CrawlEventRepository,
     FeedRepository,
@@ -61,9 +61,9 @@ def event_repo(db_manager: SQLiteManager) -> CrawlEventRepository:
 
 
 @pytest.fixture
-def sample_paper() -> Paper:
+def sample_paper() -> PaperEntity:
     """Create a sample paper for testing."""
-    return Paper(
+    return PaperEntity(
         arxiv_id="2101.00001",
         title="Test Paper",
         abstract="This is a test abstract",
@@ -78,10 +78,10 @@ def sample_paper() -> Paper:
 
 
 @pytest.fixture
-def sample_papers() -> list[Paper]:
+def sample_papers() -> list[PaperEntity]:
     """Create sample papers for testing."""
     return [
-        Paper(
+        PaperEntity(
             arxiv_id="2101.00001",
             title="Machine Learning Paper",
             abstract="This paper discusses machine learning techniques",
@@ -92,7 +92,7 @@ def sample_papers() -> list[Paper]:
             published_at="2021-01-01T00:00:00Z",
             updated_at="2021-01-01T00:00:00Z",
         ),
-        Paper(
+        PaperEntity(
             arxiv_id="2101.00002",
             title="Deep Learning Research",
             abstract="Deep learning applications in computer vision",

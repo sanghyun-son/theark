@@ -1,12 +1,12 @@
-"""Pydantic models for database entities."""
+"""Database entity models that map directly to database tables."""
 
 from datetime import datetime
 
 from pydantic import BaseModel, Field, field_validator
 
 
-class Paper(BaseModel):
-    """Paper entity model."""
+class PaperEntity(BaseModel):
+    """Paper database entity model."""
 
     paper_id: int | None = None
     arxiv_id: str = Field(..., description="arXiv ID (e.g., 2101.00001)")
@@ -48,8 +48,8 @@ class Paper(BaseModel):
             raise ValueError("Invalid ISO8601 datetime format")
 
 
-class Summary(BaseModel):
-    """Summary entity model."""
+class SummaryEntity(BaseModel):
+    """Summary database entity model."""
 
     summary_id: int | None = None
     paper_id: int = Field(..., gt=0)
@@ -75,8 +75,8 @@ class Summary(BaseModel):
         return v
 
 
-class AppUser(BaseModel):
-    """Application user model."""
+class UserEntity(BaseModel):
+    """User database entity model."""
 
     user_id: int | None = None
     email: str = Field(..., description="User email address")
@@ -91,8 +91,8 @@ class AppUser(BaseModel):
         return v.lower()
 
 
-class UserInterest(BaseModel):
-    """User interest model."""
+class UserInterestEntity(BaseModel):
+    """User interest database entity model."""
 
     user_id: int = Field(..., gt=0)
     kind: str = Field(..., description="Interest kind (category, keyword, author)")
@@ -109,8 +109,8 @@ class UserInterest(BaseModel):
         return v
 
 
-class UserStar(BaseModel):
-    """User star/bookmark model."""
+class UserStarEntity(BaseModel):
+    """User star/bookmark database entity model."""
 
     user_id: int = Field(..., gt=0)
     paper_id: int = Field(..., gt=0)
@@ -119,7 +119,7 @@ class UserStar(BaseModel):
 
 
 class FeedItem(BaseModel):
-    """Feed item model."""
+    """Feed item database entity model."""
 
     feed_item_id: int | None = None
     user_id: int = Field(..., gt=0)
@@ -140,7 +140,7 @@ class FeedItem(BaseModel):
 
 
 class CrawlEvent(BaseModel):
-    """Crawl event model."""
+    """Crawl event database entity model."""
 
     event_id: int | None = None
     arxiv_id: str | None = None

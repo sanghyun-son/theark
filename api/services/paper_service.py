@@ -4,22 +4,22 @@ import asyncio
 import re
 from typing import Any, Optional
 
-from api.models.paper import (
-    PaperCreate,
+from core import get_logger
+from core.config import load_settings
+from core.models import PaperCreateRequest as PaperCreate
+from core.models import (
     PaperDeleteResponse,
     PaperListResponse,
     PaperResponse,
-    PaperSummary,
 )
-from core import get_logger
-from core.config import load_settings
+from core.models import SummaryContent as PaperSummary
+from core.models import SummaryEntity as Summary
 from crawler.arxiv.on_demand_crawler import OnDemandCrawlConfig, OnDemandCrawler
 from crawler.database import Paper as CrawlerPaper
 from crawler.database import (
     PaperRepository,
     SummaryRepository,
 )
-from crawler.database.models import Summary
 from crawler.database.sqlite_manager import SQLiteManager
 from crawler.summarizer.service import SummarizationService
 
@@ -145,18 +145,13 @@ class PaperService:
             return None
 
         try:
-            # Connect to database for this operation
             self._ensure_db_connection(paper.arxiv_id)
-
             if not self.summary_repo:
                 return None
 
-            # Try to get summary in the specified language first
             summary_obj = self.summary_repo.get_by_paper_and_language(
                 paper.paper_id, language
             )
-
-            # If not found, fall back to English
             if not summary_obj and language != "English":
                 summary_obj = self.summary_repo.get_by_paper_and_language(
                     paper.paper_id, "English"
@@ -204,13 +199,11 @@ class PaperService:
             raise ValueError("Paper ID not available")
 
         try:
-            # Connect to database for this operation
             self._ensure_db_connection(paper.arxiv_id)
 
             if not self.paper_repo:
                 raise ValueError("Paper repository not available")
 
-            # Delete associated summaries first
             if self.summary_repo:
                 summaries = self.summary_repo.get_by_paper_id(paper.paper_id)
                 for summary in summaries:
@@ -220,7 +213,6 @@ class PaperService:
                     f"Deleted {len(summaries)} summaries for paper {paper.arxiv_id}"
                 )
 
-            # Delete the paper
             self.paper_repo.delete(paper.paper_id)
             logger.info(
                 f"Successfully deleted paper {paper.arxiv_id} (ID: {paper.paper_id})"
@@ -239,7 +231,6 @@ class PaperService:
     ) -> "PaperListResponse":
         """Get papers with pagination."""
         try:
-            # Connect to database for this operation
             self._ensure_db_connection("papers_list")
 
             if not self.paper_repo:
@@ -247,14 +238,12 @@ class PaperService:
 
             papers, total_count = self.paper_repo.get_papers_paginated(limit, offset)
 
-            # Convert to PaperResponse objects
             paper_responses = []
             for paper in papers:
                 summary = self._get_paper_summary(paper, language)
                 paper_response = PaperResponse.from_crawler_paper(paper, summary)
                 paper_responses.append(paper_response)
 
-            # Calculate has_more
             has_more = (offset + limit) < total_count
 
             return PaperListResponse(
@@ -300,18 +289,15 @@ class PaperService:
     def _get_paper_by_identifier(self, identifier: str) -> CrawlerPaper | None:
         """Get paper by ID or arXiv ID."""
         try:
-            # Connect to database for this operation
             self._ensure_db_connection(identifier)
 
             if not self.paper_repo:
                 return None
 
-            # Try arXiv ID first
             paper = self.paper_repo.get_by_arxiv_id(identifier)
             if paper:
                 return paper
 
-            # Try paper ID - just validate it's numeric, don't implement yet
             int(identifier)
             return None
         except ValueError:
@@ -337,16 +323,13 @@ class PaperService:
                 f"(ID: {paper.paper_id})"
             )
 
-            # Check if summary already exists (this will connect to DB)
             if self._summary_exists(paper, language, force_resummarize):
                 return
 
-            # Generate summary
             summary_response = await self._generate_summary(paper, language)
             if not summary_response:
                 return
 
-            # Save summary to database (this will connect to DB)
             await self._save_summary(paper, summary_response, language)
 
         except Exception as e:
@@ -358,14 +341,11 @@ class PaperService:
             logger.error(f"No database manager available for paper {arxiv_id}")
             raise ValueError("Database manager not available")
 
-        # Check if connection is already active
         try:
             self.db_manager.execute("SELECT 1")
-            # Connection is good, just ensure repositories are initialized
             if not self.paper_repo or not self.summary_repo:
                 self._initialize_repositories()
         except Exception:
-            # Connection is not active, reconnect
             try:
                 logger.info(f"Reconnecting database for paper {arxiv_id}")
                 self.db_manager.connect()
@@ -381,7 +361,6 @@ class PaperService:
         if not paper.paper_id:
             return False
 
-        # If force_resummarize is True, always return False to force regeneration
         if force_resummarize:
             logger.info(
                 f"Force resummarize requested for paper {paper.arxiv_id} in {language}"
@@ -389,7 +368,6 @@ class PaperService:
             return False
 
         try:
-            # Connect to database for this operation
             self._ensure_db_connection(paper.arxiv_id)
 
             if not self.summary_repo:
@@ -453,7 +431,6 @@ class PaperService:
             return
 
         try:
-            # Connect to database for this operation
             self._ensure_db_connection(paper.arxiv_id)
 
             if not self.summary_repo:
@@ -462,7 +439,6 @@ class PaperService:
                 )
                 return
 
-            # Check if summary already exists and delete it to avoid UNIQUE constraint
             existing_summary = self.summary_repo.get_by_paper_and_language(
                 paper.paper_id, language
             )
@@ -474,9 +450,7 @@ class PaperService:
                 self.summary_repo.delete(existing_summary.summary_id)
 
             logger.info(f"Creating Summary model for paper {paper.arxiv_id}")
-
             summary = self._create_summary_model(paper, summary_response, language)
-
             summary_id = self.summary_repo.create(summary)
             logger.info(
                 f"Successfully saved summary {summary_id} for paper {paper.arxiv_id}"

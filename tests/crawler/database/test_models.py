@@ -3,15 +3,13 @@
 import pytest
 from pydantic import ValidationError
 
-from crawler.database.models import (
-    AppUser,
+from core.models.database.entities import (
     CrawlEvent,
     FeedItem,
-    Paper,
-    Summary,
-    UserInterest,
-    UserStar,
+    PaperEntity,
+    SummaryEntity,
 )
+from core.models.domain.user import User, UserInterest, UserStar
 
 
 class TestPaper:
@@ -19,7 +17,7 @@ class TestPaper:
 
     def test_valid_paper(self) -> None:
         """Test creating a valid paper."""
-        paper = Paper(
+        paper = PaperEntity(
             arxiv_id="2101.00001",
             title="Test Paper",
             abstract="This is a test abstract",
@@ -40,7 +38,7 @@ class TestPaper:
         """Test invalid field validation."""
         # Test invalid arXiv ID
         with pytest.raises(ValidationError, match="Invalid arXiv ID format"):
-            Paper(
+            PaperEntity(
                 arxiv_id="invalid",
                 title="Test Paper",
                 abstract="This is a test abstract",
@@ -54,7 +52,7 @@ class TestPaper:
 
         # Test invalid category
         with pytest.raises(ValidationError, match="Invalid category format"):
-            Paper(
+            PaperEntity(
                 arxiv_id="2101.00001",
                 title="Test Paper",
                 abstract="This is a test abstract",
@@ -68,7 +66,7 @@ class TestPaper:
 
         # Test invalid datetime
         with pytest.raises(ValidationError, match="Invalid ISO8601 datetime format"):
-            Paper(
+            PaperEntity(
                 arxiv_id="2101.00001",
                 title="Test Paper",
                 abstract="This is a test abstract",
@@ -86,7 +84,7 @@ class TestSummary:
 
     def test_valid_summary(self) -> None:
         """Test creating a valid summary."""
-        summary = Summary(
+        summary = SummaryEntity(
             paper_id=1,
             version=1,
             overview="This paper presents a novel approach",
@@ -109,7 +107,7 @@ class TestSummary:
         """Test invalid field validation."""
         # Test invalid language
         with pytest.raises(ValidationError, match="Invalid language"):
-            Summary(
+            SummaryEntity(
                 paper_id=1,
                 version=1,
                 overview="Overview",
@@ -124,7 +122,7 @@ class TestSummary:
 
         # Test invalid relevance
         with pytest.raises(ValidationError):
-            Summary(
+            SummaryEntity(
                 paper_id=1,
                 version=1,
                 overview="Overview",
@@ -143,7 +141,7 @@ class TestAppUser:
 
     def test_valid_user(self) -> None:
         """Test creating a valid user."""
-        user = AppUser(
+        user = User(
             email="test@example.com",
             display_name="Test User",
         )
@@ -154,11 +152,11 @@ class TestAppUser:
     def test_invalid_email(self) -> None:
         """Test invalid email validation."""
         with pytest.raises(ValidationError, match="Invalid email format"):
-            AppUser(email="invalid-email")
+            User(email="invalid-email")
 
     def test_email_normalization(self) -> None:
         """Test email normalization to lowercase."""
-        user = AppUser(email="TEST@EXAMPLE.COM")
+        user = User(email="TEST@EXAMPLE.COM")
         assert user.email == "test@example.com"
 
 

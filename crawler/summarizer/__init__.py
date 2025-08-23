@@ -1,27 +1,24 @@
 """Paper abstract summarizer module."""
 
 # Export models for external use
-from .models import (
+from core.models.external.openai import (
     ChatCompletionRequest,
     ChatCompletionResponse,
     OpenAIMessage,
     OpenAIPropertyDefinition,
     OpenAITool,
-    PaperAnalysisArguments,
-    PaperAnalysisData,
-    PaperAnalysisProperties,
+    PaperAnalysis,
 )
+
 from .openai_summarizer import OpenAISummarizer
 from .summarizer import (
     AbstractSummarizer,
-    StructuredSummary,
     SummaryRequest,
     SummaryResponse,
 )
 
 __all__ = [
     "AbstractSummarizer",
-    "StructuredSummary",
     "SummaryRequest",
     "SummaryResponse",
     "OpenAISummarizer",
@@ -30,7 +27,5 @@ __all__ = [
     "OpenAIMessage",
     "OpenAIPropertyDefinition",
     "OpenAITool",
-    "PaperAnalysisArguments",
-    "PaperAnalysisData",
-    "PaperAnalysisProperties",
+    "PaperAnalysis",
 ]

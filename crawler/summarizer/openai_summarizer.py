@@ -4,8 +4,7 @@ from typing import Any
 
 import httpx
 
-from .llm_tracker import LLMRequestContext
-from .models import (
+from core.models.external.openai import (
     ChatCompletionRequest,
     ChatCompletionResponse,
     OpenAIFunction,
@@ -13,13 +12,13 @@ from .models import (
     OpenAIMessage,
     OpenAITool,
     OpenAIToolChoice,
-    PaperAnalysisArguments,
-    PaperAnalysisProperties,
+    PaperAnalysis,
 )
+
+from .llm_tracker import LLMRequestContext
 from .prompt import RELEVANCE_DESCRIPTION, SYSTEM_PROMPT, USER_PROMPT
 from .summarizer import (
     AbstractSummarizer,
-    StructuredSummary,
     SummaryRequest,
     SummaryResponse,
 )
@@ -85,10 +84,10 @@ class OpenAISummarizer(AbstractSummarizer):
                 function_parameters = OpenAIFunctionParameter(
                     type="object",
                     description="Paper analysis parameters",
-                    properties=PaperAnalysisProperties.create_paper_analysis_schema(
+                    properties=PaperAnalysis.create_paper_analysis_schema(
                         RELEVANCE_DESCRIPTION
                     ),
-                    required=PaperAnalysisProperties.get_required_fields(),
+                    required=PaperAnalysis.get_required_fields(),
                 )
 
                 function = OpenAIFunction(
@@ -142,16 +141,13 @@ class OpenAISummarizer(AbstractSummarizer):
                 tool_call = message.tool_calls[0]
 
                 # Use Pydantic validation for function arguments
-                analysis_args = PaperAnalysisArguments.from_json_string(
+                analysis_args = PaperAnalysis.from_json_string(
                     tool_call.function.arguments
                 )
 
-                # Convert to StructuredSummary (both inherit from PaperAnalysisData)
-                structured_summary = StructuredSummary(**analysis_args.model_dump())
-
                 return SummaryResponse(
                     custom_id=request.custom_id,
-                    structured_summary=structured_summary,
+                    structured_summary=analysis_args,
                     original_length=len(request.content),
                     summary_length=len(analysis_args.tldr),
                     metadata={

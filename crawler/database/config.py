@@ -109,6 +109,29 @@ def get_database_dir(environment: Environment = "development") -> Path:
     return config.database_dir
 
 
+def get_llm_database_path(environment: Environment = "development") -> Path:
+    """Get LLM database path for the specified environment.
+
+    Args:
+        environment: Environment type
+
+    Returns:
+        LLM database file path
+    """
+    config = DatabaseConfig(environment)
+    db_dir = config.database_dir
+    db_dir.mkdir(parents=True, exist_ok=True)
+
+    if environment == "testing":
+        # For testing, use a unique temporary file
+        import tempfile
+
+        return Path(tempfile.mktemp(suffix="_llm.db"))
+    else:
+        # For development and production, use llm_requests.db
+        return db_dir / "llm_requests.db"
+
+
 def setup_database_environment(
     environment: Environment = "development",
 ) -> DatabaseConfig:

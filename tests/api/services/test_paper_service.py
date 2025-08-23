@@ -1,10 +1,12 @@
 """Tests for paper service."""
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from api.models.paper import PaperCreate, PaperDeleteResponse, PaperResponse
+import pytest
+
 from api.services.paper_service import PaperService
+from core.models import PaperCreateRequest as PaperCreate
+from core.models import PaperDeleteResponse, PaperResponse
 from crawler.database import Paper as CrawlerPaper
 
 

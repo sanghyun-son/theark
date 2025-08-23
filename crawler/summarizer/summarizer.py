@@ -4,13 +4,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any
 
-from .models import PaperAnalysisData
-
-
-class StructuredSummary(PaperAnalysisData):
-    """Structured summary extracted from paper abstract."""
-
-    pass
+from core.models.external.openai import PaperAnalysis
 
 
 @dataclass
@@ -31,7 +25,7 @@ class SummaryResponse:
 
     custom_id: str
     summary: str | None = None  # For non-structured responses
-    structured_summary: StructuredSummary | None = None  # For tool-based responses
+    structured_summary: PaperAnalysis | None = None  # For tool-based responses
     original_length: int = 0
     summary_length: int = 0
     metadata: dict[str, Any] | None = None

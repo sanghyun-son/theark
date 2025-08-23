@@ -1,12 +1,10 @@
 """Tests for the summarizer module structure."""
 
-from dataclasses import dataclass
-
 import pytest
 
+from core.models.external.openai import PaperAnalysis
 from crawler.summarizer.summarizer import (
     AbstractSummarizer,
-    StructuredSummary,
     SummaryRequest,
     SummaryResponse,
 )
@@ -63,7 +61,7 @@ class TestSummaryResponse:
 
     def test_summary_response_with_structured_summary(self):
         """Test creating a SummaryResponse with structured summary."""
-        structured = StructuredSummary(
+        structured = PaperAnalysis(
             tldr="Short summary",
             motivation="Research motivation",
             method="Proposed method",
@@ -95,12 +93,12 @@ class TestSummaryResponse:
         assert response.metadata == metadata
 
 
-class TestStructuredSummary:
-    """Test StructuredSummary dataclass."""
+class TestPaperAnalysis:
+    """Test PaperAnalysis model."""
 
-    def test_structured_summary_creation(self):
-        """Test creating a StructuredSummary."""
-        structured = StructuredSummary(
+    def test_paper_analysis_creation(self):
+        """Test creating a PaperAnalysis."""
+        structured = PaperAnalysis(
             tldr="Brief summary",
             motivation="Paper motivation",
             method="Research method",

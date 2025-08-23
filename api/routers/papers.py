@@ -5,20 +5,17 @@ from typing import AsyncGenerator
 from fastapi import APIRouter, Query, Request
 from fastapi.responses import StreamingResponse
 
-from api.models.paper import (
-    PaperCreate,
+from api.services.paper_service import PaperService
+from api.services.streaming_service import StreamingService
+from api.utils.error_handler import handle_async_api_operation
+from core.models import PaperCreateRequest as PaperCreate
+from core.models import (
     PaperDeleteResponse,
     PaperListResponse,
     PaperResponse,
 )
-from api.services.paper_service import PaperService
-from api.services.streaming_service import StreamingService
-from api.utils.error_handler import handle_async_api_operation
 
 router = APIRouter(prefix="/v1/papers", tags=["papers"])
-
-
-# Database initialization will be handled in the main app startup
 
 
 @router.get("/", response_model=PaperListResponse)

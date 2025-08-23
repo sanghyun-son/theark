@@ -4,14 +4,15 @@ import asyncio
 import json
 from typing import AsyncGenerator
 
-from api.models.paper import PaperCreate, PaperResponse
-from api.models.streaming import (
+from api.services.paper_service import PaperService
+from core.models import PaperCreateRequest as PaperCreate
+from core.models import PaperEntity as Paper
+from core.models import (
+    PaperResponse,
     StreamingCompleteEvent,
     StreamingErrorEvent,
     StreamingStatusEvent,
 )
-from api.services.paper_service import PaperService
-from crawler.database.models import Paper
 
 
 class StreamingService:
@@ -26,7 +27,6 @@ class StreamingService:
     ) -> AsyncGenerator[str, None]:
         """Stream paper creation and summarization process."""
         try:
-            # Step 1: Create paper
             yield self._create_event(StreamingStatusEvent(message="Creating paper..."))
 
             paper_response = await self.paper_service.create_paper(paper_data)
@@ -34,7 +34,6 @@ class StreamingService:
                 StreamingStatusEvent(message="Paper created successfully")
             )
 
-            # Get the actual paper object for summarization
             paper = self.paper_service._get_paper_by_identifier(paper_response.arxiv_id)
             if not paper:
                 yield self._create_event(
@@ -42,14 +41,12 @@ class StreamingService:
                 )
                 return
 
-            # Step 2: Handle summarization if requested
             if paper_data.summarize_now:
                 async for event in self._stream_summarization(
                     paper, paper_data, paper_response
                 ):
                     yield event
             else:
-                # No summarization requested
                 yield self._create_event(
                     StreamingCompleteEvent(paper=paper_response.model_dump())
                 )
@@ -66,7 +63,6 @@ class StreamingService:
                 StreamingStatusEvent(message="Starting summarization...")
             )
 
-            # Start summarization in background and monitor progress
             summary_task = asyncio.create_task(
                 self.paper_service._summarize_paper_async(
                     paper,
@@ -75,11 +71,9 @@ class StreamingService:
                 )
             )
 
-            # Monitor progress
             async for event in self._monitor_summarization_progress(summary_task):
                 yield event
 
-            # Get final result
             async for event in self._handle_summarization_completion(
                 summary_task, paper, paper_response
             ):
@@ -89,7 +83,6 @@ class StreamingService:
             yield self._create_event(
                 StreamingErrorEvent(message=f"Summarization failed: {str(e)}")
             )
-            # Also return the paper without summary for consistency
             yield self._create_event(
                 StreamingCompleteEvent(paper=paper_response.model_dump())
             )
@@ -115,7 +108,6 @@ class StreamingService:
             await summary_task
             yield self._create_event(StreamingStatusEvent(message="Summary completed!"))
 
-            # Get updated paper with summary
             updated_paper = await self.paper_service.get_paper(paper.arxiv_id)
             yield self._create_event(
                 StreamingCompleteEvent(paper=updated_paper.model_dump())

@@ -2,8 +2,8 @@
 
 from fastapi import APIRouter
 
-from api.models.config import CategoriesResponse
 from core.config import load_settings
+from core.models import CategoriesResponse
 
 router = APIRouter(prefix="/v1/config", tags=["config"])
 

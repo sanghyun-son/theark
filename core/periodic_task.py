@@ -2,36 +2,14 @@
 
 import asyncio
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
 from typing import Any, Awaitable, Callable
 
 from core.log import get_logger
+from core.models.domain.task import TaskManagerStatus, TaskStats
 
 logger = get_logger(__name__)
-
-
-@dataclass
-class TaskStats:
-    """Statistics for periodic task execution."""
-
-    executions: int = 0
-    errors: int = 0
-    consecutive_errors: int = 0
-    last_execution_time: datetime | None = None
-    last_error_time: datetime | None = None
-    start_time: datetime | None = None
-
-
-@dataclass
-class TaskManagerStatus:
-    """Status information for periodic task manager."""
-
-    status: str
-    periodic_running: bool
-    stats: TaskStats
-    config: dict[str, Any]
 
 
 class TaskStatus(Enum):

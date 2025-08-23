@@ -1,25 +1,28 @@
 """Database module for the arXiv crawler."""
 
-from .base import DatabaseManager
+from core.database import DatabaseManager
+from core.models import (
+    CrawlEvent,
+    FeedItem,
+    LLMRequest,
+    LLMUsageStats,
+)
+from core.models import PaperEntity as Paper
+from core.models import SummaryEntity as Summary
+from core.models import UserEntity as AppUser
+from core.models import UserInterestEntity as UserInterest
+from core.models import UserStarEntity as UserStar
+
 from .config import (
     DatabaseConfig,
     Environment,
     get_database_dir,
     get_database_path,
+    get_llm_database_path,
     setup_database_environment,
 )
-from .llm_db import LLMDatabaseManager, close_llm_db_manager, get_llm_db_manager
-from .llm_models import LLMRequest, LLMUsageStats
 from .llm_repository import LLMRequestRepository
-from .models import (
-    AppUser,
-    CrawlEvent,
-    FeedItem,
-    Paper,
-    Summary,
-    UserInterest,
-    UserStar,
-)
+from .llm_sqlite_manager import LLMSQLiteManager
 from .repository import (
     CrawlEventRepository,
     FeedRepository,
@@ -36,6 +39,7 @@ __all__ = [
     "Environment",
     "get_database_path",
     "get_database_dir",
+    "get_llm_database_path",
     "setup_database_environment",
     "Paper",
     "Summary",
@@ -50,9 +54,7 @@ __all__ = [
     "FeedRepository",
     "CrawlEventRepository",
     # LLM tracking
-    "LLMDatabaseManager",
-    "get_llm_db_manager",
-    "close_llm_db_manager",
+    "LLMSQLiteManager",
     "LLMRequest",
     "LLMUsageStats",
     "LLMRequestRepository",

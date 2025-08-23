@@ -1,17 +1,19 @@
 """Tests for streaming service."""
 
 import asyncio
-import pytest
 from unittest.mock import AsyncMock, MagicMock
 
-from api.models.paper import PaperCreate, PaperResponse
-from api.models.streaming import (
-    StreamingStatusEvent,
+import pytest
+
+from api.services.streaming_service import StreamingService
+from core.models import PaperCreateRequest as PaperCreate
+from core.models import (
+    PaperResponse,
     StreamingCompleteEvent,
     StreamingErrorEvent,
+    StreamingStatusEvent,
 )
-from api.services.streaming_service import StreamingService
-from crawler.database.models import Paper
+from core.models.database.entities import PaperEntity
 
 
 @pytest.fixture
@@ -60,7 +62,7 @@ def sample_paper_response():
 @pytest.fixture
 def sample_paper():
     """Sample paper object."""
-    paper = MagicMock(spec=Paper)
+    paper = MagicMock(spec=PaperEntity)
     paper.paper_id = 1
     paper.arxiv_id = "1706.02677"
     paper.title = "Test Paper"

@@ -1,11 +1,12 @@
 """Tests for papers router."""
 
-import pytest
-from fastapi.testclient import TestClient
 from unittest.mock import AsyncMock, MagicMock
 
+import pytest
+from fastapi.testclient import TestClient
+
 from api.app import app
-from api.models.paper import PaperListResponse, PaperResponse
+from core.models import PaperListResponse, PaperResponse
 
 
 @pytest.fixture
@@ -218,7 +219,7 @@ class TestPapersRouter:
         app.state.paper_service = mock_paper_service
 
         # Mock service response
-        from api.models.paper import PaperDeleteResponse
+        from core.models import PaperDeleteResponse
 
         mock_response = PaperDeleteResponse(success=True, message="Paper deleted")
         mock_paper_service.delete_paper.return_value = mock_response

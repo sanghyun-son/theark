@@ -49,6 +49,7 @@ print_status "Starting code quality checks..."
 # Parse command line arguments
 CHECK_TYPE="all"
 VERBOSE=true
+FIX_MODE=false
 
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -68,6 +69,10 @@ while [[ $# -gt 0 ]]; do
             VERBOSE=false
             shift
             ;;
+        --fix)
+            FIX_MODE=true
+            shift
+            ;;
         -h|--help)
             echo "Usage: $0 [OPTIONS]"
             echo ""
@@ -76,9 +81,11 @@ while [[ $# -gt 0 ]]; do
             echo "  --lint-only         Run only linting"
             echo "  --format-only       Run only formatting checks"
             echo "  --quiet             Quiet output (default is verbose)"
+            echo "  --fix               Fix formatting and import issues automatically"
             echo "  -h, --help          Show this help message"
             echo ""
             echo "Default behavior: Run all checks with verbose output"
+            echo "With --fix: Automatically fix formatting and import issues"
             exit 0
             ;;
         *)
@@ -141,38 +148,76 @@ run_linting() {
 # Function to run formatting checks
 run_formatting() {
     echo "[black]"  
-    print_status "Checking code formatting..."
-    if $VERBOSE; then
-        if uv run black --check $SOURCE_DIRS examples/; then
-            print_success "Code formatting check passed"
+    if $FIX_MODE; then
+        print_status "Fixing code formatting..."
+        if $VERBOSE; then
+            if uv run black $SOURCE_DIRS examples/; then
+                print_success "Code formatting fixed"
+            else
+                print_error "Code formatting fix failed"
+                return 1
+            fi
         else
-            print_error "Code formatting check failed"
-            return 1
+            if uv run black $SOURCE_DIRS examples/ >/dev/null 2>&1; then
+                print_success "Code formatting fixed"
+            else
+                print_error "Code formatting fix failed"
+                return 1
+            fi
         fi
     else
-        if uv run black --check $SOURCE_DIRS examples/ >/dev/null 2>&1; then
-            print_success "Code formatting check passed"
+        print_status "Checking code formatting..."
+        if $VERBOSE; then
+            if uv run black --check $SOURCE_DIRS examples/; then
+                print_success "Code formatting check passed"
+            else
+                print_error "Code formatting check failed"
+                return 1
+            fi
         else
-            print_error "Code formatting check failed"
-            return 1
+            if uv run black --check $SOURCE_DIRS examples/ >/dev/null 2>&1; then
+                print_success "Code formatting check passed"
+            else
+                print_error "Code formatting check failed"
+                return 1
+            fi
         fi
     fi
     
     echo "[isort]"
-    print_status "Checking import sorting..."
-    if $VERBOSE; then
-        if uv run isort --check-only $SOURCE_DIRS examples/; then
-            print_success "Import sorting check passed"
+    if $FIX_MODE; then
+        print_status "Fixing import sorting..."
+        if $VERBOSE; then
+            if uv run isort $SOURCE_DIRS examples/; then
+                print_success "Import sorting fixed"
+            else
+                print_error "Import sorting fix failed"
+                return 1
+            fi
         else
-            print_error "Import sorting check failed"
-            return 1
+            if uv run isort $SOURCE_DIRS examples/ >/dev/null 2>&1; then
+                print_success "Import sorting fixed"
+            else
+                print_error "Import sorting fix failed"
+                return 1
+            fi
         fi
     else
-        if uv run isort --check-only $SOURCE_DIRS examples/ >/dev/null 2>&1; then
-            print_success "Import sorting check passed"
+        print_status "Checking import sorting..."
+        if $VERBOSE; then
+            if uv run isort --check-only $SOURCE_DIRS examples/; then
+                print_success "Import sorting check passed"
+            else
+                print_error "Import sorting check failed"
+                return 1
+            fi
         else
-            print_error "Import sorting check failed"
-            return 1
+            if uv run isort --check-only $SOURCE_DIRS examples/ >/dev/null 2>&1; then
+                print_success "Import sorting check passed"
+            else
+                print_error "Import sorting check failed"
+                return 1
+            fi
         fi
     fi
 }
