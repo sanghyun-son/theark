@@ -54,6 +54,12 @@ class Settings(BaseModel):
         description="Default interests for paper relevance scoring",
     )
 
+    # Paper Filtering Settings
+    preset_categories: list[str] = Field(
+        default=["cs.AI", "cs.CL", "cs.CV", "cs.DC", "cs.IR", "cs.LG", "cs.MA"],
+        description="Preset categories for paper filtering",
+    )
+
     def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         # Set auth_required based on environment
@@ -90,6 +96,13 @@ def load_settings() -> Settings:
         cors_origins = [origin.strip() for origin in cors_origins_str.split(",")]
 
     auth_required = os.getenv("THEARK_AUTH_REQUIRED", "false").lower() == "true"
+
+    # Parse preset categories from comma-separated string
+    preset_categories_str = os.getenv(
+        "THEARK_PRESET_CATEGORIES", "cs.AI,cs.CL,cs.CV,cs.DC,cs.IR,cs.LG,cs.MA"
+    )
+    preset_categories = [cat.strip() for cat in preset_categories_str.split(",")]
+
     return Settings(
         environment=Environment(os.getenv("THEARK_ENV", "development")),
         api_title=os.getenv("THEARK_API_TITLE", "TheArk API"),
@@ -102,6 +115,7 @@ def load_settings() -> Settings:
         default_interests=os.getenv(
             "THEARK_DEFAULT_INTERESTS", "Machine Learning,Deep Learning"
         ),
+        preset_categories=preset_categories,
     )
 
 

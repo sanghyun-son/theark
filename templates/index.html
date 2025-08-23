@@ -10,50 +10,41 @@
 </head>
 
 <body>
-    <!-- Header -->
-    <header class="header">
-        <div class="container">
-            <h1>TheArk</h1>
-            <p>Intelligent Paper Management & Summarization</p>
-        </div>
-    </header>
-
     <!-- Main Content -->
     <main class="main">
         <div class="container">
-            <!-- Paper Input Section -->
-            <section class="paper-input-section">
-                <h2 class="section-title">Add New Paper</h2>
+            <!-- Message Container -->
+            <div id="message-container"></div>
 
-                <!-- Message Container -->
-                <div id="message-container"></div>
+            <!-- Input Form -->
+            <form id="paper-form">
+                <div class="input-row">
+                    <select id="summary-language" class="form-input language-select"
+                        title="Select the language for the summary">
+                        <option value="Korean">Korean</option>
+                        <option value="English">English</option>
+                    </select>
 
-                <!-- Paper Input Form -->
-                <form id="paper-form">
-                    <div class="form-group">
-                        <label for="paper-url" class="form-label">arXiv Paper URL</label>
-                        <input type="url" id="paper-url" class="form-input"
-                            placeholder="https://arxiv.org/abs/2508.01234" required>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="summary-language" class="form-label">Summary Language</label>
-                        <select id="summary-language" class="form-input">
-                            <option value="Korean">Korean</option>
-                            <option value="English">English</option>
-                        </select>
-                    </div>
-
+                    <input type="url" id="paper-url" class="form-input url-input"
+                        title="Example: https://arxiv.org/abs/1706.03762" placeholder="arXiv URL" required>
                     <div class="btn-group">
                         <button type="button" id="summarize-btn" class="btn btn-primary">
-                            Summarize Now
+                            Summarize
                         </button>
-                        <button type="button" id="queue-btn" class="btn btn-secondary">
+                        <button type="button" id="queue-btn" class="btn btn-secondary"
+                            title="The request will be batched and processed later.">
                             Add to Queue
                         </button>
                     </div>
-                </form>
-            </section>
+                </div>
+            </form>
+
+            <!-- Category Filter -->
+            <div class="category-filter">
+                <div id="category-buttons" class="category-buttons">
+                    <!-- Category buttons will be dynamically loaded here -->
+                </div>
+            </div>
 
             <!-- Result Section -->
             <section id="result-container" class="result-section hidden">
@@ -64,9 +55,9 @@
     </main>
 
     <!-- Footer -->
-    <footer style="text-align: center; padding: 2rem 0; color: #666; background: white; margin-top: 3rem;">
+    <footer class="footer">
         <div class="container">
-            <p>&copy; 2024 TheArk. Intelligent paper management powered by AI.</p>
+            <p>&copy; 2025 Sanghyun Son.</p>
         </div>
     </footer>
 

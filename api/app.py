@@ -11,7 +11,7 @@ from fastapi.staticfiles import StaticFiles
 from core import get_logger, setup_logging
 from core.config import load_settings
 
-from .routers import common_router, main_router, papers_router
+from .routers import common_router, config_router, main_router, papers_router
 
 # Setup logging based on environment
 settings = load_settings()
@@ -75,6 +75,7 @@ def create_app() -> FastAPI:
     app.mount("/static", StaticFiles(directory="static"), name="static")
     app.include_router(main_router)
     app.include_router(common_router)
+    app.include_router(config_router)
     app.include_router(papers_router)
     return app
 

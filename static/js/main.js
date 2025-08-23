@@ -3,7 +3,10 @@
 class PaperManager {
     constructor() {
         this.apiBaseUrl = '/v1/papers';
+        this.configApiUrl = '/v1/config';
+        this.selectedCategories = new Set();
         this.initializeEventListeners();
+        this.loadCategories();
     }
 
     initializeEventListeners() {
@@ -196,6 +199,57 @@ class PaperManager {
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
+    }
+
+    async loadCategories() {
+        try {
+            const response = await fetch(`${this.configApiUrl}/categories`);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            this.renderCategoryButtons(data.categories);
+        } catch (error) {
+            console.error('Error loading categories:', error);
+        }
+    }
+
+    renderCategoryButtons(categories) {
+        const container = document.getElementById('category-buttons');
+        if (!container) return;
+
+        container.innerHTML = '';
+        
+        // Add all categories to selected set by default
+        categories.forEach(category => this.selectedCategories.add(category));
+        
+        categories.forEach(category => {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'category-btn'; // Default: active state
+            button.textContent = category;
+            button.dataset.category = category;
+            
+            button.addEventListener('click', () => this.toggleCategory(category, button));
+            
+            container.appendChild(button);
+        });
+        
+        console.log('All categories selected by default:', Array.from(this.selectedCategories));
+    }
+
+    toggleCategory(category, button) {
+        if (this.selectedCategories.has(category)) {
+            this.selectedCategories.delete(category);
+            button.classList.add('inactive');
+        } else {
+            this.selectedCategories.add(category);
+            button.classList.remove('inactive');
+        }
+        
+        console.log('Selected categories:', Array.from(this.selectedCategories));
+        // TODO: Implement paper filtering based on selected categories
     }
 }
 
