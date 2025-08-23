@@ -54,8 +54,12 @@ class SQLiteManager(DatabaseManager):
         self.connection.execute("PRAGMA synchronous = NORMAL")
         # Enable foreign keys
         self.connection.execute("PRAGMA foreign_keys = ON")
-        # Set busy timeout
-        self.connection.execute("PRAGMA busy_timeout = 30000")
+        # Set busy timeout for better handling of concurrent access
+        self.connection.execute("PRAGMA busy_timeout = 60000")
+        # Set WAL mode for better concurrent access (if not in testing)
+        # self.connection.execute("PRAGMA journal_mode = WAL")
+        # Set cache size for better performance
+        self.connection.execute("PRAGMA cache_size = -64000")  # 64MB cache
 
     def execute(self, query: str, params: tuple[Any, ...] | None = None) -> Any:
         """Execute a database query.

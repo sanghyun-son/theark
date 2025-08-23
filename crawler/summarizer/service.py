@@ -2,6 +2,7 @@
 
 import asyncio
 import os
+from typing import Any
 
 import httpx
 
@@ -24,6 +25,7 @@ class SummarizationService:
         base_url: str | None = None,
         use_tools: bool = True,
         model: str = "gpt-4o-mini",
+        db_manager: Any = None,
     ):
         """Initialize the summarization service.
 
@@ -32,11 +34,13 @@ class SummarizationService:
             base_url: OpenAI API base URL (for testing with mock server)
             use_tools: Whether to use function calling for structured output
             model: OpenAI model to use for summarization
+            db_manager: Optional LLM database manager instance
         """
         self.api_key = api_key or os.environ.get("OPENAI_API_KEY")
         self.base_url = base_url or "https://api.openai.com/v1"
         self.use_tools = use_tools
         self.model = model
+        self.db_manager = db_manager
 
         if not self.api_key:
             raise ValueError(
@@ -45,7 +49,9 @@ class SummarizationService:
             )
 
         # Initialize the summarizer
-        self.summarizer = OpenAISummarizer(api_key=self.api_key, base_url=self.base_url)
+        self.summarizer = OpenAISummarizer(
+            api_key=self.api_key, base_url=self.base_url, db_manager=self.db_manager
+        )
 
         logger.info(
             f"SummarizationService initialized with model={model}, "

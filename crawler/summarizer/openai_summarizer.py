@@ -1,5 +1,7 @@
 """OpenAI-based abstract summarizer."""
 
+from typing import Any
+
 import httpx
 
 from .llm_tracker import LLMRequestContext
@@ -26,10 +28,16 @@ from .summarizer import (
 class OpenAISummarizer(AbstractSummarizer):
     """OpenAI-based implementation of abstract summarizer."""
 
-    def __init__(self, api_key: str, base_url: str = "https://api.openai.com/v1"):
+    def __init__(
+        self,
+        api_key: str,
+        base_url: str = "https://api.openai.com/v1",
+        db_manager: Any = None,
+    ):
         """Initialize the OpenAI summarizer."""
         self.api_key = api_key
         self.base_url = base_url
+        self.db_manager = db_manager
         # Increase timeout for OpenAI API calls (default is 5 seconds)
         self.client = httpx.AsyncClient(timeout=httpx.Timeout(60.0))
 
@@ -48,6 +56,7 @@ class OpenAISummarizer(AbstractSummarizer):
                 "language": request.language,
                 "content_length": len(request.content),
             },
+            db_manager=self.db_manager,
         ) as llm_context:
             # Create messages
             messages = [

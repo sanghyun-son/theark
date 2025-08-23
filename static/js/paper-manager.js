@@ -13,7 +13,11 @@ class PaperManager {
         // Initialize
         this.initializeEventListeners();
         this.loadCategories();
-        this.infiniteScrollService.loadPapers();
+        
+        // Load papers after PaperManager is fully initialized
+        window.addEventListener('paperManagerReady', () => {
+            this.infiniteScrollService.loadPapers();
+        }, { once: true });
     }
 
     initializeEventListeners() {
@@ -169,7 +173,7 @@ class PaperManager {
         }
     }
 
-    toggleCategory(category) {
+    toggleCategory(category, event) {
         const button = event.target;
         
         if (this.selectedCategories.has(category)) {

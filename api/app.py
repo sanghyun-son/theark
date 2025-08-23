@@ -30,6 +30,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     # Initialize database
     from api.services.paper_service import PaperService
+    from crawler.database import get_llm_db_manager
     from crawler.database.config import get_database_path
     from crawler.database.sqlite_manager import SQLiteManager
 
@@ -38,11 +39,17 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     db_manager.connect()
     db_manager.create_tables()
 
+    # Initialize LLM database manager
+    llm_db_manager = get_llm_db_manager()
+
     # Store in app state for access in routers
     app.state.db_manager = db_manager
-    app.state.paper_service = PaperService(db_manager=db_manager)
+    app.state.llm_db_manager = llm_db_manager
+    app.state.paper_service = PaperService(
+        db_manager=db_manager, llm_db_manager=llm_db_manager
+    )
 
-    logger.info("Database initialized successfully")
+    logger.info("Database and LLM database initialized successfully")
 
     yield
 

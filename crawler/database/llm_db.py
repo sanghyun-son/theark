@@ -87,12 +87,14 @@ class LLMDatabaseManager:
 
     def start_sync(self) -> None:
         """Start the LLM database manager (sync)."""
+        # Connect to database
+        self.db_manager.connect()
+
         # Initialize repository
         self.llm_repo = LLMRequestRepository(self.db_manager)
 
         # Create tables
-        with self.db_manager:
-            self.llm_repo.create_table()
+        self.llm_repo.create_table()
 
         logger.info("LLM database manager started")
 

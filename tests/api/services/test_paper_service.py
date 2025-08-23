@@ -196,8 +196,13 @@ class TestPaperService:
         assert result.has_more is True  # 10 > 5 + 0
 
     @pytest.mark.asyncio
-    async def test_get_papers_no_repository(self):
+    @patch("api.services.paper_service.PaperService._ensure_db_connection")
+    async def test_get_papers_no_repository(self, mock_ensure_db):
         """Test getting papers when repository is not available."""
+        # Mock _ensure_db_connection to prevent repository re-initialization
+        mock_ensure_db.return_value = None
+
+        # Set repository to None after initialization
         self.service.paper_repo = None
 
         with pytest.raises(ValueError, match="Paper repository not available"):

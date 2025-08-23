@@ -130,7 +130,13 @@ class UIService {
         deleteBtn.style.cssText = 'background: none; border: none; cursor: pointer; font-size: 1rem; padding: 0.25rem; color: #666; transition: color 0.2s ease; flex-shrink: 0;';
         deleteBtn.onmouseover = () => deleteBtn.style.color = '#ff4444';
         deleteBtn.onmouseout = () => deleteBtn.style.color = '#666';
-        deleteBtn.onclick = () => window.paperManager.deletePaper(paper.arxiv_id);
+        deleteBtn.onclick = () => {
+            if (window.paperManager) {
+                window.paperManager.deletePaper(paper.arxiv_id);
+            } else {
+                console.error('PaperManager not initialized');
+            }
+        };
         categoriesContainer.appendChild(deleteBtn);
         
         paperDiv.appendChild(categoriesContainer);
@@ -246,7 +252,13 @@ class UIService {
             const button = document.createElement('button');
             button.className = 'category-btn active';
             button.textContent = category;
-            button.onclick = () => window.paperManager.toggleCategory(category);
+            button.onclick = (event) => {
+                if (window.paperManager) {
+                    window.paperManager.toggleCategory(category, event);
+                } else {
+                    console.error('PaperManager not initialized');
+                }
+            };
             categoryButtons.appendChild(button);
         });
     }
@@ -295,7 +307,9 @@ class UIService {
         }
         
         // Reload papers after successful submission
-        window.paperManager.loadPapers();
+        if (window.paperManager) {
+            window.paperManager.loadPapers();
+        }
     }
 
     showError(message, summarizeNow = false) {
@@ -357,7 +371,7 @@ class UIService {
         const paperElements = document.querySelectorAll('.paper-item');
         for (const element of paperElements) {
             const idSpan = element.querySelector('.paper-title span');
-            if (idSpan && idSpan.textContent.includes(arxivId)) {
+            if (idSpan && idSpan.textContent === `[${arxivId}]`) {
                 element.remove();
                 break;
             }

@@ -13,14 +13,15 @@ logger = get_logger(__name__)
 class LLMTracker:
     """Wrapper for tracking LLM API requests."""
 
-    def __init__(self, custom_id: str | None = None):
+    def __init__(self, custom_id: str | None = None, db_manager: Any = None):
         """Initialize LLM tracker.
 
         Args:
             custom_id: Custom ID for tracking related requests
+            db_manager: Optional LLM database manager instance
         """
         self.custom_id = custom_id
-        self.db_manager = get_llm_db_manager()
+        self.db_manager = db_manager or get_llm_db_manager()
 
     def start_request(
         self,
@@ -56,10 +57,9 @@ class LLMTracker:
             metadata=metadata,
         )
 
-        with self.db_manager.db_manager:
-            request_id = self.db_manager.repository.create(request)
-            logger.debug(f"Started tracking LLM request {request_id}")
-            return request_id
+        request_id = self.db_manager.repository.create(request)
+        logger.debug(f"Started tracking LLM request {request_id}")
+        return request_id
 
     def complete_request(
         self,
@@ -84,21 +84,20 @@ class LLMTracker:
         """
         status = "success" if success else "error"
 
-        with self.db_manager.db_manager:
-            self.db_manager.repository.update_status(
-                request_id=request_id,
-                status=status,
-                response_time_ms=response_time_ms,
-                tokens=tokens,
-                error_message=error_message,
-                http_status_code=http_status_code,
-            )
+        self.db_manager.repository.update_status(
+            request_id=request_id,
+            status=status,
+            response_time_ms=response_time_ms,
+            tokens=tokens,
+            error_message=error_message,
+            http_status_code=http_status_code,
+        )
 
-            # Update cost if provided
-            if estimated_cost_usd is not None:
-                # Would need to add a separate method for this, but for now we can
-                # include it in metadata
-                pass
+        # Update cost if provided
+        if estimated_cost_usd is not None:
+            # Would need to add a separate method for this, but for now we can
+            # include it in metadata
+            pass
 
         logger.debug(
             f"Completed tracking LLM request {request_id} with status {status}"
@@ -117,6 +116,7 @@ class LLMRequestContext:
         is_batched: bool = False,
         request_type: str = "chat",
         metadata: Dict[str, Any] | None = None,
+        db_manager: Any = None,
     ):
         """Initialize LLM request context.
 
@@ -128,8 +128,9 @@ class LLMRequestContext:
             is_batched: Whether this is a batch request
             request_type: Type of request
             metadata: Additional metadata
+            db_manager: Optional LLM database manager instance
         """
-        self.tracker = LLMTracker(custom_id)
+        self.tracker = LLMTracker(custom_id, db_manager)
         self.model = model
         self.provider = provider
         self.endpoint = endpoint
@@ -138,6 +139,7 @@ class LLMRequestContext:
         self.metadata = metadata
         self.request_id: int | None = None
         self.start_time: float | None = None
+        self.db_manager = db_manager
 
     def __enter__(self) -> "LLMRequestContext":
         """Enter context manager."""
@@ -181,10 +183,7 @@ class LLMRequestContext:
         Args:
             tokens: Token usage dict (prompt_tokens, completion_tokens, total_tokens)
         """
-        if self.request_id is not None:
-            # Use a fresh context manager each time
-            db_manager = get_llm_db_manager()
-
+        if self.request_id is not None and self.db_manager:
             # Calculate cost based on tokens
             estimated_cost = None
             if "prompt_tokens" in tokens and "completion_tokens" in tokens:
@@ -197,13 +196,12 @@ class LLMRequestContext:
                 )
                 estimated_cost = temp_request.calculate_cost()
 
-            with db_manager.db_manager:
-                db_manager.repository.update_status(
-                    request_id=self.request_id,
-                    status="success",  # Keep current status
-                    tokens=tokens,
-                    estimated_cost_usd=estimated_cost,
-                )
+            self.db_manager.repository.update_status(
+                request_id=self.request_id,
+                status="success",  # Keep current status
+                tokens=tokens,
+                estimated_cost_usd=estimated_cost,
+            )
 
     def update_http_status(self, status_code: int) -> None:
         """Update HTTP status code for the request.
@@ -211,12 +209,9 @@ class LLMRequestContext:
         Args:
             status_code: HTTP status code
         """
-        if self.request_id is not None:
-            # Use a fresh context manager each time
-            db_manager = get_llm_db_manager()
-            with db_manager.db_manager:
-                db_manager.repository.update_status(
-                    request_id=self.request_id,
-                    status="success" if 200 <= status_code < 300 else "error",
-                    http_status_code=status_code,
-                )
+        if self.request_id is not None and self.db_manager:
+            self.db_manager.repository.update_status(
+                request_id=self.request_id,
+                status="success" if 200 <= status_code < 300 else "error",
+                http_status_code=status_code,
+            )
