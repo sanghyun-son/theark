@@ -24,6 +24,9 @@ class PaperCreate(BaseModel):
     force_resummarize: bool = Field(
         False, description="Force re-summarization even if summary exists"
     )
+    summary_language: str = Field(
+        "Korean", description="Language for summary generation (Korean/English)"
+    )
 
     def model_post_init(self, __context: Any) -> None:
         """Post-initialization validation."""
@@ -62,6 +65,10 @@ class PaperCreate(BaseModel):
                     )
             else:
                 raise ValueError("Could not extract arXiv ID from URL for comparison")
+
+        # Validate summary language
+        if self.summary_language not in ["Korean", "English"]:
+            raise ValueError("summary_language must be either 'Korean' or 'English'")
 
 
 class PaperResponse(BaseModel):

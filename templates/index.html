@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TheArk - Paper Management System</title>
+    <link rel="stylesheet" href="/static/css/main.css">
+    <link rel="icon" href="/static/favicon.ico" type="image/x-icon">
+</head>
+
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="container">
+            <h1>TheArk</h1>
+            <p>Intelligent Paper Management & Summarization</p>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main">
+        <div class="container">
+            <!-- Paper Input Section -->
+            <section class="paper-input-section">
+                <h2 class="section-title">Add New Paper</h2>
+
+                <!-- Message Container -->
+                <div id="message-container"></div>
+
+                <!-- Paper Input Form -->
+                <form id="paper-form">
+                    <div class="form-group">
+                        <label for="paper-url" class="form-label">arXiv Paper URL</label>
+                        <input type="url" id="paper-url" class="form-input"
+                            placeholder="https://arxiv.org/abs/2508.01234" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="summary-language" class="form-label">Summary Language</label>
+                        <select id="summary-language" class="form-input">
+                            <option value="Korean">Korean</option>
+                            <option value="English">English</option>
+                        </select>
+                    </div>
+
+                    <div class="btn-group">
+                        <button type="button" id="summarize-btn" class="btn btn-primary">
+                            Summarize Now
+                        </button>
+                        <button type="button" id="queue-btn" class="btn btn-secondary">
+                            Add to Queue
+                        </button>
+                    </div>
+                </form>
+            </section>
+
+            <!-- Result Section -->
+            <section id="result-container" class="result-section hidden">
+                <h2 class="section-title">Paper Details</h2>
+                <!-- Results will be dynamically inserted here -->
+            </section>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer style="text-align: center; padding: 2rem 0; color: #666; background: white; margin-top: 3rem;">
+        <div class="container">
+            <p>&copy; 2024 TheArk. Intelligent paper management powered by AI.</p>
+        </div>
+    </footer>
+
+    <!-- JavaScript -->
+    <script src="/static/js/main.js"></script>
+</body>
+
+</html>

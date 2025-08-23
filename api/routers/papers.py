@@ -48,6 +48,38 @@ async def create_paper(request: Request, paper_data: PaperCreate) -> PaperRespon
         )
 
 
+@router.get("/{paper_identifier}", response_model=PaperResponse)
+async def get_paper(request: Request, paper_identifier: str) -> PaperResponse:
+    """Get a paper by ID or arXiv ID.
+
+    Args:
+        paper_identifier: Paper ID or arXiv ID
+
+    Returns:
+        Paper with details and summary if available
+
+    Raises:
+        HTTPException: If paper not found
+    """
+    try:
+        # Get paper service from app state
+        paper_service: PaperService = request.app.state.paper_service
+
+        # Get paper using service
+        paper = await paper_service.get_paper(paper_identifier)
+        return paper
+
+    except ValueError as e:
+        # Handle not found errors
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except Exception:
+        # Handle unexpected errors
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to get paper",
+        )
+
+
 @router.delete("/{paper_identifier}", response_model=PaperDeleteResponse)
 async def delete_paper(request: Request, paper_identifier: str) -> PaperDeleteResponse:
     """Delete a paper by ID or arXiv ID.

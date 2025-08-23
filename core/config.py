@@ -45,6 +45,15 @@ class Settings(BaseModel):
     # Logging
     log_level: str = Field(default="INFO", description="Logging level")
 
+    # Summarization Settings
+    default_summary_language: str = Field(
+        default="Korean", description="Default language for paper summaries"
+    )
+    default_interests: str = Field(
+        default="Machine Learning,Deep Learning",
+        description="Default interests for paper relevance scoring",
+    )
+
     def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         # Set auth_required based on environment
@@ -89,6 +98,10 @@ def load_settings() -> Settings:
         auth_required=auth_required,
         auth_header_name=os.getenv("THEARK_AUTH_HEADER", "Authorization"),
         log_level=os.getenv("THEARK_LOG_LEVEL", "INFO"),
+        default_summary_language=os.getenv("THEARK_DEFAULT_SUMMARY_LANGUAGE", "Korean"),
+        default_interests=os.getenv(
+            "THEARK_DEFAULT_INTERESTS", "Machine Learning,Deep Learning"
+        ),
     )
 
 

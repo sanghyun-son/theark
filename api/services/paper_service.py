@@ -30,6 +30,11 @@ class PaperService:
         self.summary_repo: SummaryRepository | None = None
         self.summarization_service: SummarizationService | None = None
 
+        # Load settings for default values
+        from core.config import load_settings
+
+        self.settings = load_settings()
+
         # Initialize repositories if db_manager is provided
         if self.db_manager:
             self.paper_repo = PaperRepository(self.db_manager)
@@ -60,7 +65,9 @@ class PaperService:
         # Check if paper already exists
         existing_paper = self._get_paper_by_arxiv_id(arxiv_id)
         if existing_paper and not paper_data.force_refresh_metadata:
-            logger.info(f"Paper {arxiv_id} already exists, returning existing paper")
+            logger.info(
+                f"Paper {arxiv_id} already exists, returning existing paper"
+            )
             return PaperResponse.from_crawler_paper(existing_paper)
 
         # Create crawler and crawl the paper
@@ -80,18 +87,21 @@ class PaperService:
 
             logger.info(f"Successfully crawled paper {arxiv_id}")
 
-            # Trigger summarization if requested
+            # Initialize summary as None
             summary = None
+
             if paper_data.summarize_now and self.summarization_service:
                 try:
                     # Start summarization in background
                     asyncio.create_task(
                         self._summarize_paper_async(
-                            crawled_paper, paper_data.force_resummarize
+                            crawled_paper,
+                            paper_data.force_resummarize,
+                            paper_data.summary_language,
                         )
                     )
                     logger.info(
-                        f"Started background summarization for paper {arxiv_id}"
+                        f"Started background summarization for paper {arxiv_id} in {paper_data.summary_language}"
                     )
                 except Exception as e:
                     logger.error(
@@ -99,6 +109,51 @@ class PaperService:
                     )
 
             return PaperResponse.from_crawler_paper(crawled_paper, summary)
+
+    async def get_paper(self, paper_identifier: str) -> PaperResponse:
+        """Get a paper by ID or arXiv ID.
+
+        Args:
+            paper_identifier: Paper ID or arXiv ID
+
+        Returns:
+            Paper with details and summary if available
+
+        Raises:
+            ValueError: If paper not found
+        """
+        # Find paper by ID or arXiv ID
+        paper = self._get_paper_by_identifier(paper_identifier)
+        if not paper:
+            raise ValueError(f"Paper not found: {paper_identifier}")
+
+        # Get summary if available
+        summary = None
+        if self.summary_repo and paper.paper_id:
+            summary_obj = self.summary_repo.get_by_paper_and_language(
+                paper.paper_id, "English"
+            )
+            if summary_obj:
+                # Create a simple summary string from the structured data
+                summary_parts = []
+                if summary_obj.overview:
+                    summary_parts.append(f"Overview: {summary_obj.overview}")
+                if summary_obj.motivation:
+                    summary_parts.append(
+                        f"Motivation: {summary_obj.motivation}"
+                    )
+                if summary_obj.method:
+                    summary_parts.append(f"Method: {summary_obj.method}")
+                if summary_obj.result:
+                    summary_parts.append(f"Result: {summary_obj.result}")
+                if summary_obj.conclusion:
+                    summary_parts.append(
+                        f"Conclusion: {summary_obj.conclusion}"
+                    )
+
+                summary = "\n\n".join(summary_parts)
+
+        return PaperResponse.from_crawler_paper(paper, summary)
 
     async def delete_paper(self, paper_identifier: str) -> PaperDeleteResponse:
         """Delete a paper by ID or arXiv ID.
@@ -120,7 +175,9 @@ class PaperService:
         # Delete paper from database
         if self.paper_repo and paper.paper_id:
             # For now, just log since delete method doesn't exist
-            logger.info(f"Would delete paper {paper.arxiv_id} (ID: {paper.paper_id})")
+            logger.info(
+                f"Would delete paper {paper.arxiv_id} (ID: {paper.paper_id})"
+            )
 
         return PaperDeleteResponse(
             id=str(paper.paper_id),
@@ -209,7 +266,10 @@ class PaperService:
             return None
 
     async def _summarize_paper_async(
-        self, paper: CrawlerPaper, force_resummarize: bool = False
+        self,
+        paper: CrawlerPaper,
+        force_resummarize: bool = False,
+        language: str = "Korean",
     ) -> None:
         """Summarize paper asynchronously.
 
@@ -222,23 +282,137 @@ class PaperService:
             return
 
         try:
+            logger.info(
+                f"Starting summarization for paper {paper.arxiv_id} (ID: {paper.paper_id})"
+            )
+
+            # Ensure database is connected by trying to reconnect if needed
+            try:
+                if self.db_manager:
+                    # Try to execute a simple query to check connection
+                    self.db_manager.execute("SELECT 1")
+            except Exception:
+                logger.info(f"Reconnecting database for paper {paper.arxiv_id}")
+                if self.db_manager:
+                    self.db_manager.connect()
+                    # Reinitialize repositories with new connection
+                    self.paper_repo = PaperRepository(self.db_manager)
+                    self.summary_repo = SummaryRepository(self.db_manager)
+
             # Check if summary already exists
-            if not force_resummarize and self.summary_repo:
-                # For now, just log since get_latest_by_paper_id doesn't exist
-                logger.info(f"Would check existing summary for paper {paper.arxiv_id}")
+            if not force_resummarize and self.summary_repo and paper.paper_id:
+                existing_summary = self.summary_repo.get_by_paper_and_language(
+                    paper.paper_id, language
+                )
+                if existing_summary:
+                    logger.info(
+                        f"Summary already exists for paper {paper.arxiv_id} in {language}"
+                    )
+                    return
 
             # Create summary request
+            logger.info(
+                f"Calling summarization service for paper {paper.arxiv_id}"
+            )
             summary_response = await self.summarization_service.summarize_paper(
                 paper_id=str(paper.paper_id),
                 abstract=paper.abstract,
-                language="English",
+                language=language,
+                interest_section=self.settings.default_interests,
             )
 
-            if summary_response and self.summary_repo:
-                # For now, just log since create_from_summary_response doesn't exist
-                logger.info(f"Would save summary for paper {paper.arxiv_id}")
+            logger.info(
+                f"Summary response received for paper {paper.arxiv_id}: {summary_response is not None}"
+            )
+
+            if summary_response and self.summary_repo and paper.paper_id:
+                # Create Summary model from response
+                from crawler.database.models import Summary
+
+                logger.info(
+                    f"Creating Summary model for paper {paper.arxiv_id}"
+                )
+
+                # Extract structured summary data
+                structured_data = summary_response.structured_summary
+                if structured_data:
+                    logger.info(
+                        f"Using structured summary data for paper {paper.arxiv_id}"
+                    )
+                    summary = Summary(
+                        paper_id=paper.paper_id,
+                        version=1,
+                        overview=structured_data.tldr or "",
+                        motivation=structured_data.motivation or "",
+                        method=structured_data.method or "",
+                        result=structured_data.result or "",
+                        conclusion=structured_data.conclusion or "",
+                        language=language,
+                        interests=self.settings.default_interests,
+                        relevance=(
+                            int(float(structured_data.relevance))
+                            if structured_data.relevance
+                            and structured_data.relevance.replace(
+                                ".", ""
+                            ).isdigit()
+                            else 0
+                        ),
+                        model=(
+                            summary_response.metadata.get("model", "unknown")
+                            if summary_response.metadata
+                            else "unknown"
+                        ),
+                    )
+                else:
+                    logger.info(
+                        f"Using simple summary data for paper {paper.arxiv_id}"
+                    )
+                    # Fallback to simple summary if structured data is not available
+                    summary = Summary(
+                        paper_id=paper.paper_id,
+                        version=1,
+                        overview=summary_response.summary or "",
+                        motivation="",
+                        method="",
+                        result="",
+                        conclusion="",
+                        language=language,
+                        interests=self.settings.default_interests,
+                        relevance=0,
+                        model=(
+                            summary_response.metadata.get("model", "unknown")
+                            if summary_response.metadata
+                            else "unknown"
+                        ),
+                    )
+
+                logger.info(
+                    f"Summary model created for paper {paper.arxiv_id}, attempting to save to database"
+                )
+
+                # Save to database
+                try:
+                    summary_id = self.summary_repo.create(summary)
+                    logger.info(
+                        f"Successfully saved summary {summary_id} for paper {paper.arxiv_id}"
+                    )
+                except Exception as db_error:
+                    logger.error(
+                        f"Database error saving summary for paper {paper.arxiv_id}: {db_error}"
+                    )
+                    raise
             else:
-                logger.error(f"Failed to create summary for paper {paper.arxiv_id}")
+                if not summary_response:
+                    logger.error(
+                        f"No summary response received for paper {paper.arxiv_id}"
+                    )
+                if not self.summary_repo:
+                    logger.error(
+                        f"No summary repository available for paper {paper.arxiv_id}"
+                    )
+                logger.error(
+                    f"Failed to create summary for paper {paper.arxiv_id}"
+                )
 
         except Exception as e:
             logger.error(f"Error summarizing paper {paper.arxiv_id}: {e}")
