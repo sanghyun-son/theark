@@ -5,7 +5,7 @@ class InfiniteScrollService {
         this.apiService = apiService;
         this.uiService = uiService;
         this.currentPage = 0;
-        this.pageSize = 20;
+        this.pageSize = 10;
         this.papers = [];
         this.isLoading = false;
         this.hasMore = true;
@@ -42,6 +42,9 @@ class InfiniteScrollService {
         this.isLoading = true;
         this.currentPage++;
         
+        // Show loading indicator
+        this.uiService.showLoadingIndicator('⏳ Loading more papers...');
+        
         try {
             const language = document.getElementById('summary-language').value;
             const data = await this.apiService.getPapers(this.pageSize, this.currentPage * this.pageSize, language);
@@ -53,11 +56,16 @@ class InfiniteScrollService {
             // Render all papers
             this.uiService.renderPaperList(this.papers);
             
-            // Show loading indicator at bottom
-            this.uiService.showLoadingIndicator();
+            // Update bottom indicator based on hasMore status
+            if (this.hasMore) {
+                this.uiService.showLoadMoreButton();
+            } else {
+                this.uiService.showRefreshButton();
+            }
         } catch (error) {
             console.error('Error loading more papers:', error);
             this.currentPage--; // Revert page increment
+            this.uiService.showErrorIndicator('❌ Failed to load more papers');
         } finally {
             this.isLoading = false;
         }
@@ -72,9 +80,16 @@ class InfiniteScrollService {
             this.papers = data.papers; // Store papers
             this.hasMore = data.has_more;
             this.uiService.renderPaperList(this.papers);
-            this.uiService.hideLoadingIndicator();
+            
+            // Update bottom indicator based on hasMore status
+            if (this.hasMore) {
+                this.uiService.showLoadMoreButton();
+            } else {
+                this.uiService.showRefreshButton();
+            }
         } catch (error) {
             console.error('Error loading papers:', error);
+            this.uiService.showErrorIndicator('❌ Failed to load papers');
         } finally {
             this.isLoading = false;
         }
@@ -85,6 +100,7 @@ class InfiniteScrollService {
         this.papers = [];
         this.hasMore = true;
         this.isLoading = false;
+        this.uiService.hideBottomIndicator();
     }
 
     getPapers() {

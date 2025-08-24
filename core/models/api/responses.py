@@ -17,10 +17,14 @@ class PaperResponse(BaseModel):
     pdf_url: str
     published_date: str | None = None
     summary: SummaryEntity | None = None
+    is_starred: bool = False
 
     @classmethod
     def from_crawler_paper(
-        cls, paper: "PaperEntity", summary: SummaryEntity | None = None
+        cls,
+        paper: PaperEntity,
+        summary: SummaryEntity | None = None,
+        is_starred: bool = False,
     ) -> "PaperResponse":
         """Create PaperResponse from crawler Paper model (legacy compatibility)."""
         return cls(
@@ -33,6 +37,7 @@ class PaperResponse(BaseModel):
             pdf_url=paper.url_pdf or "",
             published_date=paper.published_at,
             summary=summary,
+            is_starred=is_starred,
         )
 
 

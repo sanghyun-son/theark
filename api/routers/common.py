@@ -4,7 +4,7 @@ import datetime
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Request, status
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from pydantic import BaseModel
 
 from core import get_logger
@@ -97,3 +97,15 @@ async def favicon() -> HTMLResponse | FileResponse:
             status_code=200,
             headers={"Content-Type": "text/html"},
         )
+
+
+@router.get(
+    "/.well-known/appspecific/com.chrome.devtools.json",
+    include_in_schema=False,
+)
+def devtools_probe():
+    return JSONResponse(
+        content={},
+        media_type="application/json",
+        headers={"Cache-Control": "no-store"},
+    )

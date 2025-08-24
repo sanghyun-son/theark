@@ -135,6 +135,7 @@ class PaperService:
     async def get_papers(
         self,
         db_manager: SQLiteManager,
+        user: User,
         limit: int = 20,
         offset: int = 0,
         language: str = "Korean",
@@ -142,14 +143,29 @@ class PaperService:
         """Get papers with pagination."""
         paper_repo = PaperRepository(db_manager)
         summary_repo = SummaryRepository(db_manager)
+        user_repo = UserRepository(db_manager)
 
         try:
             papers, total_count = paper_repo.get_papers_paginated(limit, offset)
             paper_responses = []
 
+            # Get user's starred papers for efficient lookup
+            user_stars = []
+            if user.user_id is not None:
+                user_stars = user_repo.get_user_stars(user.user_id, limit=1000)
+                starred_paper_ids = {star.paper_id for star in user_stars}
+
             for paper in papers:
                 summary = self._get_paper_summary(paper, summary_repo, language)
-                paper_response = PaperResponse.from_crawler_paper(paper, summary)
+
+                # Check if this paper is starred by the user
+                is_starred = False
+                if user.user_id is not None and paper.paper_id:
+                    is_starred = paper.paper_id in starred_paper_ids
+
+                paper_response = PaperResponse.from_crawler_paper(
+                    paper, summary, is_starred
+                )
                 paper_responses.append(paper_response)
 
             has_more = total_count > (offset + limit)

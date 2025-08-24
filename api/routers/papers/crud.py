@@ -4,6 +4,7 @@ from fastapi import APIRouter, Query
 
 from api.dependencies import (
     ArxivClientDep,
+    CurrentUser,
     DBManager,
     LLMDBManager,
     PaperServiceDep,
@@ -24,6 +25,7 @@ router = APIRouter()
 async def get_papers(
     paper_service: PaperServiceDep,
     db_manager: DBManager,
+    current_user: CurrentUser,
     limit: int = Query(
         default=20, ge=1, le=100, description="Number of papers to return"
     ),
@@ -35,6 +37,7 @@ async def get_papers(
     Args:
         limit: Number of papers to return (1-100)
         offset: Number of papers to skip
+        current_user: Current user information
 
     Returns:
         List of papers with pagination metadata
@@ -45,7 +48,7 @@ async def get_papers(
 
     async def get_papers_operation() -> PaperListResponse:
         return await paper_service.get_papers(
-            db_manager, limit=limit, offset=offset, language=language
+            db_manager, current_user, limit=limit, offset=offset, language=language
         )
 
     return await handle_async_api_operation(
