@@ -25,9 +25,9 @@ class TestArxivParser:
     @pytest.fixture
     def sample_xml(self):
         """Sample XML response from arXiv API."""
-        from tests.shared_test_data import SAMPLE_PAPER_XML
+        from tests.shared_test_data import ARXIV_RESPONSES
 
-        return SAMPLE_PAPER_XML
+        return ARXIV_RESPONSES["1706.03762"]
 
     def test_initialization(self, parser):
         """Test parser initialization."""
@@ -46,16 +46,16 @@ class TestArxivParser:
         assert "Transformer" in paper.abstract
         assert paper.authors == "Ashish Vaswani;Noam Shazeer;Niki Parmar"
         assert paper.primary_category == "cs.CL"
-        assert paper.categories == "cs.CL,cs.LG"
+        assert paper.categories == "cs.CL,cs.AI"
         assert paper.url_abs == "https://arxiv.org/abs/1706.03762"
         assert paper.url_pdf == "https://arxiv.org/pdf/1706.03762"
         # Note: Paper model doesn't include doi and comments fields
 
     def test_parse_paper_no_entries(self, parser):
         """Test parsing XML with no entries."""
-        from tests.shared_test_data import EMPTY_FEED_XML
+        from tests.shared_test_data import ARXIV_RESPONSES
 
-        paper = parser.parse_paper(EMPTY_FEED_XML)
+        paper = parser.parse_paper(ARXIV_RESPONSES["9999.99999"])
         assert paper is None
 
     def test_parse_paper_invalid_xml(self, parser):
@@ -267,17 +267,14 @@ class TestArxivParser:
 
     def test_parse_paper_with_mock_server(self, parser, mock_arxiv_server):
         """Test parsing paper using mock arXiv server."""
-        from tests.shared_test_data import DETAILED_PAPER_XML
+        from tests.shared_test_data import ARXIV_RESPONSES
 
-        paper = parser.parse_paper(DETAILED_PAPER_XML)
+        paper = parser.parse_paper(ARXIV_RESPONSES["1706.03762"])
 
         assert paper is not None
         assert paper.arxiv_id == "1706.03762"
         assert paper.title == "Attention Is All You Need"
         assert "Transformer" in paper.abstract
-        assert (
-            paper.authors
-            == "Ashish Vaswani;Noam Shazeer;Niki Parmar;Jakob Uszkoreit;Llion Jones;Aidan N. Gomez;Lukasz Kaiser;Illia Polosukhin"
-        )
+        assert paper.authors == "Ashish Vaswani;Noam Shazeer;Niki Parmar"
         assert paper.primary_category == "cs.CL"
-        assert paper.categories == "cs.CL,cs.LG"
+        assert paper.categories == "cs.CL,cs.AI"

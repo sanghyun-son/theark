@@ -180,7 +180,7 @@ class PaperSummarizationService:
                 result=analysis.result or "No result available",
                 conclusion=analysis.conclusion or "No conclusion available",
                 language=language,
-                interests="machine learning",  # Default value
+                interests=settings.default_interests,
                 relevance=self._parse_relevance(analysis.relevance),
                 model=settings.llm_model,
                 is_read=False,
@@ -197,7 +197,7 @@ class PaperSummarizationService:
                 result="No structured result available",
                 conclusion="No structured conclusion available",
                 language=language,
-                interests="machine learning",
+                interests=settings.default_interests,
                 relevance=5,  # Default relevance
                 model=settings.llm_model,
                 is_read=False,

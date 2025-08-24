@@ -1,52 +1,20 @@
 """Shared test data for theark tests."""
 
-# Sample arXiv XML responses for testing
-SAMPLE_PAPER_XML = """<?xml version="1.0" encoding="UTF-8"?>
-<feed xmlns="http://www.w3.org/2005/Atom" xmlns:arxiv="http://arxiv.org/schemas/atom">
-  <entry>
-    <id>http://arxiv.org/abs/1706.03762</id>
-    <updated>2017-06-12T18:00:00Z</updated>
-    <published>2017-06-12T18:00:00Z</published>
-    <title>Attention Is All You Need</title>
-    <summary>We propose a new simple network architecture, the Transformer, based solely on attention mechanisms, dispensing with recurrence and convolutions entirely.</summary>
-    <author>
-      <name>Ashish Vaswani</name>
-    </author>
-    <author>
-      <name>Noam Shazeer</name>
-    </author>
-    <author>
-      <name>Niki Parmar</name>
-    </author>
-    <arxiv:primary_category xmlns:arxiv="http://arxiv.org/schemas/atom" term="cs.CL" />
-    <category term="cs.CL" />
-    <category term="cs.LG" />
-    <link title="pdf" href="https://arxiv.org/pdf/1706.03762" rel="related" type="application/pdf" />
-    <link title="doi" href="https://doi.org/10.48550/arXiv.1706.03762" rel="related" />
-    <arxiv:doi xmlns:arxiv="http://arxiv.org/schemas/atom">10.48550/arXiv.1706.03762</arxiv:doi>
-    <arxiv:comment xmlns:arxiv="http://arxiv.org/schemas/atom">NIPS 2017</arxiv:comment>
-  </entry>
-</feed>"""
-
-EMPTY_FEED_XML = """<?xml version="1.0" encoding="UTF-8"?>
+# ArXiv Mock Data
+ARXIV_RESPONSES = {
+    "1706.03762": """<?xml version="1.0" encoding="UTF-8"?>
 <feed xmlns="http://www.w3.org/2005/Atom">
-</feed>"""
-
-# More detailed XML response (matches mock server format)
-DETAILED_PAPER_XML = """<?xml version="1.0" encoding="UTF-8"?>
-<feed xmlns="http://www.w3.org/2005/Atom" xmlns:opensearch="http://a9.com/-/spec/opensearch/1.1/" xmlns:arxiv="http://arxiv.org/schemas/atom">
-  <title>ArXiv Query: search_query=id:1706.03762&amp;id_list=&amp;start=0&amp;max_results=1</title>
-  <id>http://arxiv.org/api/query?search_query=id:1706.03762&amp;id_list=&amp;start=0&amp;max_results=1</id>
-  <updated>2023-08-02T00:41:18Z</updated>
-  <opensearch:totalResults>1</opensearch:totalResults>
-  <opensearch:startIndex>0</opensearch:startIndex>
-  <opensearch:itemsPerPage>1</opensearch:itemsPerPage>
   <entry>
     <id>http://arxiv.org/abs/1706.03762</id>
-    <updated>2023-08-02T00:41:18Z</updated>
-    <published>2017-06-12T17:57:34Z</published>
+    <updated>2017-12-06T00:37:27Z</updated>
+    <published>2017-06-12T17:57:58Z</published>
     <title>Attention Is All You Need</title>
-    <summary>The dominant sequence transduction models are based on complex recurrent or convolutional neural networks in an encoder-decoder configuration. The best performing models also connect the encoder and decoder through an attention mechanism. We propose a new simple network architecture, the Transformer, based solely on attention mechanisms, dispensing with recurrence and convolutions entirely. Experiments on two machine translation tasks show these models to be superior in quality while being more parallelizable and requiring significantly less time to train. Our model achieves 28.4 BLEU on the WMT 2014 English-to-German translation task, improving over the existing best results, including ensembles by over 2 BLEU. On the WMT 2014 English-to-French translation task, our model establishes a new single-model state-of-the-art BLEU score of 41.8 after training for 3.5 days on eight GPUs, a small fraction of the training costs of the best models from the literature. We show that the Transformer generalizes well to other tasks by applying it successfully to English constituency parsing both with large and limited training data.</summary>
+    <summary>The dominant sequence transduction models are based on complex recurrent or
+convolutional neural networks that include an encoder and a decoder. The best
+performing models also connect the encoder and decoder through an attention
+mechanism. We propose a new simple network architecture, the Transformer,
+based solely on attention mechanisms, dispensing with recurrence and
+convolutions entirely.</summary>
     <author>
       <name>Ashish Vaswani</name>
     </author>
@@ -55,94 +23,180 @@ DETAILED_PAPER_XML = """<?xml version="1.0" encoding="UTF-8"?>
     </author>
     <author>
       <name>Niki Parmar</name>
-    </author>
-    <author>
-      <name>Jakob Uszkoreit</name>
-    </author>
-    <author>
-      <name>Llion Jones</name>
-    </author>
-    <author>
-      <name>Aidan N. Gomez</name>
-    </author>
-    <author>
-      <name>Lukasz Kaiser</name>
-    </author>
-    <author>
-      <name>Illia Polosukhin</name>
     </author>
     <link href="http://arxiv.org/abs/1706.03762" rel="alternate" type="text/html"/>
     <link title="pdf" href="http://arxiv.org/pdf/1706.03762" rel="related" type="application/pdf"/>
     <arxiv:primary_category xmlns:arxiv="http://arxiv.org/schemas/atom" term="cs.CL" scheme="http://arxiv.org/schemas/atom"/>
-    <category term="cs.CL"/>
-    <category term="cs.LG"/>
-    <arxiv:doi xmlns:arxiv="http://arxiv.org/schemas/atom">10.48550/arXiv.1706.03762</arxiv:doi>
-    <arxiv:journal_ref xmlns:arxiv="http://arxiv.org/schemas/atom"></arxiv:journal_ref>
-    <arxiv:comment xmlns:arxiv="http://arxiv.org/schemas/atom">15 pages, 5 figures</arxiv:comment>
+    <category term="cs.CL" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.AI" scheme="http://arxiv.org/schemas/atom"/>
   </entry>
-</feed>"""
-
-# Sample paper data
-SAMPLE_PAPER_DATA = {
-    "arxiv_id": "1706.03762",
-    "title": "Attention Is All You Need",
-    "abstract": "We propose a new simple network architecture, the Transformer, based solely on attention mechanisms, dispensing with recurrence and convolutions entirely.",
-    "authors": "Ashish Vaswani;Noam Shazeer;Niki Parmar",
-    "primary_category": "cs.CL",
-    "categories": "cs.CL,cs.LG",
-    "url_abs": "https://arxiv.org/abs/1706.03762",
-    "url_pdf": "https://arxiv.org/pdf/1706.03762",
-    "published_at": "2017-06-12T18:00:00Z",
-    "updated_at": "2017-06-12T18:00:00Z",
+</feed>""",
+    "9999.99999": """<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <opensearch:totalResults xmlns:opensearch="http://a9.com/-/spec/opensearch/1.1/">0</opensearch:totalResults>
+  <opensearch:startIndex xmlns:opensearch="http://a9.com/-/spec/opensearch/1.1/">0</opensearch:startIndex>
+  <opensearch:itemsPerPage xmlns:opensearch="http://a9.com/-/spec/opensearch/1.1/">1</opensearch:itemsPerPage>
+</feed>""",
+    "default": """<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <entry>
+    <id>http://arxiv.org/abs/1409.0575</id>
+    <updated>2014-09-01T22:29:38Z</updated>
+    <published>2014-09-01T22:29:38Z</published>
+    <title>ImageNet Large Scale Visual Recognition Challenge</title>
+    <summary>The ImageNet Large Scale Visual Recognition Challenge is a benchmark in
+object category classification and detection on hundreds of object categories
+and millions of images. The challenge has been run annually from 2010 to
+present, attracting participation from more than fifty institutions.
+  This paper describes the creation of this benchmark dataset and the advances
+in object recognition that have been possible as a result. We discuss the
+challenges of collecting large-scale ground truth annotation, highlight key
+breakthroughs in categorical object recognition, provide a detailed analysis of
+the current state of the field of large-scale image classification and object
+detection, and compare the state-of-the-art computer vision accuracy with human
+accuracy. We conclude with lessons learned in the five years of the challenge,
+and propose future directions and improvements.</summary>
+    <author>
+      <name>Olga Russakovsky</name>
+    </author>
+    <author>
+      <name>Jia Deng</name>
+    </author>
+    <author>
+      <name>Hao Su</name>
+    </author>
+    <author>
+      <name>Jonathan Krause</name>
+    </author>
+    <author>
+      <name>Sanjeev Satheesh</name>
+    </author>
+    <author>
+      <name>Sean Ma</name>
+    </author>
+    <author>
+      <name>Zhiheng Huang</name>
+    </author>
+    <author>
+      <name>Andrej Karpathy</name>
+    </author>
+    <author>
+      <name>Aditya Khosla</name>
+    </author>
+    <author>
+      <name>Michael Bernstein</name>
+    </author>
+    <author>
+      <name>Alexander C. Berg</name>
+    </author>
+    <author>
+      <name>Li Fei-Fei</name>
+    </author>
+    <link href="http://arxiv.org/abs/1409.0575" rel="alternate" type="text/html"/>
+    <link title="pdf" href="http://arxiv.org/pdf/1409.0575" rel="related" type="application/pdf"/>
+    <arxiv:primary_category xmlns:arxiv="http://arxiv.org/schemas/atom" term="cs.CV" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.CV" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="I.4.8; I.5.2" scheme="http://arxiv.org/schemas/atom"/>
+  </entry>
+</feed>""",
 }
 
-# Sample summary data
-SAMPLE_SUMMARY_DATA = {
-    "paper_id": 1,
-    "version": 1,
-    "overview": "This paper presents the Transformer architecture as a novel approach to sequence-to-sequence modeling.",
-    "motivation": "Existing models rely heavily on recurrent or convolutional neural networks which are slow and difficult to parallelize.",
-    "method": "The authors propose a model based entirely on attention mechanisms, eliminating recurrence and convolutions.",
-    "result": "The Transformer achieves new state-of-the-art results on machine translation tasks while being more parallelizable.",
-    "conclusion": "Attention is all you need for sequence modeling, opening up new possibilities for parallelization and efficiency.",
-    "language": "English",
-    "interests": "attention,transformer,machine translation,neural networks",
-    "relevance": 9,
-    "model": "gpt-4",
-}
-
-# Sample user data
-SAMPLE_USER_DATA = {
-    "email": "researcher@example.com",
-    "display_name": "AI Researcher",
-}
-
-# Sample interest data
-SAMPLE_INTEREST_DATA = {
-    "user_id": 1,
-    "kind": "category",
-    "value": "cs.CL",
-    "weight": 2.0,
-}
-
-# Sample star data
-SAMPLE_STAR_DATA = {
-    "user_id": 1,
-    "paper_id": 1,
-    "note": "Important paper for my research",
-}
-
-# Sample feed item data
-SAMPLE_FEED_ITEM_DATA = {
-    "user_id": 1,
-    "paper_id": 1,
-    "score": 0.95,
-    "feed_date": "2021-01-01",
-}
-
-# Sample crawl event data
-SAMPLE_CRAWL_EVENT_DATA = {
-    "arxiv_id": "1706.03762",
-    "event_type": "FOUND",
-    "detail": "Paper found during crawl",
+# OpenAI Mock Data
+OPENAI_RESPONSES = {
+    "tool_response": {
+        "id": "chatcmpl-test-123",
+        "object": "chat.completion",
+        "created": 1677652288,
+        "model": "gpt-4o-mini",
+        "usage": {
+            "prompt_tokens": 150,
+            "completion_tokens": 80,
+            "total_tokens": 230,
+        },
+        "choices": [
+            {
+                "index": 0,
+                "message": {
+                    "role": "assistant",
+                    "content": None,
+                    "tool_calls": [
+                        {
+                            "id": "call_123",
+                            "type": "function",
+                            "function": {
+                                "name": "Structure",
+                                "arguments": '{"tldr": "This paper presents a novel approach to abstract summarization using professional analysis methods.", "motivation": "Current methods lack structured analysis of research papers and fail to provide relevance scoring.", "method": "The authors propose a function-calling approach with structured output and professional evaluation criteria.", "result": "Improved accuracy in extracting key information from abstracts with relevance scoring from 1-10.", "conclusion": "Function calling enables better structured summarization with professional-grade analysis.", "relevance": "8"}',
+                            },
+                        }
+                    ],
+                },
+                "finish_reason": "tool_calls",
+            }
+        ],
+    },
+    "text_response": {
+        "id": "chatcmpl-test-456",
+        "object": "chat.completion",
+        "created": 1677652288,
+        "model": "gpt-4o-mini",
+        "usage": {
+            "prompt_tokens": 50,
+            "completion_tokens": 20,
+            "total_tokens": 70,
+        },
+        "choices": [
+            {
+                "index": 0,
+                "message": {
+                    "role": "assistant",
+                    "content": "This paper presents a professional analysis of abstract summarization methods. The research demonstrates improved techniques for extracting key information with relevance scoring. Based on the provided interests, this work has a relevance score of 7 out of 10.",
+                },
+                "finish_reason": "stop",
+            }
+        ],
+    },
+    "batch_response": {
+        "id": "batch-test-123",
+        "object": "batch",
+        "status": "completed",
+        "results": [
+            {
+                "custom_id": "paper-001",
+                "response": {
+                    "status_code": 200,
+                    "body": {
+                        "id": "chatcmpl-batch-1",
+                        "object": "chat.completion",
+                        "created": 1677652288,
+                        "model": "gpt-4o-mini",
+                        "choices": [
+                            {
+                                "index": 0,
+                                "message": {
+                                    "role": "assistant",
+                                    "content": None,
+                                    "tool_calls": [
+                                        {
+                                            "id": "call_batch_1",
+                                            "type": "function",
+                                            "function": {
+                                                "name": "Structure",
+                                                "arguments": '{"tldr": "Batch processed paper summary.", "motivation": "Efficient processing of multiple papers.", "method": "Batch API processing.", "result": "Successfully processed in batch.", "conclusion": "Batch processing is effective.", "relevance": "Medium"}',
+                                            },
+                                        }
+                                    ],
+                                },
+                                "finish_reason": "tool_calls",
+                            }
+                        ],
+                        "usage": {
+                            "prompt_tokens": 30,
+                            "completion_tokens": 15,
+                            "total_tokens": 45,
+                        },
+                    },
+                },
+            }
+        ],
+    },
 }

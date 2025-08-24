@@ -32,17 +32,17 @@ class OpenAISummarizer(AbstractSummarizer):
         api_key: str,
         base_url: str = "https://api.openai.com/v1",
         db_manager: Any = None,
+        timeout: float = 60.0,
     ):
         """Initialize the OpenAI summarizer."""
         self.api_key = api_key
         self.base_url = base_url
         self.db_manager = db_manager
-        # Increase timeout for OpenAI API calls (default is 5 seconds)
-        self.client = httpx.AsyncClient(timeout=httpx.Timeout(60.0))
+        self.timeout = timeout
+        self.client = httpx.AsyncClient(timeout=httpx.Timeout(timeout))
 
     async def summarize(self, request: SummaryRequest) -> SummaryResponse:
         """Summarize the given abstract using OpenAI API."""
-        # Track the LLM request
         with LLMRequestContext(
             model=request.model,
             custom_id=request.custom_id,
@@ -50,69 +50,14 @@ class OpenAISummarizer(AbstractSummarizer):
             endpoint="/v1/chat/completions",
             is_batched=False,
             request_type="chat",
-            metadata={
-                "use_tools": request.use_tools,
-                "language": request.language,
-                "content_length": len(request.content),
-            },
+            metadata=self._create_request_metadata(request),
             db_manager=self.db_manager,
         ) as llm_context:
-            # Create messages
-            messages = [
-                OpenAIMessage(
-                    role="system",
-                    content=SYSTEM_PROMPT.format(language=request.language),
-                ),
-                OpenAIMessage(
-                    role="user",
-                    content=USER_PROMPT.format(
-                        language=request.language,
-                        interest_section=request.interest_section,
-                        content=request.content,
-                    ),
-                ),
-            ]
+            # Build and send request
+            payload = self._build_request_payload(request)
+            response = await self._make_api_request(payload)
 
-            # Create request payload
-            payload = ChatCompletionRequest(
-                model=request.model,
-                messages=messages,
-            )
-
-            # Add tools if requested
-            if request.use_tools:
-                function_parameters = OpenAIFunctionParameter(
-                    type="object",
-                    description="Paper analysis parameters",
-                    properties=PaperAnalysis.create_paper_analysis_schema(
-                        RELEVANCE_DESCRIPTION
-                    ),
-                    required=PaperAnalysis.get_required_fields(),
-                )
-
-                function = OpenAIFunction(
-                    name="Structure",
-                    description="Analyze paper abstract and extract key information",
-                    parameters=function_parameters,
-                )
-
-                tool = OpenAITool(function=function)
-                tool_choice = OpenAIToolChoice(function={"name": "Structure"})
-
-                payload.tools = [tool]
-                payload.tool_choice = tool_choice
-
-            # Make the API request
-            response = await self.client.post(
-                f"{self.base_url}/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {self.api_key}",
-                    "Content-Type": "application/json",
-                },
-                json=payload.model_dump(),
-            )
-
-            # Update HTTP status in tracking
+            # Update tracking with response data
             llm_context.update_http_status(response.status_code)
 
             if response.status_code != 200:
@@ -120,56 +65,152 @@ class OpenAISummarizer(AbstractSummarizer):
                     f"OpenAI API error: {response.status_code} - {response.text}"
                 )
 
-            response_data = response.json()
-            chat_response = ChatCompletionResponse(**response_data)
-            choice = chat_response.choices[0]
-            message = choice.message
+            # Parse response
+            chat_response = ChatCompletionResponse(**response.json())
+            self._update_token_tracking(llm_context, chat_response)
 
-            # Update token usage in tracking
-            if chat_response.usage:
-                llm_context.update_tokens(
-                    {
-                        "prompt_tokens": chat_response.usage.prompt_tokens,
-                        "completion_tokens": chat_response.usage.completion_tokens,
-                        "total_tokens": chat_response.usage.total_tokens,
-                    }
-                )
+            return self._parse_response(request, chat_response)
 
-            # Parse the response based on whether tools were used
-            if request.use_tools and message.tool_calls:
-                # Structured response with function calling
-                tool_call = message.tool_calls[0]
+    def _create_request_metadata(self, request: SummaryRequest) -> dict[str, Any]:
+        """Create metadata for the LLM request tracking."""
+        return {
+            "use_tools": request.use_tools,
+            "language": request.language,
+            "content_length": len(request.content),
+        }
 
-                # Use Pydantic validation for function arguments
-                analysis_args = PaperAnalysis.from_json_string(
-                    tool_call.function.arguments
-                )
+    def _build_request_payload(self, request: SummaryRequest) -> ChatCompletionRequest:
+        """Build the OpenAI API request payload."""
+        messages = self._create_messages(request)
+        payload = ChatCompletionRequest(model=request.model, messages=messages)
 
-                return SummaryResponse(
-                    custom_id=request.custom_id,
-                    structured_summary=analysis_args,
-                    original_length=len(request.content),
-                    summary_length=len(analysis_args.tldr),
-                    metadata={
-                        "model": request.model,
-                        "usage": chat_response.usage.model_dump(),
-                        "finish_reason": choice.finish_reason,
-                    },
-                )
-            else:
-                # Regular text response
-                content = message.content or ""
-                return SummaryResponse(
-                    custom_id=request.custom_id,
-                    summary=content,
-                    original_length=len(request.content),
-                    summary_length=len(content),
-                    metadata={
-                        "model": request.model,
-                        "usage": chat_response.usage.model_dump(),
-                        "finish_reason": choice.finish_reason,
-                    },
-                )
+        if request.use_tools:
+            payload.tools = [self._create_tool()]
+            payload.tool_choice = self._create_tool_choice()
+
+        return payload
+
+    def _create_messages(self, request: SummaryRequest) -> list[OpenAIMessage]:
+        """Create the messages for the OpenAI API request."""
+        return [
+            OpenAIMessage(
+                role="system",
+                content=SYSTEM_PROMPT.format(language=request.language),
+            ),
+            OpenAIMessage(
+                role="user",
+                content=USER_PROMPT.format(
+                    language=request.language,
+                    interest_section=request.interest_section,
+                    content=request.content,
+                ),
+            ),
+        ]
+
+    def _create_tool(self) -> OpenAITool:
+        """Create the function calling tool."""
+        function_parameters = OpenAIFunctionParameter(
+            type="object",
+            description="Paper analysis parameters",
+            properties=PaperAnalysis.create_paper_analysis_schema(
+                RELEVANCE_DESCRIPTION
+            ),
+            required=PaperAnalysis.get_required_fields(),
+        )
+
+        function = OpenAIFunction(
+            name="Structure",
+            description="Analyze paper abstract and extract key information",
+            parameters=function_parameters,
+        )
+
+        return OpenAITool(function=function)
+
+    def _create_tool_choice(self) -> OpenAIToolChoice:
+        """Create the tool choice configuration."""
+        return OpenAIToolChoice(function={"name": "Structure"})
+
+    async def _make_api_request(self, payload: ChatCompletionRequest) -> httpx.Response:
+        """Make the API request to OpenAI."""
+        return await self.client.post(
+            f"{self.base_url}/chat/completions",
+            headers={
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json",
+            },
+            json=payload.model_dump(),
+        )
+
+    def _update_token_tracking(
+        self, llm_context: LLMRequestContext, chat_response: ChatCompletionResponse
+    ) -> None:
+        """Update token usage tracking."""
+        if chat_response.usage:
+            llm_context.update_tokens(
+                {
+                    "prompt_tokens": chat_response.usage.prompt_tokens,
+                    "completion_tokens": chat_response.usage.completion_tokens,
+                    "total_tokens": chat_response.usage.total_tokens,
+                }
+            )
+
+    def _parse_response(
+        self, request: SummaryRequest, chat_response: ChatCompletionResponse
+    ) -> SummaryResponse:
+        """Parse the OpenAI API response."""
+        choice = chat_response.choices[0]
+        message = choice.message
+        metadata = self._create_response_metadata(request, chat_response, choice)
+
+        if request.use_tools and message.tool_calls:
+            return self._parse_structured_response(request, message, metadata)
+        else:
+            return self._parse_text_response(request, message, metadata)
+
+    def _create_response_metadata(
+        self,
+        request: SummaryRequest,
+        chat_response: ChatCompletionResponse,
+        choice: Any,
+    ) -> dict[str, Any]:
+        """Create metadata for the response."""
+        return {
+            "model": request.model,
+            "usage": chat_response.usage.model_dump() if chat_response.usage else None,
+            "finish_reason": choice.finish_reason,
+        }
+
+    def _parse_structured_response(
+        self, request: SummaryRequest, message: OpenAIMessage, metadata: dict[str, Any]
+    ) -> SummaryResponse:
+        """Parse structured response with function calling."""
+        if not message.tool_calls:
+            raise ValueError("Expected tool calls but none found")
+
+        tool_call = message.tool_calls[0]
+        analysis_args = PaperAnalysis.from_json_string(tool_call.function.arguments)
+
+        return SummaryResponse(
+            custom_id=request.custom_id,
+            structured_summary=analysis_args,
+            original_length=len(request.content),
+            summary_length=len(analysis_args.tldr),
+            metadata=metadata,
+        )
+
+    def _parse_text_response(
+        self, request: SummaryRequest, message: OpenAIMessage, metadata: dict[str, Any]
+    ) -> SummaryResponse:
+        """Parse regular text response."""
+        content = message.content or ""
+
+        return SummaryResponse(
+            custom_id=request.custom_id,
+            summary=content,
+            original_length=len(request.content),
+            summary_length=len(content),
+            metadata=metadata,
+        )
 
     async def close(self) -> None:
         """Close the HTTP client."""

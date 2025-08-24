@@ -5,6 +5,14 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 
+class TokenUsage(BaseModel):
+    """Generic token usage model for LLM requests."""
+
+    prompt_tokens: int = Field(description="Number of tokens in the prompt")
+    completion_tokens: int = Field(description="Number of tokens in the completion")
+    total_tokens: int = Field(description="Total number of tokens used")
+
+
 class OpenAIMessage(BaseModel):
     """OpenAI API message model."""
 
@@ -66,12 +74,11 @@ class OpenAIToolCall(BaseModel):
     function: OpenAIFunctionCall
 
 
-class OpenAITokenUsage(BaseModel):
-    """OpenAI API token usage model."""
+class OpenAITokenUsage(TokenUsage):
+    """OpenAI API token usage model (extends generic TokenUsage)."""
 
-    prompt_tokens: int
-    completion_tokens: int
-    total_tokens: int
+    # Inherits all fields from TokenUsage
+    pass
 
 
 class OpenAIChoice(BaseModel):

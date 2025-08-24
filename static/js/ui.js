@@ -405,6 +405,8 @@ class UIService {
         if (papersContainer && paperElement) {
             // Insert at the beginning
             papersContainer.insertBefore(paperElement, papersContainer.firstChild);
+            
+
         }
     }
 
@@ -431,22 +433,45 @@ class UIService {
                 }
                 
                 // Update the TLDR summary if it exists
+                let tldrContainer = paperElement.querySelector('.tldr-container');
                 let tldrElement = paperElement.querySelector('.paper-tldr');
                 
                 if (paperData.summary) {
                     if (tldrElement) {
                         // Update existing TLDR
                         tldrElement.textContent = this.createTLDR(paperData.summary);
+                        
+                        // Update relevance tag if exists
+                        const existingRelevanceTag = tldrContainer.querySelector('.paper-relevance-tag-container');
+                        if (existingRelevanceTag) {
+                            existingRelevanceTag.remove();
+                        }
+                        
+                        if (paperData.summary.relevance !== undefined && paperData.summary.relevance !== null) {
+                            const relevanceTag = this.createRelevanceTag(paperData.summary.relevance, true);
+                            tldrContainer.insertBefore(relevanceTag, tldrElement);
+                        }
                     } else {
-                        // Create new TLDR element
+                        // Create new TLDR container and element
+                        tldrContainer = document.createElement('div');
+                        tldrContainer.className = 'tldr-container';
+                        tldrContainer.style.position = 'relative';
+                        
+                        // Add relevance tag if exists
+                        if (paperData.summary.relevance !== undefined && paperData.summary.relevance !== null) {
+                            const relevanceTag = this.createRelevanceTag(paperData.summary.relevance, true);
+                            tldrContainer.appendChild(relevanceTag);
+                        }
+                        
                         tldrElement = document.createElement('div');
                         tldrElement.className = 'paper-tldr korean-text';
                         tldrElement.textContent = this.createTLDR(paperData.summary);
                         tldrElement.onclick = () => this.showSummaryModal(paperData);
+                        tldrContainer.appendChild(tldrElement);
                         
                         // Insert before categories
                         const categoriesContainer = paperElement.querySelector('.paper-categories').parentElement;
-                        paperElement.insertBefore(tldrElement, categoriesContainer);
+                        paperElement.insertBefore(tldrContainer, categoriesContainer);
                     }
                 }
                 break;

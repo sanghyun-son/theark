@@ -44,7 +44,7 @@ class SummarizationConfig:
     language: str = "English"
 
     # User interest section for relevance scoring
-    interest_section: str = ""
+    interest_section: str = "Machine Learning,Deep Learning"
 
 
 @dataclass
