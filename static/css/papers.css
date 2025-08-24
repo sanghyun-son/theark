@@ -15,6 +15,7 @@
     border: 1px solid #e1e5e9;
     border-radius: 8px;
     padding: 0.5rem;
+    padding-top: 0.25rem;
     margin-left: 0.5rem;
     margin-right: 1.5rem;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
@@ -24,7 +25,9 @@
     box-sizing: border-box;
     position: relative;
     overflow: visible;
-    height: fit-content; /* Ensure consistent height in grid */
+    min-height: 120px; /* Fixed minimum height */
+    display: flex;
+    flex-direction: column;
 }
 
 .paper-item:hover {
@@ -42,16 +45,38 @@
     border-color: #d97706;
 }
 
+/* Paper title row layout */
+.paper-title-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
 .paper-title {
     font-size: 1.1rem;
     font-weight: 600;
     color: #2c3e50;
-    margin-bottom: 0.5rem;
     line-height: 1.4;
+    font-family: 'Consolas', 'Malgun Gothic', '맑은 고딕', 'Monaco', 'Courier New', monospace;
+    flex: 1;
+    min-width: 0; /* Allow flex item to shrink below content size */
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.paper-id {
+    color: #666;
+    font-weight: normal;
+    flex-shrink: 0;
+}
+
+.paper-title-text {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    font-family: 'Consolas', 'Malgun Gothic', '맑은 고딕', 'Monaco', 'Courier New', monospace;
+    flex: 1;
+    min-width: 0;
 }
 
 .paper-meta {
@@ -95,6 +120,7 @@
     display: flex;
     gap: 0.25rem;
     align-items: center;
+    flex-shrink: 0;
 }
 
 .paper-link {

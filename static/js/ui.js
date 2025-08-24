@@ -32,20 +32,13 @@ class UIService {
             paperDiv.classList.add('unread');
         }
         
-        // Title with links on the left
+        // Title row with links, title, and star button
         const titleRow = document.createElement('div');
-        titleRow.style.display = 'flex';
-        titleRow.style.alignItems = 'flex-start';
-        titleRow.style.gap = '0.5rem';
+        titleRow.className = 'paper-title-row';
         
         // Links
         const linksDiv = document.createElement('div');
         linksDiv.className = 'paper-links';
-        linksDiv.style.flexShrink = '0';
-        linksDiv.style.display = 'flex';
-        linksDiv.style.alignItems = 'center';
-        linksDiv.style.gap = '0.25rem';
-        linksDiv.style.marginTop = '0.1rem';
         
         const pdfLink = document.createElement('a');
         pdfLink.href = paper.pdf_url;
@@ -66,22 +59,23 @@ class UIService {
         // Title with ID
         const titleDiv = document.createElement('div');
         titleDiv.className = 'paper-title';
-        titleDiv.style.flex = '1';
-        titleDiv.style.marginBottom = '0';
         
         const idSpan = document.createElement('span');
-        idSpan.style.color = '#666';
-        idSpan.style.fontWeight = 'normal';
-        idSpan.style.marginRight = '0.5rem';
+        idSpan.className = 'paper-id';
         idSpan.textContent = `[${paper.arxiv_id}]`;
         
         const titleText = document.createElement('span');
+        titleText.className = 'paper-title-text';
         titleText.textContent = paper.title;
         titleText.title = paper.title;
         
         titleDiv.appendChild(idSpan);
         titleDiv.appendChild(titleText);
         titleRow.appendChild(titleDiv);
+        
+        // Star button (fixed width)
+        const starButton = this.createStarButton(paper);
+        titleRow.appendChild(starButton);
         
         paperDiv.appendChild(titleRow);
         
@@ -227,6 +221,94 @@ class UIService {
         }
         
         return null;
+    }
+
+    createStarButton(paper) {
+        const starButton = document.createElement('button');
+        starButton.className = 'star-button';
+        
+        // Set initial state based on paper data
+        const isStarred = paper.is_starred || false;
+        starButton.textContent = isStarred ? '⭐' : '☆';
+        starButton.title = isStarred ? 'Remove from favorites' : 'Add to favorites';
+        
+        if (isStarred) {
+            starButton.classList.add('starred');
+        }
+        
+        // Add click handler
+        starButton.onclick = (e) => {
+            e.stopPropagation(); // Prevent triggering other click events
+            this.toggleStar(paper, starButton);
+        };
+        
+        return starButton;
+    }
+
+    async toggleStar(paper, starButton) {
+        try {
+            const isCurrentlyStarred = starButton.textContent === '⭐';
+            
+            if (isCurrentlyStarred) {
+                // Remove star
+                await this.removeStar(paper.paper_id);
+                starButton.textContent = '☆';
+                starButton.classList.remove('starred');
+                starButton.title = 'Add to favorites';
+                paper.is_starred = false;
+            } else {
+                // Add star
+                await this.addStar(paper.paper_id);
+                starButton.textContent = '⭐';
+                starButton.classList.add('starred');
+                starButton.title = 'Remove from favorites';
+                paper.is_starred = true;
+            }
+        } catch (error) {
+            console.error('Failed to toggle star:', error);
+            // Revert visual state on error
+            const isCurrentlyStarred = starButton.textContent === '⭐';
+            if (isCurrentlyStarred) {
+                starButton.textContent = '☆';
+                starButton.classList.remove('starred');
+                starButton.title = 'Add to favorites';
+            } else {
+                starButton.textContent = '⭐';
+                starButton.classList.add('starred');
+                starButton.title = 'Remove from favorites';
+            }
+        }
+    }
+
+    async addStar(paperId) {
+        const response = await fetch(`/v1/papers/${paperId}/star`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ note: null }),
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to add star');
+        }
+
+        return await response.json();
+    }
+
+    async removeStar(paperId) {
+        const response = await fetch(`/v1/papers/${paperId}/star`, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to remove star');
+        }
+
+        return await response.json();
     }
 
     createRelevanceTag(score, isPaper = false) {
@@ -493,9 +575,33 @@ class SummaryModal {
         // Create body
         const body = this.createBody();
         
+        // Create container for relevance tag and star button
+        const tagContainer = this.createTagContainer();
+        
         this.modal.appendChild(header);
         this.modal.appendChild(body);
+        this.modal.appendChild(tagContainer);
         this.overlay.appendChild(this.modal);
+    }
+
+    createTagContainer() {
+        const container = document.createElement('div');
+        container.className = 'modal-tag-container';
+        container.style.position = 'relative';
+        container.style.width = '0';
+        container.style.height = '0';
+        
+        // Add relevance tag if exists
+        if (this.paper.summary && this.paper.summary.relevance !== undefined && this.paper.summary.relevance !== null) {
+            const relevanceTag = this.createModalRelevanceTag(this.paper.summary.relevance);
+            container.appendChild(relevanceTag);
+        }
+        
+        // Add star button
+        const starButton = this.createModalStarButton();
+        container.appendChild(starButton);
+        
+        return container;
     }
 
     createHeader() {
@@ -517,18 +623,100 @@ class SummaryModal {
         return header;
     }
 
+    createModalStarButton() {
+        const starButton = document.createElement('button');
+        starButton.className = 'modal-star-button';
+        
+        // Set initial state based on paper data
+        const isStarred = this.paper.is_starred || false;
+        starButton.textContent = isStarred ? '⭐' : '☆';
+        starButton.title = isStarred ? 'Remove from favorites' : 'Add to favorites';
+        
+        if (isStarred) {
+            starButton.classList.add('starred');
+        }
+        
+        // Add click handler
+        starButton.onclick = (e) => {
+            e.stopPropagation();
+            this.toggleModalStar(starButton);
+        };
+        
+        return starButton;
+    }
+
+    async toggleModalStar(starButton) {
+        try {
+            const isCurrentlyStarred = starButton.classList.contains('starred');
+            
+            if (isCurrentlyStarred) {
+                // Remove star
+                await this.removeModalStar();
+                starButton.textContent = '☆';
+                starButton.classList.remove('starred');
+                starButton.title = 'Add to favorites';
+                this.paper.is_starred = false;
+            } else {
+                // Add star
+                await this.addModalStar();
+                starButton.textContent = '⭐';
+                starButton.classList.add('starred');
+                starButton.title = 'Remove from favorites';
+                this.paper.is_starred = true;
+            }
+        } catch (error) {
+            console.error('Failed to toggle star in modal:', error);
+            // Revert visual state on error
+            const isCurrentlyStarred = starButton.classList.contains('starred');
+            if (isCurrentlyStarred) {
+                starButton.textContent = '☆';
+                starButton.classList.remove('starred');
+                starButton.title = 'Add to favorites';
+            } else {
+                starButton.textContent = '⭐';
+                starButton.classList.add('starred');
+                starButton.title = 'Remove from favorites';
+            }
+        }
+    }
+
+    async addModalStar() {
+        const response = await fetch(`/v1/papers/${this.paper.paper_id}/star`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ note: null }),
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to add star');
+        }
+
+        return await response.json();
+    }
+
+    async removeModalStar() {
+        const response = await fetch(`/v1/papers/${this.paper.paper_id}/star`, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to remove star');
+        }
+
+        return await response.json();
+    }
+
     createBody() {
         const body = document.createElement('div');
         body.className = 'modal-body';
         
         if (this.paper.summary) {
             const summary = this.paper.summary;
-            
-            // Add relevance tag at the top
-            if (summary.relevance !== undefined && summary.relevance !== null) {
-                const relevanceTag = window.UIService.prototype.createRelevanceTag(summary.relevance);
-                body.appendChild(relevanceTag);
-            }
             
             const summaryContent = this.createSummaryContent(summary);
             body.appendChild(summaryContent);
@@ -545,6 +733,34 @@ class SummaryModal {
         }
         
         return body;
+    }
+
+
+
+    createModalRelevanceTag(score) {
+        const tagContainer = document.createElement('div');
+        const tag = document.createElement('div');
+        
+        tagContainer.className = 'relevance-tag-container';
+        tag.className = 'relevance-tag';
+        
+        // Handle score 0 (error case)
+        if (score === 0 || score === null || score === undefined) {
+            tag.className = 'relevance-tag score-0';
+            const scoreText = document.createElement('span');
+            scoreText.textContent = '-';
+            tag.appendChild(scoreText);
+        } else {
+            // Add CSS class based on score
+            tag.className = `relevance-tag score-${score}`;
+            const scoreText = document.createElement('span');
+            scoreText.textContent = score.toString();
+            tag.appendChild(scoreText);
+        }
+        
+        tagContainer.appendChild(tag);
+        
+        return tagContainer;
     }
 
     createSummaryContent(summary) {

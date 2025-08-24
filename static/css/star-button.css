@@ -1,0 +1,116 @@
+/* Star Button Styles */
+
+/* Paper list star button */
+.star-button {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 1.2rem;
+    padding: 0.25rem;
+    color: #ccc;
+    transition: color 0.2s ease, transform 0.1s ease;
+    flex-shrink: 0;
+    border-radius: 4px;
+    width: 2rem;
+    height: 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+    vertical-align: middle;
+}
+
+.star-button:hover {
+    transform: scale(1.1);
+}
+
+.star-button.starred {
+    color: #ffd700;
+}
+
+.star-button.starred:hover {
+    color: #ffed4e;
+}
+
+/* Modal star button */
+.modal-star-button {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 1.5rem;
+    padding: 0.5rem;
+    color: #ccc !important;
+    transition: color 0.2s ease, transform 0.1s ease;
+    border-radius: 4px;
+}
+
+.modal-star-button.starred {
+    color: #ffd700 !important;
+}
+
+.modal-star-button:not(.starred) {
+    color: #ccc !important;
+}
+
+/* Modal tag container */
+.modal-tag-container {
+    position: absolute !important;
+    top: -20px !important;
+    left: -20px !important;
+    z-index: 1001 !important;
+}
+
+/* Modal star button positioned like relevance tag */
+.modal-content .modal-star-button {
+    position: absolute !important;
+    top: 0px !important;
+    left: 40px !important;
+    z-index: 1001 !important;
+    background: transparent !important;
+    border-radius: 50% !important;
+    width: 40px !important;
+    height: 40px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    box-shadow: none !important;
+    border: none !important;
+    padding: 0 !important;
+    font-size: 2em !important;
+    color: #ccc !important;
+    line-height: 1 !important;
+    vertical-align: middle !important;
+}
+
+.modal-star-button:hover {
+    transform: scale(1.1);
+}
+
+.modal-star-button.starred {
+    top: -2px !important;
+}
+
+.modal-star-button.starred:hover {
+    top: -2px !important;
+}
+
+/* Modal header layout */
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+}
+
+.modal-title {
+    flex: 1;
+}
+
+.modal-header-right {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-shrink: 0;
+}
+
+
