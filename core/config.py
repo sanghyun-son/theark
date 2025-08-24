@@ -1,19 +1,12 @@
 """Configuration management for the theark system."""
 
 import os
-from enum import Enum
 from typing import Any
 
 from dotenv import load_dotenv
 from pydantic import BaseModel, Field
 
-
-class Environment(str, Enum):
-    """Application environment types."""
-
-    DEVELOPMENT = "development"
-    PRODUCTION = "production"
-    TESTING = "testing"
+from .types import Environment
 
 
 class Settings(BaseModel):

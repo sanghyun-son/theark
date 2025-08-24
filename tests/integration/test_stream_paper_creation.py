@@ -9,6 +9,9 @@ import pytest
 from fastapi.testclient import TestClient
 
 from api.app import create_app
+from crawler.database import LLMSQLiteManager
+from crawler.database.sqlite_manager import SQLiteManager
+from core.types import Environment
 
 
 class TestStreamPaperCreationIntegration:
@@ -29,53 +32,36 @@ class TestStreamPaperCreationIntegration:
         }
 
         with patch.dict(os.environ, test_env, clear=False):
-            # Reload settings to pick up test environment variables
-            from core.config import load_settings
+            # Create app - it will automatically detect testing environment and use temp DB paths
+            app = create_app()
 
-            # Force reload settings with test environment
-            settings = load_settings()
-            print(f"DEBUG: ArXiv API URL: {settings.arxiv_api_base_url}")
-            print(f"DEBUG: LLM API URL: {settings.llm_api_base_url}")
+            # Manually initialize app state since lifespan might not run in tests
+            from api.services.paper_service import PaperService
+            from crawler.arxiv.client import ArxivClient
 
-            with patch("core.config.settings", settings):
-                # Create new app instance with test settings
-                app = create_app()
+            # Create ArxivClient with mock server URL
+            mock_arxiv_base_url = (
+                f"http://{mock_arxiv_server.host}:{mock_arxiv_server.port}/api/query"
+            )
+            arxiv_client = ArxivClient(base_url=mock_arxiv_base_url)
 
-                # Override database paths to use temp directory
-                with (
-                    patch("crawler.database.config.get_database_path") as mock_db_path,
-                    patch(
-                        "crawler.database.config.get_llm_database_path"
-                    ) as mock_llm_path,
-                ):
+            # Use tmp_path for testing databases
+            db_path = tmp_path / "test.db"
+            db_manager = SQLiteManager(db_path)
+            db_manager.connect()
+            db_manager.create_tables()
 
-                    mock_db_path.return_value = str(tmp_path / "test.db")
-                    mock_llm_path.return_value = str(tmp_path / "test_llm.db")
+            llm_db_path = tmp_path / "test_llm.db"
+            llm_db_manager = LLMSQLiteManager(llm_db_path)
+            llm_db_manager.connect()
+            llm_db_manager.create_tables()
 
-                    # Manually initialize app state since lifespan might not run in tests
-                    from api.services.paper_service import PaperService
-                    from crawler.database import LLMSQLiteManager
-                    from crawler.database.sqlite_manager import SQLiteManager
-                    from crawler.arxiv.client import ArxivClient
+            app.state.db_manager = db_manager
+            app.state.llm_db_manager = llm_db_manager
+            app.state.paper_service = PaperService()
+            app.state.arxiv_client = arxiv_client
 
-                    db_manager = SQLiteManager(str(tmp_path / "test.db"))
-                    db_manager.connect()
-                    db_manager.create_tables()
-
-                    llm_db_manager = LLMSQLiteManager(str(tmp_path / "test_llm.db"))
-                    llm_db_manager.connect()
-                    llm_db_manager.create_tables()
-
-                    # Create ArxivClient with mock server URL
-                    mock_arxiv_base_url = f"http://{mock_arxiv_server.host}:{mock_arxiv_server.port}/api/query"
-                    arxiv_client = ArxivClient(base_url=mock_arxiv_base_url)
-
-                    app.state.db_manager = db_manager
-                    app.state.llm_db_manager = llm_db_manager
-                    app.state.paper_service = PaperService()
-                    app.state.arxiv_client = arxiv_client
-
-                    return TestClient(app)
+            return TestClient(app)
 
     @pytest.mark.asyncio
     async def test_stream_paper_creation_end_to_end(self, client: TestClient):

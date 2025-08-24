@@ -1,6 +1,6 @@
 """Core functionality for the theark system."""
 
-from .config import Environment, Settings, settings
+from .config import Settings, settings
 from .log import (
     get_logger,
     setup_logging,
@@ -14,6 +14,7 @@ from .periodic_task import (
     TaskStatus,
 )
 from .rate_limiter import AsyncRateLimiter
+from .types import Environment
 
 __all__ = [
     "Environment",

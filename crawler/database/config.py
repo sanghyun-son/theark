@@ -1,20 +1,17 @@
 """Database configuration for different environments."""
 
 from pathlib import Path
-from typing import Literal
 
 from core.log import get_logger
+from core.types import Environment
 
 logger = get_logger(__name__)
-
-# Environment types
-Environment = Literal["development", "testing", "production"]
 
 
 class DatabaseConfig:
     """Database configuration manager."""
 
-    def __init__(self, environment: Environment = "development") -> None:
+    def __init__(self, environment: Environment = Environment.DEVELOPMENT) -> None:
         """Initialize database configuration.
 
         Args:
@@ -26,7 +23,7 @@ class DatabaseConfig:
     @property
     def database_dir(self) -> Path:
         """Get database directory for current environment."""
-        if self.environment == "testing":
+        if self.environment == Environment.TESTING:
             # For testing, use a temporary directory
             return Path("/tmp")
         else:
@@ -39,12 +36,10 @@ class DatabaseConfig:
         db_dir = self.database_dir
         db_dir.mkdir(parents=True, exist_ok=True)
 
-        if self.environment == "testing":
-            # For testing, use a unique temporary file
-            import tempfile
-
-            return Path(tempfile.mktemp(suffix=".db"))
-        elif self.environment == "development":
+        if self.environment == Environment.TESTING:
+            # For testing, use arxiv.test.db
+            return db_dir / "arxiv.test.db"
+        elif self.environment == Environment.DEVELOPMENT:
             # For development, use arxiv.dev.db
             return db_dir / "arxiv.dev.db"
         else:
@@ -57,7 +52,7 @@ class DatabaseConfig:
 
     def setup_database_directory(self) -> None:
         """Create database directory if it doesn't exist."""
-        if self.environment not in ["testing"]:
+        if self.environment != Environment.TESTING:
             self.database_dir.mkdir(parents=True, exist_ok=True)
             logger.info(f"Database directory: {self.database_dir}")
 
@@ -83,7 +78,7 @@ class DatabaseConfig:
 
 
 # Convenience functions
-def get_database_path(environment: Environment = "development") -> Path:
+def get_database_path(environment: Environment = Environment.DEVELOPMENT) -> Path:
     """Get database path for the specified environment.
 
     Args:
@@ -96,7 +91,7 @@ def get_database_path(environment: Environment = "development") -> Path:
     return config.database_path
 
 
-def get_database_dir(environment: Environment = "development") -> Path:
+def get_database_dir(environment: Environment = Environment.DEVELOPMENT) -> Path:
     """Get database directory for the specified environment.
 
     Args:
@@ -109,7 +104,7 @@ def get_database_dir(environment: Environment = "development") -> Path:
     return config.database_dir
 
 
-def get_llm_database_path(environment: Environment = "development") -> Path:
+def get_llm_database_path(environment: Environment = Environment.DEVELOPMENT) -> Path:
     """Get LLM database path for the specified environment.
 
     Args:
@@ -122,18 +117,19 @@ def get_llm_database_path(environment: Environment = "development") -> Path:
     db_dir = config.database_dir
     db_dir.mkdir(parents=True, exist_ok=True)
 
-    if environment == "testing":
-        # For testing, use a unique temporary file
-        import tempfile
-
-        return Path(tempfile.mktemp(suffix="_llm.db"))
+    if environment == Environment.TESTING:
+        # For testing, use llm_requests.test.db
+        return db_dir / "llm_requests.test.db"
+    elif environment == Environment.DEVELOPMENT:
+        # For development, use llm_requests.dev.db
+        return db_dir / "llm_requests.dev.db"
     else:
-        # For development and production, use llm_requests.db
+        # For production, use llm_requests.db
         return db_dir / "llm_requests.db"
 
 
 def setup_database_environment(
-    environment: Environment = "development",
+    environment: Environment = Environment.DEVELOPMENT,
 ) -> DatabaseConfig:
     """Setup database environment and return configuration.
 
@@ -146,3 +142,13 @@ def setup_database_environment(
     config = DatabaseConfig(environment)
     config.setup_database_directory()
     return config
+
+
+__all__ = [
+    "Environment",
+    "DatabaseConfig",
+    "get_database_path",
+    "get_database_dir",
+    "get_llm_database_path",
+    "setup_database_environment",
+]
