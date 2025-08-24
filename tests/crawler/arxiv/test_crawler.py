@@ -191,7 +191,7 @@ class TestArxivCrawler:
         )
 
         # Mock the core crawler's crawl_single_paper method
-        async def mock_crawl_single_paper(identifier):
+        async def mock_crawl_single_paper(identifier, db_manager):
             return mock_paper
 
         crawler.on_demand_crawler.core.crawl_single_paper = mock_crawl_single_paper
@@ -199,7 +199,9 @@ class TestArxivCrawler:
         await crawler.start()
 
         # Test crawling
-        result = await crawler.crawl_single_paper("1706.03762")
+        result = await crawler.crawl_single_paper(
+            "1706.03762", mock_paper_repo.db_manager
+        )
 
         assert result is not None
         assert result.arxiv_id == "1706.03762"
@@ -211,7 +213,7 @@ class TestArxivCrawler:
         """Test crawling non-existent paper."""
 
         # Mock the core crawler's crawl_single_paper method to return None
-        async def mock_crawl_single_paper(identifier):
+        async def mock_crawl_single_paper(identifier, db_manager):
             return None
 
         crawler.on_demand_crawler.core.crawl_single_paper = mock_crawl_single_paper
@@ -219,7 +221,9 @@ class TestArxivCrawler:
         await crawler.start()
 
         # Test crawling
-        result = await crawler.crawl_single_paper("9999.99999")
+        result = await crawler.crawl_single_paper(
+            "9999.99999", mock_paper_repo.db_manager
+        )
 
         assert result is None
 
@@ -242,7 +246,7 @@ class TestArxivCrawler:
         )
 
         # Mock the core crawler's crawl_single_paper method to return existing paper
-        async def mock_crawl_single_paper(identifier):
+        async def mock_crawl_single_paper(identifier, db_manager):
             return existing_paper
 
         crawler.on_demand_crawler.core.crawl_single_paper = mock_crawl_single_paper
@@ -250,7 +254,9 @@ class TestArxivCrawler:
         await crawler.start()
 
         # Test crawling
-        result = await crawler.crawl_single_paper("1706.03762")
+        result = await crawler.crawl_single_paper(
+            "1706.03762", mock_paper_repo.db_manager
+        )
 
         assert result == existing_paper
 
@@ -335,7 +341,7 @@ class TestArxivCrawler:
         )
 
         # Mock the on_demand_crawler's crawl_single_paper method to trigger callback
-        async def mock_crawl_single_paper_with_callback(identifier):
+        async def mock_crawl_single_paper_with_callback(identifier, db_manager):
             # Trigger the callback through the core's callback chain
             if crawler.on_demand_crawler.core.on_paper_crawled:
                 await crawler.on_demand_crawler.core.on_paper_crawled(mock_paper)
@@ -346,7 +352,7 @@ class TestArxivCrawler:
         )
 
         await crawler.start()
-        await crawler.crawl_single_paper("1706.03762")
+        await crawler.crawl_single_paper("1706.03762", mock_db_manager)
 
         # Verify callback was called
         assert callback_tracker["called"] is True
@@ -367,7 +373,7 @@ class TestArxivCrawler:
         crawler = ArxivCrawler(mock_db_manager, on_error=on_error)
 
         # Mock the on_demand_crawler's crawl_single_paper method to trigger error callback
-        async def mock_crawl_single_paper_with_error(identifier):
+        async def mock_crawl_single_paper_with_error(identifier, db_manager):
             error = Exception("Test error")
             # Trigger the error callback through the core's callback chain
             if crawler.on_demand_crawler.core.on_error:
@@ -379,7 +385,7 @@ class TestArxivCrawler:
         )
 
         await crawler.start()
-        await crawler.crawl_single_paper("1706.03762")
+        await crawler.crawl_single_paper("1706.03762", mock_db_manager)
 
         # Verify error callback was called
         assert error_tracker["called"] is True

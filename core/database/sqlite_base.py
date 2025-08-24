@@ -31,7 +31,7 @@ class BaseSQLiteManager(DatabaseManager):
             self.connection = sqlite3.connect(
                 self.db_path,
                 check_same_thread=False,
-                timeout=30.0,
+                timeout=60.0,  # Increased timeout for streaming operations
             )
             self.connection.row_factory = sqlite3.Row
             self._configure_connection()
@@ -59,7 +59,7 @@ class BaseSQLiteManager(DatabaseManager):
         # Enable foreign keys
         self.connection.execute("PRAGMA foreign_keys = ON")
         # Set busy timeout for better handling of concurrent access
-        self.connection.execute("PRAGMA busy_timeout = 60000")
+        self.connection.execute("PRAGMA busy_timeout = 90000")
         # Set WAL mode for better concurrent access (if not in testing)
         # self.connection.execute("PRAGMA journal_mode = WAL")
         # Set cache size for better performance

@@ -94,7 +94,6 @@ class ArxivCrawler:
 
         # On-demand crawler
         self.on_demand_crawler = OnDemandCrawler(
-            db_manager=db_manager,
             config=self.config.on_demand,
             on_paper_crawled=self._on_paper_crawled,
             on_error=self.on_error,
@@ -171,16 +170,19 @@ class ArxivCrawler:
         self.status = CrawlStatus.PAUSED
         logger.info("Background crawling loop stopped")
 
-    async def crawl_single_paper(self, identifier: str) -> PaperEntity | None:
+    async def crawl_single_paper(
+        self, identifier: str, db_manager: DatabaseManager
+    ) -> PaperEntity | None:
         """Crawl a single paper by ID or URL.
 
         Args:
             identifier: arXiv ID, abstract URL, or PDF URL
+            db_manager: Database manager instance
 
         Returns:
             Crawled paper or None if failed
         """
-        return await self.on_demand_crawler.crawl_single_paper(identifier)
+        return await self.on_demand_crawler.crawl_single_paper(identifier, db_manager)
 
     async def crawl_recent_papers(self, limit: int | None = None) -> list[PaperEntity]:
         """Crawl the most recent papers.

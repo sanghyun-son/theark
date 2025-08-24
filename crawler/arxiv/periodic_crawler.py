@@ -105,7 +105,6 @@ class PeriodicCrawler:
 
         # Core crawler functionality
         self.core = ArxivCrawlerCore(
-            db_manager=db_manager,
             config=self.config,
             on_paper_crawled=self._on_paper_crawled,
             on_error=self.on_error,

@@ -90,16 +90,6 @@ class TestSummarizationIntegration:
                 SummarizationService()
 
     @pytest.mark.asyncio
-    async def test_summarization_service_with_mock_server(
-        self, mock_summarization_service
-    ):
-        """Test summarization service with mock server."""
-        # This test would require a running mock server
-        # For now, we'll test the service structure
-        assert mock_summarization_service.summarizer is not None
-        assert hasattr(mock_summarization_service.summarizer, "summarize")
-
-    @pytest.mark.asyncio
     async def test_summarization_request_creation(self):
         """Test creating summarization requests."""
         from crawler.summarizer import SummaryRequest

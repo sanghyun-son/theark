@@ -1,28 +1,26 @@
 """API request models."""
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field
 
 
 class PaperCreateRequest(BaseModel):
-    """Request model for creating a new paper."""
+    """Request model for creating a paper."""
 
-    url: str = Field(..., description="arXiv paper URL")
-    summarize_now: bool = Field(
-        default=False, description="Whether to summarize immediately"
+    url: str = Field(..., description="arXiv URL of the paper")
+    skip_auto_summarization: bool = Field(
+        default=False, description="Skip automatic summarization"
     )
-    force_refresh_metadata: bool = Field(
-        default=False, description="Force refresh paper metadata"
+    summary_language: str = Field(
+        default="Korean", description="Language for summary generation"
     )
-    force_resummarize: bool = Field(default=False, description="Force re-summarization")
-    summary_language: str = Field(default="Korean", description="Language for summary")
 
-    @field_validator("summary_language")
-    @classmethod
-    def validate_summary_language(cls, v: str) -> str:
-        """Validate summary language."""
-        if v not in ["Korean", "English"]:
-            raise ValueError("summary_language must be 'Korean' or 'English'")
-        return v
+
+class StarRequest(BaseModel):
+    """Request model for star operations."""
+
+    note: str | None = Field(
+        default=None, description="Optional note for the starred paper", max_length=500
+    )
 
 
 class PaperListRequest(BaseModel):

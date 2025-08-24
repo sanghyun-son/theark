@@ -93,6 +93,22 @@ class PaperRepository:
             return self._row_to_paper(row)
         return None
 
+    def get_by_id(self, paper_id: int) -> PaperEntity | None:
+        """Get paper by ID.
+
+        Args:
+            paper_id: Paper ID
+
+        Returns:
+            Paper model or None if not found
+        """
+        query = "SELECT * FROM paper WHERE paper_id = ?"
+        row = self.db.fetch_one(query, (paper_id,))
+
+        if row:
+            return self._row_to_paper(row)
+        return None
+
     def update(self, paper: PaperEntity) -> bool:
         """Update an existing paper.
 
@@ -230,7 +246,15 @@ class SummaryRepository:
 
     def __init__(self, db_manager: DatabaseManager) -> None:
         """Initialize repository with database manager."""
+        from core import get_logger
+
+        logger = get_logger(__name__)
         self.db = db_manager
+
+        # Log the database manager state for debugging
+        logger.debug(f"SummaryRepository initialized with db_manager: {db_manager}")
+        if hasattr(db_manager, "connection"):
+            logger.debug(f"Database connection state: {db_manager.connection}")
 
     def _row_to_summary(self, row: tuple[Any, ...]) -> SummaryEntity:
         """Convert database row to Summary model.
@@ -533,6 +557,20 @@ class UserRepository:
         """
         params = (star.user_id, star.paper_id, star.note)
         self.db.execute(query, params)
+
+    def remove_star(self, user_id: int, paper_id: int) -> bool:
+        """Remove a star/bookmark for a user.
+
+        Args:
+            user_id: User ID
+            paper_id: Paper ID
+
+        Returns:
+            True if removed, False if not found
+        """
+        query = "DELETE FROM user_star WHERE user_id = ? AND paper_id = ?"
+        cursor = self.db.execute(query, (user_id, paper_id))
+        return bool(cursor.rowcount > 0)
 
     def get_user_stars(self, user_id: int, limit: int = 100) -> list[UserStarEntity]:
         """Get all stars for a user.

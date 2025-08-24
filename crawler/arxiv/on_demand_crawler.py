@@ -5,6 +5,7 @@ from typing import Any, Awaitable, Callable
 
 from core import get_logger
 from core.models.database.entities import PaperEntity
+from crawler.arxiv.client import ArxivClient
 from crawler.arxiv.constants import (
     DEFAULT_MONTHLY_PAPERS_LIMIT,
     DEFAULT_RECENT_PAPERS_LIMIT,
@@ -49,18 +50,18 @@ class OnDemandCrawler:
 
     def __init__(
         self,
-        db_manager: DatabaseManager,
         config: OnDemandCrawlConfig | None = None,
         on_paper_crawled: Callable[[PaperEntity], Awaitable[None]] | None = None,
         on_error: Callable[[Exception], Awaitable[None]] | None = None,
+        arxiv_client: ArxivClient | None = None,
     ):
         """Initialize the on-demand crawler.
 
         Args:
-            db_manager: Database manager for persistence
             config: Crawler configuration
             on_paper_crawled: Callback when paper is successfully crawled
             on_error: Callback when error occurs
+            arxiv_client: Optional ArxivClient instance for dependency injection
         """
         self.config = config or OnDemandCrawlConfig()
         self.on_paper_crawled = on_paper_crawled
@@ -68,10 +69,10 @@ class OnDemandCrawler:
 
         # Core crawler functionality
         self.core = ArxivCrawlerCore(
-            db_manager=db_manager,
             config=self.config,
             on_paper_crawled=self._on_paper_crawled,
             on_error=self.on_error,
+            arxiv_client=arxiv_client,
         )
 
         logger.info("OnDemandCrawler initialized")
@@ -100,29 +101,35 @@ class OnDemandCrawler:
         await self.core.stop()
         logger.info("OnDemandCrawler stopped")
 
-    async def crawl_single_paper(self, identifier: str) -> PaperEntity | None:
+    async def crawl_single_paper(
+        self, identifier: str, db_manager: DatabaseManager
+    ) -> PaperEntity | None:
         """Crawl a single paper by ID or URL.
 
         Args:
             identifier: arXiv ID, abstract URL, or PDF URL
+            db_manager: Database manager instance
 
         Returns:
             Crawled paper or None if failed
         """
         logger.info(f"On-demand crawling single paper: {identifier}")
-        return await self.core.crawl_single_paper(identifier)
+        return await self.core.crawl_single_paper(identifier, db_manager)
 
-    async def crawl_papers_batch(self, identifiers: list[str]) -> list[PaperEntity]:
+    async def crawl_papers_batch(
+        self, identifiers: list[str], db_manager: DatabaseManager
+    ) -> list[PaperEntity]:
         """Crawl multiple papers in a batch.
 
         Args:
             identifiers: List of arXiv IDs, abstract URLs, or PDF URLs
+            db_manager: Database manager instance
 
         Returns:
             List of successfully crawled papers
         """
         logger.info(f"On-demand crawling batch of {len(identifiers)} papers")
-        return await self.core.crawl_papers_batch(identifiers)
+        return await self.core.crawl_papers_batch(identifiers, db_manager)
 
     async def crawl_recent_papers(self, limit: int | None = None) -> list[PaperEntity]:
         """Crawl the most recent papers (placeholder for future implementation).

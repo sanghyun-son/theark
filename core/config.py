@@ -60,6 +60,11 @@ class Settings(BaseModel):
         description="Preset categories for paper filtering",
     )
 
+    # ArXiv Settings
+    arxiv_api_base_url: str = Field(
+        default="https://export.arxiv.org", description="ArXiv API base URL"
+    )
+
     # LLM Settings
     llm_model: str = Field(
         default="gpt-4o-mini", description="LLM model to use for summarization"
@@ -131,6 +136,9 @@ def load_settings() -> Settings:
             "THEARK_DEFAULT_INTERESTS", "Machine Learning,Deep Learning"
         ),
         preset_categories=preset_categories,
+        arxiv_api_base_url=os.getenv(
+            "THEARK_ARXIV_API_BASE_URL", "https://export.arxiv.org"
+        ),
         llm_model=os.getenv("THEARK_LLM_MODEL", "gpt-4o-mini"),
         llm_api_base_url=os.getenv(
             "THEARK_LLM_API_BASE_URL", "https://api.openai.com/v1"

@@ -1,4 +1,6 @@
-"""Pytest configuration for theark project."""
+"""Global pytest configuration and fixtures."""
+
+import json
 
 import pytest
 import pytest_asyncio
@@ -21,26 +23,205 @@ def logger():
     return get_logger("test")
 
 
-@pytest.fixture(scope="function")
-def mock_arxiv_server(httpserver: HTTPServer):
-    """Mock arXiv API server for testing."""
+@pytest_asyncio.fixture
+async def mock_openai_server(httpserver: HTTPServer) -> HTTPServer:
+    """Set up mock OpenAI server for integration tests."""
 
-    # Realistic paper XML response based on actual arXiv API format
-    # Using the structure from https://arxiv.org/abs/1706.03762 as reference
-    sample_paper_xml = """<?xml version="1.0" encoding="UTF-8"?>
-<feed xmlns="http://www.w3.org/2005/Atom" xmlns:opensearch="http://a9.com/-/spec/opensearch/1.1/" xmlns:arxiv="http://arxiv.org/schemas/atom">
-  <title>ArXiv Query: search_query=id:1706.03762&amp;id_list=&amp;start=0&amp;max_results=1</title>
-  <id>http://arxiv.org/api/query?search_query=id:1706.03762&amp;id_list=&amp;start=0&amp;max_results=1</id>
-  <updated>2023-08-02T00:41:18Z</updated>
-  <opensearch:totalResults>1</opensearch:totalResults>
-  <opensearch:startIndex>0</opensearch:startIndex>
-  <opensearch:itemsPerPage>1</opensearch:itemsPerPage>
+    def chat_completion_handler(request):
+        """Handle chat completion requests with or without tools."""
+        from werkzeug.wrappers import Response
+
+        body = json.loads(request.data.decode("utf-8"))
+
+        # Common response structure
+        base_response = {
+            "id": "chatcmpl-test-123",
+            "object": "chat.completion",
+            "created": 1677652288,
+            "model": body.get("model", "gpt-4o-mini"),
+            "usage": {
+                "prompt_tokens": 150,
+                "completion_tokens": 80,
+                "total_tokens": 230,
+            },
+        }
+
+        # Check if tools are used
+        if "tools" in body and body.get("tool_choice"):
+            # Tool-based response with function calling
+            structured_data = {
+                "tldr": "This paper presents a novel approach to abstract summarization using professional analysis methods.",
+                "motivation": "Current methods lack structured analysis of research papers and fail to provide relevance scoring.",
+                "method": "The authors propose a function-calling approach with structured output and professional evaluation criteria.",
+                "result": "Improved accuracy in extracting key information from abstracts with relevance scoring from 1-10.",
+                "conclusion": "Function calling enables better structured summarization with professional-grade analysis.",
+                "relevance": "8",
+            }
+
+            response_data = {
+                **base_response,
+                "choices": [
+                    {
+                        "index": 0,
+                        "message": {
+                            "role": "assistant",
+                            "content": None,
+                            "tool_calls": [
+                                {
+                                    "id": "call_123",
+                                    "type": "function",
+                                    "function": {
+                                        "name": "Structure",
+                                        "arguments": json.dumps(structured_data),
+                                    },
+                                }
+                            ],
+                        },
+                        "finish_reason": "tool_calls",
+                    }
+                ],
+            }
+        else:
+            # Regular text response without tools
+            response_data = {
+                **base_response,
+                "id": "chatcmpl-test-456",
+                "usage": {
+                    "prompt_tokens": 50,
+                    "completion_tokens": 20,
+                    "total_tokens": 70,
+                },
+                "choices": [
+                    {
+                        "index": 0,
+                        "message": {
+                            "role": "assistant",
+                            "content": "This paper presents a professional analysis of abstract summarization methods. The research demonstrates improved techniques for extracting key information with relevance scoring. Based on the provided interests, this work has a relevance score of 7 out of 10.",
+                        },
+                        "finish_reason": "stop",
+                    }
+                ],
+            }
+
+        return Response(
+            json.dumps(response_data),
+            status=200,
+            headers={"Content-Type": "application/json"},
+        )
+
+    # Mock /v1/chat/completions endpoint with dynamic handler
+    httpserver.expect_request(
+        "/v1/chat/completions",
+        method="POST",
+        headers={"Authorization": "Bearer test-api-key"},
+    ).respond_with_handler(chat_completion_handler)
+
+    # Mock batch processing endpoint
+    def batch_handler(request):
+        """Handle batch requests for multiple summaries."""
+        from werkzeug.wrappers import Response
+
+        batch_structured_data = {
+            "tldr": "Batch processed paper summary.",
+            "motivation": "Efficient processing of multiple papers.",
+            "method": "Batch API processing.",
+            "result": "Successfully processed in batch.",
+            "conclusion": "Batch processing is effective.",
+            "relevance": "Medium",
+        }
+
+        batch_choice = {
+            "index": 0,
+            "message": {
+                "role": "assistant",
+                "content": None,
+                "tool_calls": [
+                    {
+                        "id": "call_batch_1",
+                        "type": "function",
+                        "function": {
+                            "name": "Structure",
+                            "arguments": json.dumps(batch_structured_data),
+                        },
+                    }
+                ],
+            },
+            "finish_reason": "tool_calls",
+        }
+
+        batch_completion = {
+            "id": "chatcmpl-batch-1",
+            "object": "chat.completion",
+            "created": 1677652288,
+            "model": "gpt-4o-mini",
+            "choices": [batch_choice],
+            "usage": {
+                "prompt_tokens": 30,
+                "completion_tokens": 15,
+                "total_tokens": 45,
+            },
+        }
+
+        response_data = {
+            "id": "batch-test-123",
+            "object": "batch",
+            "status": "completed",
+            "results": [
+                {
+                    "custom_id": "paper-001",
+                    "response": {
+                        "status_code": 200,
+                        "body": batch_completion,
+                    },
+                }
+            ],
+        }
+
+        return Response(
+            json.dumps(response_data),
+            status=200,
+            headers={"Content-Type": "application/json"},
+        )
+
+    httpserver.expect_request(
+        "/v1/batch",
+        method="POST",
+        headers={"Authorization": "Bearer test-api-key"},
+    ).respond_with_handler(batch_handler)
+
+    return httpserver
+
+
+@pytest_asyncio.fixture
+async def mock_arxiv_server(httpserver: HTTPServer) -> HTTPServer:
+    """Set up mock arXiv server for integration tests."""
+
+    def arxiv_query_handler(request):
+        """Handle arXiv API query requests."""
+        from werkzeug.wrappers import Response
+        from urllib.parse import parse_qs, urlparse
+
+        # Parse query parameters
+        parsed_url = urlparse(request.url)
+        query_params = parse_qs(parsed_url.query)
+        id_list = query_params.get("id_list", [""])[0]
+
+        # Handle different paper scenarios
+        if id_list == "1706.03762":
+            # Attention Is All You Need paper
+            response_data = """<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
   <entry>
     <id>http://arxiv.org/abs/1706.03762</id>
-    <updated>2023-08-02T00:41:18Z</updated>
-    <published>2017-06-12T17:57:34Z</published>
+    <updated>2017-12-06T00:37:27Z</updated>
+    <published>2017-06-12T17:57:58Z</published>
     <title>Attention Is All You Need</title>
-    <summary>The dominant sequence transduction models are based on complex recurrent or convolutional neural networks in an encoder-decoder configuration. The best performing models also connect the encoder and decoder through an attention mechanism. We propose a new simple network architecture, the Transformer, based solely on attention mechanisms, dispensing with recurrence and convolutions entirely. Experiments on two machine translation tasks show these models to be superior in quality while being more parallelizable and requiring significantly less time to train. Our model achieves 28.4 BLEU on the WMT 2014 English-to-German translation task, improving over the existing best results, including ensembles by over 2 BLEU. On the WMT 2014 English-to-French translation task, our model establishes a new single-model state-of-the-art BLEU score of 41.8 after training for 3.5 days on eight GPUs, a small fraction of the training costs of the best models from the literature. We show that the Transformer generalizes well to other tasks by applying it successfully to English constituency parsing both with large and limited training data.</summary>
+    <summary>The dominant sequence transduction models are based on complex recurrent or
+convolutional neural networks that include an encoder and a decoder. The best
+performing models also connect the encoder and decoder through an attention
+mechanism. We propose a new simple network architecture, the Transformer,
+based solely on attention mechanisms, dispensing with recurrence and
+convolutions entirely.</summary>
     <author>
       <name>Ashish Vaswani</name>
     </author>
@@ -50,56 +231,89 @@ def mock_arxiv_server(httpserver: HTTPServer):
     <author>
       <name>Niki Parmar</name>
     </author>
-    <author>
-      <name>Jakob Uszkoreit</name>
-    </author>
-    <author>
-      <name>Llion Jones</name>
-    </author>
-    <author>
-      <name>Aidan N. Gomez</name>
-    </author>
-    <author>
-      <name>Lukasz Kaiser</name>
-    </author>
-    <author>
-      <name>Illia Polosukhin</name>
-    </author>
     <link href="http://arxiv.org/abs/1706.03762" rel="alternate" type="text/html"/>
     <link title="pdf" href="http://arxiv.org/pdf/1706.03762" rel="related" type="application/pdf"/>
     <arxiv:primary_category xmlns:arxiv="http://arxiv.org/schemas/atom" term="cs.CL" scheme="http://arxiv.org/schemas/atom"/>
-    <category term="cs.CL"/>
-    <category term="cs.LG"/>
-    <arxiv:doi xmlns:arxiv="http://arxiv.org/schemas/atom">10.48550/arXiv.1706.03762</arxiv:doi>
-    <arxiv:journal_ref xmlns:arxiv="http://arxiv.org/schemas/atom"></arxiv:journal_ref>
-    <arxiv:comment xmlns:arxiv="http://arxiv.org/schemas/atom">15 pages, 5 figures</arxiv:comment>
+    <category term="cs.CL" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.AI" scheme="http://arxiv.org/schemas/atom"/>
+  </entry>
+</feed>"""
+        elif id_list == "9999.99999":
+            # Paper not found
+            response_data = """<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <opensearch:totalResults xmlns:opensearch="http://a9.com/-/spec/opensearch/1.1/">0</opensearch:totalResults>
+  <opensearch:startIndex xmlns:opensearch="http://a9.com/-/spec/opensearch/1.1/">0</opensearch:startIndex>
+  <opensearch:itemsPerPage xmlns:opensearch="http://a9.com/-/spec/opensearch/1.1/">1</opensearch:itemsPerPage>
+</feed>"""
+        elif id_list == "1706.99999":
+            # Server error scenario
+            return Response(
+                "Internal Server Error",
+                status=500,
+                headers={"Content-Type": "text/plain"},
+            )
+        else:
+            # Default response (ImageNet paper for 1409.0575 and others)
+            authors = [
+                "Olga Russakovsky",
+                "Jia Deng",
+                "Hao Su",
+                "Jonathan Krause",
+                "Sanjeev Satheesh",
+                "Sean Ma",
+                "Zhiheng Huang",
+                "Andrej Karpathy",
+                "Aditya Khosla",
+                "Michael Bernstein",
+                "Alexander C. Berg",
+                "Li Fei-Fei",
+            ]
+
+            author_elements = "".join(
+                [
+                    f"    <author>\n      <name>{author}</name>\n    </author>\n"
+                    for author in authors
+                ]
+            )
+
+            response_data = f"""<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <entry>
+    <id>http://arxiv.org/abs/1409.0575</id>
+    <updated>2014-09-01T22:29:38Z</updated>
+    <published>2014-09-01T22:29:38Z</published>
+    <title>ImageNet Large Scale Visual Recognition Challenge</title>
+    <summary>The ImageNet Large Scale Visual Recognition Challenge is a benchmark in
+object category classification and detection on hundreds of object categories
+and millions of images. The challenge has been run annually from 2010 to
+present, attracting participation from more than fifty institutions.
+  This paper describes the creation of this benchmark dataset and the advances
+in object recognition that have been possible as a result. We discuss the
+challenges of collecting large-scale ground truth annotation, highlight key
+breakthroughs in categorical object recognition, provide a detailed analysis of
+the current state of the field of large-scale image classification and object
+detection, and compare the state-of-the-art computer vision accuracy with human
+accuracy. We conclude with lessons learned in the five years of the challenge,
+and propose future directions and improvements.</summary>
+{author_elements}    <link href="http://arxiv.org/abs/1409.0575" rel="alternate" type="text/html"/>
+    <link title="pdf" href="http://arxiv.org/pdf/1409.0575" rel="related" type="application/pdf"/>
+    <arxiv:primary_category xmlns:arxiv="http://arxiv.org/schemas/atom" term="cs.CV" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.CV" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="I.4.8; I.5.2" scheme="http://arxiv.org/schemas/atom"/>
   </entry>
 </feed>"""
 
-    # Mock single paper endpoint (using real arXiv ID from reference)
-    httpserver.expect_request(
-        "/api/query", query_string="id_list=1706.03762&start=0&max_results=1"
-    ).respond_with_data(sample_paper_xml, content_type="application/xml")
+        return Response(
+            response_data,
+            status=200,
+            headers={"Content-Type": "application/xml"},
+        )
 
-    # Mock 404 for non-existent paper
+    # Mock arXiv API endpoint
     httpserver.expect_request(
-        "/api/query", query_string="id_list=9999.99999&start=0&max_results=1"
-    ).respond_with_data(
-        """<?xml version="1.0" encoding="UTF-8"?>
-<feed xmlns="http://www.w3.org/2005/Atom" xmlns:opensearch="http://a9.com/-/spec/opensearch/1.1/" xmlns:arxiv="http://arxiv.org/schemas/atom">
-  <title>ArXiv Query: search_query=id:9999.99999&amp;id_list=&amp;start=0&amp;max_results=1</title>
-  <id>http://arxiv.org/api/query?search_query=id:9999.99999&amp;id_list=&amp;start=0&amp;max_results=1</id>
-  <updated>2024-01-15T12:00:00Z</updated>
-  <opensearch:totalResults>0</opensearch:totalResults>
-  <opensearch:startIndex>0</opensearch:startIndex>
-  <opensearch:itemsPerPage>1</opensearch:itemsPerPage>
-</feed>""",
-        content_type="application/xml",
-    )
-
-    # Mock server error
-    httpserver.expect_request(
-        "/api/query", query_string="id_list=1706.99999&start=0&max_results=1"
-    ).respond_with_data("Internal Server Error", status=500, content_type="text/plain")
+        "/api/query",
+        method="GET",
+    ).respond_with_handler(arxiv_query_handler)
 
     return httpserver

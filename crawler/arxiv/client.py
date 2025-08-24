@@ -1,7 +1,6 @@
 """ArXiv API client for fetching papers."""
 
 import re
-from typing import Any
 
 import httpx
 
@@ -33,27 +32,19 @@ class ArxivClient:
             base_url: Base URL for arXiv API
         """
         self.base_url = base_url
-        self.client: httpx.AsyncClient | None = None
         self.rate_limiter = AsyncRateLimiter(requests_per_second=DEFAULT_RATE_LIMIT)
+        self._client: httpx.AsyncClient | None = None
 
-    async def __aenter__(self) -> "ArxivClient":
-        """Async context manager entry."""
-        self.client = httpx.AsyncClient(
-            timeout=httpx.Timeout(DEFAULT_TIMEOUT),
-            limits=httpx.Limits(max_keepalive_connections=5, max_connections=10),
-            headers={"User-Agent": DEFAULT_USER_AGENT},
-        )
-        return self
-
-    async def __aexit__(
-        self,
-        exc_type: type[BaseException] | None,
-        exc_val: BaseException | None,
-        exc_tb: Any,
-    ) -> None:
-        """Async context manager exit."""
-        if self.client:
-            await self.client.aclose()
+    @property
+    def client(self) -> httpx.AsyncClient:
+        """Get or create HTTP client."""
+        if self._client is None:
+            self._client = httpx.AsyncClient(
+                timeout=httpx.Timeout(DEFAULT_TIMEOUT),
+                limits=httpx.Limits(max_keepalive_connections=5, max_connections=10),
+                headers={"User-Agent": DEFAULT_USER_AGENT},
+            )
+        return self._client
 
     def _extract_arxiv_id(self, identifier: str) -> str:
         """Extract arXiv ID from various input formats.
@@ -98,9 +89,6 @@ class ArxivClient:
             ArxivAPIError: If API request fails
             ArxivTimeoutError: If request times out
         """
-        if not self.client:
-            raise RuntimeError("Client not initialized. Use async context manager.")
-
         # Extract arXiv ID from various input formats
         arxiv_id = self._extract_arxiv_id(identifier)
         logger.info(f"Fetching paper: {arxiv_id}")

@@ -48,11 +48,6 @@ class SummarizationService:
                 "variable not set"
             )
 
-        # Initialize the summarizer
-        self.summarizer = OpenAISummarizer(
-            api_key=self.api_key, base_url=self.base_url, db_manager=self.db_manager
-        )
-
         logger.info(
             f"SummarizationService initialized with model={model}, "
             f"use_tools={use_tools}, base_url={self.base_url}"
@@ -79,6 +74,13 @@ class SummarizationService:
         try:
             logger.info(f"Summarizing paper {paper_id}")
 
+            # Create summarizer
+            if not self.api_key:
+                raise ValueError("API key is required for summarization")
+            summarizer = OpenAISummarizer(
+                api_key=self.api_key, base_url=self.base_url, db_manager=self.db_manager
+            )
+
             # Create summary request
             request = SummaryRequest(
                 custom_id=paper_id,
@@ -93,7 +95,7 @@ class SummarizationService:
             max_retries = 3
             for attempt in range(max_retries):
                 try:
-                    response = await self.summarizer.summarize(request)
+                    response = await summarizer.summarize(request)
                     logger.info(f"Successfully summarized paper {paper_id}")
                     return response
                 except httpx.ReadTimeout as e:
@@ -124,6 +126,5 @@ class SummarizationService:
 
     async def close(self) -> None:
         """Close the summarization service and cleanup resources."""
-        if hasattr(self.summarizer, "close"):
-            await self.summarizer.close()
+        # No cleanup needed since summarizer is created per request
         logger.info("SummarizationService closed")

@@ -1,7 +1,6 @@
 """Shared LLM request database manager."""
 
 from pathlib import Path
-from typing import Any
 
 from core import get_logger
 from core.database import BaseSQLiteManager
@@ -48,17 +47,3 @@ class LLMSQLiteManager(BaseSQLiteManager):
         if self.llm_repo is None:
             raise RuntimeError("LLM database not connected")
         return self.llm_repo
-
-    def __enter__(self) -> "LLMSQLiteManager":
-        """Context manager entry."""
-        self.connect()
-        return self
-
-    def __exit__(
-        self,
-        exc_type: type[BaseException] | None,
-        exc_val: BaseException | None,
-        exc_tb: Any,
-    ) -> None:
-        """Context manager exit."""
-        self.disconnect()

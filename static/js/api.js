@@ -75,6 +75,22 @@ class ApiService {
         
         return await response.json();
     }
+
+    async markSummaryAsRead(paperId, summaryId) {
+        const response = await fetch(`${this.apiBaseUrl}/${paperId}/summary/${summaryId}/read`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to mark summary as read');
+        }
+
+        return await response.json();
+    }
 }
 
 // Export for use in other modules

@@ -67,23 +67,24 @@ class PaperManager {
         const urlInput = document.getElementById('paper-url');
         const url = urlInput.value.trim();
         
-        const validation = ValidationService.validatePaperUrl(url);
-        if (!validation.isValid) {
-            this.uiService.showError(validation.message);
+        // Only check for empty string
+        if (!url) {
+            this.uiService.showError('Please enter a paper URL');
             return false;
         }
         
         return true;
     }
 
+
+
     async submitPaper(summarizeNow = false) {
         const urlInput = document.getElementById('paper-url');
         const url = urlInput.value.trim();
 
-        // Validation
-        const validation = ValidationService.validatePaperUrl(url);
-        if (!validation.isValid) {
-            this.uiService.showError(validation.message, summarizeNow);
+        // Only check for empty string
+        if (!url) {
+            this.uiService.showError('Please enter a paper URL', summarizeNow);
             return;
         }
 
@@ -96,9 +97,7 @@ class PaperManager {
             
             const requestData = {
                 url: url,
-                summarize_now: summarizeNow,
-                force_refresh_metadata: false,
-                force_resummarize: false,
+                skip_auto_summarization: !summarizeNow,
                 summary_language: selectedLanguage
             };
 
@@ -186,6 +185,8 @@ class PaperManager {
                 }
                 break;
             case 'error':
+                // Show error as a prominent warning popup
+                alert(`Streaming Error: ${data.message}`);
                 this.uiService.showError(data.message, true);
                 break;
         }

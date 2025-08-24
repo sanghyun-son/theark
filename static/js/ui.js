@@ -181,9 +181,52 @@ class UIService {
         return tldr || 'No summary available';
     }
 
-    showSummaryModal(paper) {
+    async showSummaryModal(paper) {
         const modal = new SummaryModal(paper);
         modal.show();
+        
+        // Mark summary as read if it exists and hasn't been read
+        if (paper.summary && paper.summary.summary_id && !paper.summary.is_read) {
+            try {
+                const response = await fetch(`/v1/papers/${paper.paper_id}/summary/${paper.summary.summary_id}/read`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Failed to mark summary as read');
+                }
+
+                await response.json();
+                
+                // Update the paper's read status locally
+                paper.summary.is_read = true;
+                
+                // Update the UI to remove 'unread' styling
+                const paperElement = this.findPaperElement(paper.arxiv_id);
+                if (paperElement) {
+                    paperElement.classList.remove('unread');
+                }
+            } catch (error) {
+                console.error('Failed to mark summary as read:', error);
+            }
+        }
+    }
+
+    findPaperElement(arxivId) {
+        const paperElements = document.querySelectorAll('.paper-item');
+        
+        for (const paperElement of paperElements) {
+            const idSpan = paperElement.querySelector('.paper-title span');
+            if (idSpan && idSpan.textContent === `[${arxivId}]`) {
+                return paperElement;
+            }
+        }
+        
+        return null;
     }
 
     createRelevanceTag(score, isPaper = false) {

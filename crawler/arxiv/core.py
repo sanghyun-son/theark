@@ -88,41 +88,27 @@ class ArxivCrawlerCore:
 
     def __init__(
         self,
-        db_manager: DatabaseManager,
         config: CrawlConfig | None = None,
         on_paper_crawled: Callable[[PaperEntity], Awaitable[None]] | None = None,
         on_error: Callable[[Exception], Awaitable[None]] | None = None,
+        arxiv_client: ArxivClient | None = None,
     ):
         """Initialize the core crawler.
 
         Args:
-            db_manager: Database manager for persistence
             config: Crawler configuration
             on_paper_crawled: Callback when paper is successfully crawled
             on_error: Callback when error occurs
+            arxiv_client: Optional ArxivClient instance for dependency injection
         """
-        self.db_manager = db_manager
         self.config = config or CrawlConfig()
         self.on_paper_crawled = on_paper_crawled
         self.on_error = on_error
+        self.arxiv_client = arxiv_client
 
-        # Repositories
-        self.paper_repo: PaperRepository | None = None
-        self.summary_repo: SummaryRepository | None = None
-        self.event_repo: CrawlEventRepository | None = None
-
-        # Rate limiter
         self.rate_limiter = AsyncRateLimiter(self.config.requests_per_second)
-
-        # Parser
         self.parser = ArxivParser()
-
-        # Summarization service (initialized lazily)
-        self.summarization_service: SummarizationService | None = None
-
-        # Statistics
         self.stats = CrawlStats()
-
         logger.info("ArxivCrawlerCore initialized")
 
     async def __aenter__(self) -> "ArxivCrawlerCore":
@@ -142,9 +128,6 @@ class ArxivCrawlerCore:
     async def start(self) -> None:
         """Start the core crawler and initialize components."""
         try:
-            # Initialize database repositories
-            await self._initialize_repositories()
-
             # Update statistics
             self.stats.start_time = datetime.now()
 
@@ -161,11 +144,14 @@ class ArxivCrawlerCore:
         logger.info("Stopping ArxivCrawlerCore...")
         logger.info("ArxivCrawlerCore stopped")
 
-    async def crawl_single_paper(self, identifier: str) -> PaperEntity | None:
+    async def crawl_single_paper(
+        self, identifier: str, db_manager: DatabaseManager
+    ) -> PaperEntity | None:
         """Crawl a single paper by ID or URL.
 
         Args:
             identifier: arXiv ID, abstract URL, or PDF URL
+            db_manager: Database manager instance
 
         Returns:
             Crawled paper or None if failed
@@ -173,11 +159,14 @@ class ArxivCrawlerCore:
         logger.info(f"Crawling single paper: {identifier}")
 
         try:
+            # Get repositories
+            paper_repo, summary_repo, event_repo = self._get_repositories(db_manager)
+
             # Record crawl event
-            await self._record_crawl_event("FOUND", identifier)
+            await self._record_crawl_event("FOUND", identifier, event_repo)
 
             # Crawl the paper
-            paper = await self._crawl_paper(identifier)
+            paper = await self._crawl_paper(identifier, db_manager, paper_repo)
 
             if paper:
                 self.stats.papers_crawled += 1
@@ -197,11 +186,14 @@ class ArxivCrawlerCore:
                 await self.on_error(e)
             return None
 
-    async def crawl_papers_batch(self, identifiers: list[str]) -> list[PaperEntity]:
+    async def crawl_papers_batch(
+        self, identifiers: list[str], db_manager: DatabaseManager
+    ) -> list[PaperEntity]:
         """Crawl multiple papers in a batch.
 
         Args:
             identifiers: List of arXiv IDs, abstract URLs, or PDF URLs
+            db_manager: Database manager instance
 
         Returns:
             List of successfully crawled papers
@@ -213,7 +205,7 @@ class ArxivCrawlerCore:
         # Use rate limiter for concurrent crawling
         async def crawl_with_rate_limit(identifier: str) -> PaperEntity | None:
             await self.rate_limiter.wait()
-            return await self.crawl_single_paper(identifier)
+            return await self.crawl_single_paper(identifier, db_manager)
 
         # Crawl papers concurrently
         tasks = [crawl_with_rate_limit(identifier) for identifier in identifiers]
@@ -249,34 +241,60 @@ class ArxivCrawlerCore:
             },
         )
 
-    async def _initialize_repositories(self) -> None:
-        """Initialize database repositories."""
-        self.paper_repo = PaperRepository(self.db_manager)
-        self.summary_repo = SummaryRepository(self.db_manager)
-        self.event_repo = CrawlEventRepository(self.db_manager)
+    def _get_repositories(
+        self, db_manager: DatabaseManager
+    ) -> tuple[PaperRepository, SummaryRepository, CrawlEventRepository]:
+        """Get database repositories.
 
-    async def _initialize_summarization_service(self) -> None:
-        """Initialize the summarization service if configured."""
+        Args:
+            db_manager: Database manager instance
+
+        Returns:
+            Tuple of (paper_repo, summary_repo, event_repo)
+        """
+        paper_repo = PaperRepository(db_manager)
+        summary_repo = SummaryRepository(db_manager)
+        event_repo = CrawlEventRepository(db_manager)
+        return paper_repo, summary_repo, event_repo
+
+    def _get_summarization_service(
+        self, llm_db_manager: Any
+    ) -> SummarizationService | None:
+        """Get summarization service if configured.
+
+        Args:
+            llm_db_manager: LLM database manager instance
+
+        Returns:
+            SummarizationService instance or None if not configured
+        """
         if (
             self.config.summarization
             and self.config.summarization.summarize_immediately
-            and self.summarization_service is None
         ):
             try:
-                self.summarization_service = SummarizationService(
+                from core.config import settings
+
+                return SummarizationService(
+                    base_url=settings.llm_api_base_url,
                     use_tools=self.config.summarization.use_tools,
                     model=self.config.summarization.model,
+                    db_manager=llm_db_manager,
                 )
-                logger.info("Summarization service initialized")
             except Exception as e:
-                logger.error(f"Failed to initialize summarization service: {e}")
-                # Don't fail the entire crawler if summarization fails
+                logger.error(f"Failed to create summarization service: {e}")
+                return None
+        return None
 
-    async def _crawl_paper(self, identifier: str) -> PaperEntity | None:
+    async def _crawl_paper(
+        self, identifier: str, db_manager: DatabaseManager, paper_repo: PaperRepository
+    ) -> PaperEntity | None:
         """Crawl a single paper and store in database.
 
         Args:
             identifier: arXiv ID, abstract URL, or PDF URL
+            db_manager: Database manager instance
+            paper_repo: Paper repository instance
 
         Returns:
             Crawled paper or None if failed
@@ -285,64 +303,71 @@ class ArxivCrawlerCore:
             logger.warning("Empty identifier provided")
             return None
 
-        async with ArxivClient() as client:
-            try:
-                # Fetch paper from arXiv API
-                xml_response = await client.get_paper(identifier)
+        # Use injected client or create a new one
+        if self.arxiv_client:
+            # Use injected client (already managed externally)
+            return await self._crawl_with_client(
+                self.arxiv_client, identifier, db_manager, paper_repo
+            )
+        else:
+            # Create new client with settings
+            from core.config import settings
 
-                # Parse XML response and extract paper metadata
-                paper = self.parser.parse_paper(xml_response)
-                if not paper:
-                    logger.warning(f"Failed to parse paper from XML: {identifier}")
-                    return None
+            base_url = f"{settings.arxiv_api_base_url}/api/query"
+            client = ArxivClient(base_url=base_url)
+            return await self._crawl_with_client(
+                client, identifier, db_manager, paper_repo
+            )
 
-                # Check if paper already exists
-                with self.db_manager:
-                    if self.paper_repo is None:
-                        raise RuntimeError("Paper repository not initialized")
+    async def _crawl_with_client(
+        self,
+        client: ArxivClient,
+        identifier: str,
+        db_manager: DatabaseManager,
+        paper_repo: PaperRepository,
+    ) -> PaperEntity | None:
+        """Crawl paper using the provided client."""
+        try:
+            # Fetch paper from arXiv API
+            xml_response = await client.get_paper(identifier)
 
-                    existing_paper = self.paper_repo.get_by_arxiv_id(paper.arxiv_id)
-                    if existing_paper:
-                        logger.info(
-                            f"Paper {paper.arxiv_id} already exists in database"
-                        )
-                        return existing_paper
-
-                    # Store in database
-                    paper_id = self.paper_repo.create(paper)
-                    logger.info(
-                        f"Stored paper {paper.arxiv_id} in database with ID {paper_id}"
-                    )
-
-                    # Retrieve the stored paper to get the database ID
-                    stored_paper = self.paper_repo.get_by_arxiv_id(paper.arxiv_id)
-
-                    # Initialize summarization service if needed
-                    await self._initialize_summarization_service()
-
-                    if (
-                        self.summarization_service
-                        and self.config.summarization
-                        and self.config.summarization.summarize_immediately
-                        and stored_paper
-                    ):
-                        await self._summarize_paper(stored_paper)
-
-                    return stored_paper
-
-            except ArxivNotFoundError:
-                logger.warning(f"Paper not found: {identifier}")
+            # Parse XML response and extract paper metadata
+            paper = self.parser.parse_paper(xml_response)
+            if not paper:
+                logger.warning(f"Failed to parse paper from XML: {identifier}")
                 return None
-            except Exception as e:
-                logger.error(f"Error crawling paper {identifier}: {e}")
-                raise
 
-    async def _record_crawl_event(self, event_type: str, identifier: str) -> None:
+            # Check if paper already exists
+            existing_paper = paper_repo.get_by_arxiv_id(paper.arxiv_id)
+            if existing_paper:
+                logger.info(f"Paper {paper.arxiv_id} already exists in database")
+                return existing_paper
+
+            # Store in database
+            paper_id = paper_repo.create(paper)
+            logger.info(f"Stored paper {paper.arxiv_id} in database with ID {paper_id}")
+
+            # Retrieve the stored paper to get the database ID
+            stored_paper = paper_repo.get_by_arxiv_id(paper.arxiv_id)
+
+            return stored_paper
+
+        except ArxivNotFoundError:
+            logger.warning(f"Paper not found: {identifier}")
+            return None
+        except Exception as e:
+            logger.error(f"Error crawling paper {identifier}: {e}")
+            raise
+
+    async def _record_crawl_event(
+        self, event_type: str, identifier: str, event_repo: CrawlEventRepository
+    ) -> None:
         """Record a crawl event in the database.
 
         Args:
             event_type: Type of crawl event
             identifier: Paper identifier or search criteria
+            event_repo: Event repository instance
         """
         try:
             event = CrawlEvent(
@@ -351,21 +376,27 @@ class ArxivCrawlerCore:
                 detail=f"Identifier: {identifier}",
             )
 
-            with self.db_manager:
-                if self.event_repo is None:
-                    raise RuntimeError("Event repository not initialized")
-                self.event_repo.log_event(event)
+            event_repo.log_event(event)
 
         except Exception as e:
             logger.error(f"Failed to record crawl event: {e}")
 
-    async def _summarize_paper(self, paper: PaperEntity) -> None:
+    async def _summarize_paper(
+        self, paper: PaperEntity, llm_db_manager: Any, summary_repo: SummaryRepository
+    ) -> None:
         """Summarize a paper and store the summary in the database.
 
         Args:
             paper: The paper to summarize
+            llm_db_manager: LLM database manager instance
+            summary_repo: Summary repository instance
         """
-        if not self.summarization_service or not self.config.summarization:
+        if not self.config.summarization:
+            return
+
+        # Get summarization service
+        summarization_service = self._get_summarization_service(llm_db_manager)
+        if not summarization_service:
             return
 
         try:
@@ -376,7 +407,7 @@ class ArxivCrawlerCore:
                 return
 
             # Summarize the paper
-            summary_response = await self.summarization_service.summarize_paper(
+            summary_response = await summarization_service.summarize_paper(
                 paper_id=paper.arxiv_id,
                 abstract=abstract,
                 language=self.config.summarization.language,
@@ -392,73 +423,68 @@ class ArxivCrawlerCore:
                     )
                     return
 
-                # Store the summary in the database
-                with self.db_manager:
-                    if self.summary_repo is None:
-                        raise RuntimeError("Summary repository not initialized")
+                # Create summary record
+                from core.models.database.entities import SummaryEntity
 
-                    # Create summary record
-                    from core.models.database.entities import SummaryEntity
+                # Convert relevance string to integer score
+                relevance_map = {
+                    "Must": 10,
+                    "High": 8,
+                    "Medium": 5,
+                    "Low": 2,
+                    "Irrelevant": 0,
+                }
 
-                    # Convert relevance string to integer score
-                    relevance_map = {
-                        "Must": 10,
-                        "High": 8,
-                        "Medium": 5,
-                        "Low": 2,
-                        "Irrelevant": 0,
-                    }
+                # Get relevance value
+                relevance_value = (
+                    summary_response.structured_summary.relevance
+                    if summary_response.structured_summary
+                    else "Medium"
+                )
 
-                    # Get relevance value
-                    relevance_value = (
-                        summary_response.structured_summary.relevance
-                        if summary_response.structured_summary
-                        else "Medium"
-                    )
+                # Handle both string and numeric relevance values
+                if relevance_value.isdigit():
+                    relevance_score = int(relevance_value)
+                else:
+                    relevance_score = relevance_map.get(relevance_value, 5)
 
-                    # Handle both string and numeric relevance values
-                    if relevance_value.isdigit():
-                        relevance_score = int(relevance_value)
-                    else:
-                        relevance_score = relevance_map.get(relevance_value, 5)
+                # Create overview from structured summary
+                if summary_response.structured_summary:
+                    overview = summary_response.structured_summary.tldr
+                    motivation = summary_response.structured_summary.motivation
+                    method = summary_response.structured_summary.method
+                    result = summary_response.structured_summary.result
+                    conclusion = summary_response.structured_summary.conclusion
+                else:
+                    overview = summary_response.summary or ""
+                    motivation = "Not available"
+                    method = "Not available"
+                    result = "Not available"
+                    conclusion = "Not available"
 
-                    # Create overview from structured summary
-                    if summary_response.structured_summary:
-                        overview = summary_response.structured_summary.tldr
-                        motivation = summary_response.structured_summary.motivation
-                        method = summary_response.structured_summary.method
-                        result = summary_response.structured_summary.result
-                        conclusion = summary_response.structured_summary.conclusion
-                    else:
-                        overview = summary_response.summary or ""
-                        motivation = "Not available"
-                        method = "Not available"
-                        result = "Not available"
-                        conclusion = "Not available"
+                summary = SummaryEntity(
+                    paper_id=paper.paper_id,
+                    version=1,
+                    overview=overview,
+                    motivation=motivation,
+                    method=method,
+                    result=result,
+                    conclusion=conclusion,
+                    language=self.config.summarization.language,
+                    interests=self.config.summarization.interest_section,
+                    relevance=relevance_score,
+                    model=(
+                        summary_response.metadata.get("model")
+                        if summary_response.metadata
+                        else None
+                    ),
+                )
 
-                    summary = SummaryEntity(
-                        paper_id=paper.paper_id,
-                        version=1,
-                        overview=overview,
-                        motivation=motivation,
-                        method=method,
-                        result=result,
-                        conclusion=conclusion,
-                        language=self.config.summarization.language,
-                        interests=self.config.summarization.interest_section,
-                        relevance=relevance_score,
-                        model=(
-                            summary_response.metadata.get("model")
-                            if summary_response.metadata
-                            else None
-                        ),
-                    )
-
-                    summary_id = self.summary_repo.create(summary)
-                    logger.info(
-                        f"Stored summary for paper {paper.arxiv_id} "
-                        f"with ID {summary_id}"
-                    )
+                summary_id = summary_repo.create(summary)
+                logger.info(
+                    f"Stored summary for paper {paper.arxiv_id} "
+                    f"with ID {summary_id}"
+                )
 
         except Exception as e:
             logger.error(f"Failed to summarize paper {paper.arxiv_id}: {e}")

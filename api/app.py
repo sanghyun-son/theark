@@ -44,9 +44,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     app.state.db_manager = db_manager
     app.state.llm_db_manager = llm_db_manager
-    app.state.paper_service = PaperService(
-        db_manager=db_manager, llm_db_manager=llm_db_manager
-    )
+    app.state.paper_service = PaperService()
     logger.info("Database and LLM database initialized successfully")
 
     yield

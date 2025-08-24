@@ -1,7 +1,6 @@
 """SQLite database manager implementation."""
 
 import sqlite3
-from typing import Any
 
 from core.database import BaseSQLiteManager
 
@@ -105,17 +104,3 @@ class SQLiteManager(BaseSQLiteManager):
         except sqlite3.Error as e:
             self.logger.error(f"Failed to create tables: {e}")
             raise
-
-    def __enter__(self) -> "SQLiteManager":
-        """Context manager entry."""
-        self.connect()
-        return self
-
-    def __exit__(
-        self,
-        exc_type: type[BaseException] | None,
-        exc_val: BaseException | None,
-        exc_tb: Any,
-    ) -> None:
-        """Context manager exit."""
-        self.disconnect()

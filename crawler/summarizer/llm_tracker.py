@@ -47,6 +47,14 @@ class LLMTracker:
         Returns:
             Request ID for tracking
         """
+        # Ensure database is connected
+        if (
+            hasattr(self.db_manager, "connection")
+            and self.db_manager.connection is None
+        ):
+            logger.debug("LLM database connection lost, attempting to reconnect")
+            self.db_manager.connect()
+
         request = LLMRequest(
             timestamp=datetime.now().isoformat(),
             model=model,
@@ -84,6 +92,14 @@ class LLMTracker:
             http_status_code: HTTP status code
             estimated_cost_usd: Estimated cost in USD
         """
+        # Ensure database is connected
+        if (
+            hasattr(self.db_manager, "connection")
+            and self.db_manager.connection is None
+        ):
+            logger.debug("LLM database connection lost, attempting to reconnect")
+            self.db_manager.connect()
+
         status = "success" if success else "error"
 
         self.db_manager.repository.update_status(

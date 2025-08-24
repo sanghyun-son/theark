@@ -69,6 +69,26 @@ class SummaryReadResponse(BaseModel):
     is_read: bool
 
 
+class StarResponse(BaseModel):
+    """Response model for star operations."""
+
+    success: bool
+    message: str
+    paper_id: int
+    is_starred: bool
+    note: str | None = None
+    created_at: str | None = None
+
+
+class StarredPapersResponse(BaseModel):
+    """Response model for starred papers list."""
+
+    papers: list[PaperResponse]
+    total_count: int
+    limit: int
+    offset: int
+
+
 class AuthError(BaseModel):
     """Model for authentication error."""
 
