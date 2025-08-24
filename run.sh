@@ -75,6 +75,7 @@ fi
 
 export PYTHONPATH="${PYTHONPATH:+${PYTHONPATH}:}$(pwd)"
 export THEARK_ENV="$ENV"
+export THEARK_LOG_LEVEL="$LOG_LEVEL"
 
 echo "📊 Server Configuration:"
 echo "   Host: $HOST"

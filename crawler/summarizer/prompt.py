@@ -35,10 +35,3 @@ Interest:
 
 Content (Abstract):
 {content}"""
-
-# Relevance mapping for structured output
-# flake8: noqa: E501
-RELEVANCE_DESCRIPTION = (
-    """relevance level between the abstract and user interests: Must, High, Medium, """
-    """Low, or Irrelevant (map 10-9: Must, 8-7: High, 6-4: Medium, 3-2: Low, 1: Irrelevant)"""
-)

@@ -117,7 +117,7 @@ class PaperAnalysis(BaseModel):
     method: str = Field(description="Methodology used")
     result: str = Field(description="Results obtained")
     conclusion: str = Field(description="Conclusions drawn")
-    relevance: str = Field(description="Relevance to user interests")
+    relevance: int = Field(description="Relevance (1-10) to user interests")
 
     @classmethod
     def from_json_string(cls, json_str: str) -> "PaperAnalysis":
@@ -128,34 +128,34 @@ class PaperAnalysis(BaseModel):
         return cls(**data)
 
     @classmethod
-    def create_paper_analysis_schema(
-        cls, relevance_description: str
-    ) -> dict[str, OpenAIPropertyDefinition]:
+    def create_paper_analysis_schema(cls) -> dict[str, OpenAIPropertyDefinition]:
         """Create the standard paper analysis properties schema."""
         return {
             "tldr": OpenAIPropertyDefinition(
                 type="string",
-                description="generate a too long; didn't read summary",
+                description="Generate a too long; didn't read summary in one line.",
             ),
             "motivation": OpenAIPropertyDefinition(
                 type="string",
-                description="describe the motivation in this paper",
+                description="Describe the motivation in this paper.",
             ),
             "method": OpenAIPropertyDefinition(
                 type="string",
-                description="method of this paper",
+                description="Describe the method of this paper in detail.",
             ),
             "result": OpenAIPropertyDefinition(
                 type="string",
-                description="result of this paper",
+                description="Describe the result and achievement of this paper.",
             ),
             "conclusion": OpenAIPropertyDefinition(
                 type="string",
-                description="conclusion of this paper",
+                description="Describe the conclusion and implication of this paper.",
             ),
             "relevance": OpenAIPropertyDefinition(
-                type="string",
-                description=relevance_description,
+                type="integer",
+                description=(
+                    "Relevance level (1-10) " "between the abstract and user interests."
+                ),
             ),
         }
 

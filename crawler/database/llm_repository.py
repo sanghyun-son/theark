@@ -57,8 +57,6 @@ class LLMRequestRepository:
             "CREATE INDEX IF NOT EXISTS idx_llm_custom_id ON llm_requests(custom_id)"
         )
 
-        logger.debug("LLM requests table and indexes created")
-
     def create(self, request: LLMRequest) -> int:
         """Create a new LLM request record."""
         insert_sql = """

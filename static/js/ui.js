@@ -173,9 +173,9 @@ class UIService {
             tldr = summary.conclusion;
         }
         
-        // Truncate to one line (approximately 100 characters)
-        if (tldr.length > 100) {
-            tldr = tldr.substring(0, 97) + '...';
+        // Truncate to one line (approximately 200 characters for more content)
+        if (tldr.length > 200) {
+            tldr = tldr.substring(0, 197) + '...';
         }
         
         return tldr || 'No summary available';
@@ -352,26 +352,9 @@ class UIService {
     }
 
     setLoadingState(loading, summarizeNow) {
-        const summarizeBtn = document.getElementById('summarize-btn');
-        const queueBtn = document.getElementById('queue-btn');
-        const urlInput = document.getElementById('paper-url');
-
-        if (loading) {
-            if (summarizeNow) {
-                summarizeBtn.disabled = true;
-                summarizeBtn.innerHTML = '<span class="loading"></span>⏳';
-            } else {
-                queueBtn.disabled = true;
-                queueBtn.innerHTML = '<span class="loading"></span>⏳';
-            }
-            urlInput.disabled = true;
-        } else {
-            summarizeBtn.disabled = false;
-            queueBtn.disabled = false;
-            summarizeBtn.innerHTML = '⚡';
-            queueBtn.innerHTML = '📋';
-            urlInput.disabled = false;
-        }
+        // 로딩 상태를 표시하지 않고 버튼을 비활성화하지 않음
+        // 사용자가 연속으로 제출할 수 있도록 함
+        return;
     }
 
     // updateButtonStatus method removed - no longer needed for concurrent submissions

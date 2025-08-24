@@ -37,12 +37,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     db_path = get_database_path(current_environment)
     db_manager = SQLiteManager(db_path)
     db_manager.connect()
-    db_manager.create_tables()
 
     llm_db_path = get_llm_database_path(current_environment)
     llm_db_manager = LLMSQLiteManager(llm_db_path)
     llm_db_manager.connect()
-    llm_db_manager.create_tables()
 
     app.state.db_manager = db_manager
     app.state.llm_db_manager = llm_db_manager

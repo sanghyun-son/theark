@@ -4,6 +4,7 @@ from typing import Any
 
 import httpx
 
+from core.log import get_logger
 from core.models.external.openai import (
     ChatCompletionRequest,
     ChatCompletionResponse,
@@ -16,12 +17,14 @@ from core.models.external.openai import (
 )
 
 from .llm_tracker import LLMRequestContext
-from .prompt import RELEVANCE_DESCRIPTION, SYSTEM_PROMPT, USER_PROMPT
+from .prompt import SYSTEM_PROMPT, USER_PROMPT
 from .summarizer import (
     AbstractSummarizer,
     SummaryRequest,
     SummaryResponse,
 )
+
+logger = get_logger(__name__)
 
 
 class OpenAISummarizer(AbstractSummarizer):
@@ -55,6 +58,7 @@ class OpenAISummarizer(AbstractSummarizer):
         ) as llm_context:
             # Build and send request
             payload = self._build_request_payload(request)
+            logger.debug(f"OpenAI Request: {payload.model_dump_json(indent=2)}")
             response = await self._make_api_request(payload)
 
             # Update tracking with response data
@@ -67,6 +71,7 @@ class OpenAISummarizer(AbstractSummarizer):
 
             # Parse response
             chat_response = ChatCompletionResponse(**response.json())
+            logger.debug(f"OpenAI Response: {chat_response.model_dump_json(indent=2)}")
             self._update_token_tracking(llm_context, chat_response)
 
             return self._parse_response(request, chat_response)
@@ -112,9 +117,7 @@ class OpenAISummarizer(AbstractSummarizer):
         function_parameters = OpenAIFunctionParameter(
             type="object",
             description="Paper analysis parameters",
-            properties=PaperAnalysis.create_paper_analysis_schema(
-                RELEVANCE_DESCRIPTION
-            ),
+            properties=PaperAnalysis.create_paper_analysis_schema(),
             required=PaperAnalysis.get_required_fields(),
         )
 

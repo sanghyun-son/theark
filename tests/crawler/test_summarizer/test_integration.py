@@ -45,7 +45,7 @@ class TestSummarizationIntegration:
         assert config.use_tools is True
         assert config.model == "gpt-4o-mini"
         assert config.language == "English"
-        assert config.interest_section == ""
+        assert config.interest_section == "Machine Learning,Deep Learning"
 
     @pytest.mark.asyncio
     async def test_summarization_config_custom(self):

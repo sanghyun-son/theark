@@ -88,9 +88,6 @@ class PaperManager {
             return;
         }
 
-        // Show loading state
-        this.uiService.setLoadingState(true, summarizeNow);
-
         try {
             const languageSelect = document.getElementById('summary-language');
             const selectedLanguage = languageSelect ? languageSelect.value : 'Korean';
@@ -115,8 +112,6 @@ class PaperManager {
             
         } catch (error) {
             this.uiService.showError(error.message, summarizeNow);
-        } finally {
-            this.uiService.setLoadingState(false, summarizeNow);
         }
     }
 

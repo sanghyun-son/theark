@@ -23,6 +23,7 @@ class BaseSQLiteManager(DatabaseManager):
         super().__init__(str(db_path))
         self.db_path = Path(db_path)
         self.connection: sqlite3.Connection | None = None
+        logger.info(f"Initialized {self.__class__.__name__}")
 
     def connect(self) -> None:
         """Establish SQLite database connection."""
@@ -35,7 +36,7 @@ class BaseSQLiteManager(DatabaseManager):
             )
             self.connection.row_factory = sqlite3.Row
             self._configure_connection()
-            logger.info(f"Connected to SQLite database: {self.db_path}")
+            logger.info(f"Connected to {self.__class__.__name__}: {self.db_path}")
         except sqlite3.Error as e:
             logger.error(f"Failed to connect to SQLite database: {e}")
             raise
@@ -45,7 +46,7 @@ class BaseSQLiteManager(DatabaseManager):
         if self.connection:
             self.connection.close()
             self.connection = None
-            logger.info("Disconnected from SQLite database")
+            logger.info(f"Disconnected from {self.__class__.__name__}")
 
     def _configure_connection(self) -> None:
         """Configure SQLite connection settings."""

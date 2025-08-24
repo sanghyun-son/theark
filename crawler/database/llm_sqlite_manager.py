@@ -21,20 +21,17 @@ class LLMSQLiteManager(BaseSQLiteManager):
         """
         super().__init__(db_path)
         self.llm_repo: LLMRequestRepository | None = None
-        logger.info(f"LLM database manager initialized: {self.db_path}")
 
     def connect(self) -> None:
         """Connect to the LLM database."""
         super().connect()
         self.llm_repo = LLMRequestRepository(self)
         self.llm_repo.create_table()
-        logger.info("LLM database connected")
 
     def disconnect(self) -> None:
         """Disconnect from the LLM database."""
         super().disconnect()
         self.llm_repo = None
-        logger.info("LLM database disconnected")
 
     def create_tables(self) -> None:
         """Create all necessary tables."""

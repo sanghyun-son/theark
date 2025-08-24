@@ -81,7 +81,10 @@ class PaperSummarizationService:
 
             # Create summary using summarization service
             summary_response = await summarization_service.summarize_paper(
-                paper.arxiv_id, paper.abstract, language=language
+                paper.arxiv_id,
+                paper.abstract,
+                language=language,
+                interest_section=settings.default_interests,
             )
 
             # Save summary to database
@@ -181,7 +184,7 @@ class PaperSummarizationService:
                 conclusion=analysis.conclusion or "No conclusion available",
                 language=language,
                 interests=settings.default_interests,
-                relevance=self._parse_relevance(analysis.relevance),
+                relevance=analysis.relevance,
                 model=settings.llm_model,
                 is_read=False,
             )
@@ -202,19 +205,6 @@ class PaperSummarizationService:
                 model=settings.llm_model,
                 is_read=False,
             )
-
-    def _parse_relevance(self, relevance_str: str) -> int:
-        """Parse relevance string to integer."""
-        try:
-            # Try to extract number from relevance string (e.g., "8/10" -> 8)
-            import re
-
-            match = re.search(r"(\d+)", relevance_str)
-            if match:
-                return min(max(int(match.group(1)), 1), 10)  # Clamp between 1-10
-            return 5  # Default
-        except (ValueError, AttributeError):
-            return 5  # Default
 
     def get_paper_summary(
         self,

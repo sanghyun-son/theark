@@ -24,10 +24,19 @@ class TestPaperSummarizationService:
     @pytest.mark.asyncio
     @patch("api.services.paper_summarization_service.SummarizationService")
     @patch("api.services.paper_summarization_service.SummaryRepository")
+    @patch("api.services.paper_summarization_service.load_settings")
     async def test_summarize_paper_success(
-        self, mock_repo_class, mock_summarization_class
+        self, mock_load_settings, mock_repo_class, mock_summarization_class
     ) -> None:
         """Test successful paper summarization."""
+        # Mock settings
+        mock_settings = MagicMock()
+        mock_settings.llm_model = "gpt-4o-mini"
+        mock_settings.llm_api_base_url = "https://api.openai.com/v1"
+        mock_settings.llm_use_tools = True
+        mock_settings.default_interests = "Machine Learning,Deep Learning"
+        mock_load_settings.return_value = mock_settings
+
         # Mock repository and summarization service
         mock_repo_class.return_value = self.mock_summary_repo
         mock_summarization_service = AsyncMock()
@@ -59,7 +68,10 @@ class TestPaperSummarizationService:
 
         # Verify summarization service was called
         mock_summarization_service.summarize_paper.assert_called_once_with(
-            mock_paper.arxiv_id, mock_paper.abstract, language="Korean"
+            mock_paper.arxiv_id,
+            mock_paper.abstract,
+            language="Korean",
+            interest_section="Machine Learning,Deep Learning",
         )
 
         # Verify summary was saved
@@ -96,10 +108,19 @@ class TestPaperSummarizationService:
     @pytest.mark.asyncio
     @patch("api.services.paper_summarization_service.SummarizationService")
     @patch("api.services.paper_summarization_service.SummaryRepository")
+    @patch("api.services.paper_summarization_service.load_settings")
     async def test_summarize_paper_force_resummarize(
-        self, mock_repo_class, mock_summarization_class
+        self, mock_load_settings, mock_repo_class, mock_summarization_class
     ) -> None:
         """Test summarization with force_resummarize=True."""
+        # Mock settings
+        mock_settings = MagicMock()
+        mock_settings.llm_model = "gpt-4o-mini"
+        mock_settings.llm_api_base_url = "https://api.openai.com/v1"
+        mock_settings.llm_use_tools = True
+        mock_settings.default_interests = "Machine Learning,Deep Learning"
+        mock_load_settings.return_value = mock_settings
+
         # Mock repository and summarization service
         mock_repo_class.return_value = self.mock_summary_repo
         mock_summarization_service = AsyncMock()
@@ -135,7 +156,10 @@ class TestPaperSummarizationService:
 
         # Verify summarization service was called despite existing summary
         mock_summarization_service.summarize_paper.assert_called_once_with(
-            mock_paper.arxiv_id, mock_paper.abstract, language="Korean"
+            mock_paper.arxiv_id,
+            mock_paper.abstract,
+            language="Korean",
+            interest_section="Machine Learning,Deep Learning",
         )
 
         # Verify summary was saved
