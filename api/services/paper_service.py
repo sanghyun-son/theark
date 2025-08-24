@@ -17,6 +17,7 @@ from core.models import (
 )
 from core.models.api.responses import StarredPapersResponse, StarResponse
 from core.models.database.entities import PaperEntity, UserStarEntity
+from core.models.domain.user import User
 from crawler.arxiv.client import ArxivClient
 from crawler.database import (
     PaperRepository,
@@ -25,6 +26,7 @@ from crawler.database import (
 )
 from crawler.database.llm_sqlite_manager import LLMSQLiteManager
 from crawler.database.sqlite_manager import SQLiteManager
+from crawler.summarizer.client import SummaryClient
 from crawler.summarizer.service import SummarizationService
 
 logger = get_logger(__name__)
@@ -42,18 +44,7 @@ class PaperService:
     ) -> SummarizationService:
         """Initialize summarization service."""
         try:
-            summarization_service = SummarizationService(
-                model=self.settings.llm_model,
-                base_url=self.settings.llm_api_base_url,
-                use_tools=self.settings.llm_use_tools,
-                db_manager=llm_db_manager,
-            )
-            logger.info(
-                f"SummarizationService successfully initialized with "
-                f"model={self.settings.llm_model}, "
-                f"base_url={self.settings.llm_api_base_url}, "
-                f"use_tools={self.settings.llm_use_tools}"
-            )
+            summarization_service = SummarizationService()
             return summarization_service
         except Exception as e:
             logger.error(
@@ -67,6 +58,8 @@ class PaperService:
         paper_data: PaperCreate,
         db_manager: SQLiteManager,
         llm_db_manager: LLMSQLiteManager,
+        arxiv_client: ArxivClient,
+        summary_client: SummaryClient,
         skip_auto_summarization: bool = False,
     ) -> PaperResponse:
         """Create a new paper using new architecture."""
@@ -78,11 +71,11 @@ class PaperService:
 
         if skip_auto_summarization:
             return await orchestration_service.create_paper_streaming(
-                paper_data, db_manager
+                paper_data, db_manager, arxiv_client
             )
         else:
             return await orchestration_service.create_paper_normal(
-                paper_data, db_manager, llm_db_manager
+                paper_data, db_manager, llm_db_manager, arxiv_client, summary_client
             )
 
     async def get_paper(
@@ -99,12 +92,31 @@ class PaperService:
         )
         return await orchestration_service.get_paper(paper_identifier, db_manager)
 
+    async def create_paper_streaming(
+        self,
+        paper_data: PaperCreate,
+        db_manager: SQLiteManager,
+        llm_db_manager: LLMSQLiteManager,
+        arxiv_client: ArxivClient,
+        summary_client: SummaryClient,
+    ) -> AsyncGenerator[str, None]:
+        """Create a paper with streaming response."""
+        creation_service = PaperCreationService()
+        summarization_service_wrapper = PaperSummarizationService()
+        orchestration_service = PaperOrchestrationService(
+            creation_service, summarization_service_wrapper
+        )
+
+        async for event in orchestration_service.stream_paper_creation(
+            paper_data, db_manager, llm_db_manager, arxiv_client, summary_client
+        ):
+            yield event
+
     async def delete_paper(
         self, paper_identifier: str, db_manager: SQLiteManager
     ) -> PaperDeleteResponse:
         """Delete a paper by ID or arXiv ID."""
         paper_repo = PaperRepository(db_manager)
-
         paper = self._get_paper_by_identifier(paper_identifier, paper_repo)
         if not paper:
             raise ValueError("Paper not found")
@@ -159,7 +171,6 @@ class PaperService:
     ) -> SummaryReadResponse:
         """Mark a summary as read."""
         summary_repo = SummaryRepository(db_manager)
-
         summary = summary_repo.get_by_id(summary_id)
         if not summary:
             raise ValueError(f"Summary {summary_id} not found")
@@ -182,26 +193,29 @@ class PaperService:
 
     # Star functionality methods
     async def add_star(
-        self, paper_id: int, db_manager: SQLiteManager, note: str | None = None
+        self,
+        paper_id: int,
+        db_manager: SQLiteManager,
+        user: User,
+        note: str | None = None,
     ) -> StarResponse:
         """Add a star to a paper."""
-        user_repo = UserRepository(db_manager)
-        paper_repo = PaperRepository(db_manager)
+        if user.user_id is None:
+            raise ValueError("User ID is required")
 
-        # Check if paper exists
+        paper_repo = PaperRepository(db_manager)
         paper = paper_repo.get_by_id(paper_id)
         if not paper:
             raise ValueError(f"Paper {paper_id} not found")
 
-        user_id = 1
-
         star = UserStarEntity(
-            user_id=user_id,
+            user_id=user.user_id,
             paper_id=paper_id,
             note=note,
         )
 
         # Add star to database
+        user_repo = UserRepository(db_manager)
         user_repo.add_star(star)
 
         return StarResponse(
@@ -214,21 +228,19 @@ class PaperService:
         )
 
     async def remove_star(
-        self, paper_id: int, db_manager: SQLiteManager
+        self, paper_id: int, db_manager: SQLiteManager, user: User
     ) -> StarResponse:
         """Remove a star from a paper."""
-        user_repo = UserRepository(db_manager)
-        paper_repo = PaperRepository(db_manager)
+        if user.user_id is None:
+            raise ValueError("User ID is required")
 
-        # Check if paper exists
+        paper_repo = PaperRepository(db_manager)
         paper = paper_repo.get_by_id(paper_id)
         if not paper:
             raise ValueError(f"Paper {paper_id} not found")
 
-        user_id = 1
-
-        # Remove star from database
-        user_repo.remove_star(user_id, paper_id)
+        user_repo = UserRepository(db_manager)
+        user_repo.remove_star(user.user_id, paper_id)
 
         return StarResponse(
             success=True,
@@ -240,17 +252,21 @@ class PaperService:
         )
 
     async def get_starred_papers(
-        self, db_manager: SQLiteManager, limit: int = 20, offset: int = 0
+        self,
+        db_manager: SQLiteManager,
+        user: User,
+        limit: int = 20,
+        offset: int = 0,
     ) -> StarredPapersResponse:
         """Get all starred papers for the current user."""
-        user_repo = UserRepository(db_manager)
+        if user.user_id is None:
+            raise ValueError("User ID is required")
+
         paper_repo = PaperRepository(db_manager)
         summary_repo = SummaryRepository(db_manager)
 
-        user_id = 1
-
-        # Get starred papers
-        stars = user_repo.get_user_stars(user_id, limit=limit + offset)
+        user_repo = UserRepository(db_manager)
+        stars = user_repo.get_user_stars(user.user_id, limit=limit + offset)
 
         # Apply offset
         stars = stars[offset : offset + limit]
@@ -282,21 +298,20 @@ class PaperService:
         )
 
     async def is_paper_starred(
-        self, paper_id: int, db_manager: SQLiteManager
+        self, paper_id: int, db_manager: SQLiteManager, user: User
     ) -> StarResponse:
         """Check if a paper is starred by the current user."""
+        if user.user_id is None:
+            raise ValueError("User ID is required")
+
         user_repo = UserRepository(db_manager)
         paper_repo = PaperRepository(db_manager)
 
-        # Check if paper exists
         paper = paper_repo.get_by_id(paper_id)
         if not paper:
             raise ValueError(f"Paper {paper_id} not found")
 
-        user_id = 1
-
-        # Get user stars and check if this paper is starred
-        stars = user_repo.get_user_stars(user_id, limit=1000)  # Get all stars
+        stars = user_repo.get_user_stars(user.user_id, limit=1000)  # Get all stars
         starred_paper = next(
             (star for star in stars if star.paper_id == paper_id), None
         )
@@ -382,7 +397,8 @@ class PaperService:
         paper_data: PaperCreate,
         db_manager: SQLiteManager,
         llm_db_manager: LLMSQLiteManager,
-        arxiv_client: ArxivClient | None = None,
+        arxiv_client: ArxivClient,
+        summary_client: SummaryClient,
     ) -> AsyncGenerator[str, None]:
         """Stream paper creation and summarization process."""
         creation_service = PaperCreationService()
@@ -390,8 +406,9 @@ class PaperService:
         orchestration_service = PaperOrchestrationService(
             creation_service, summarization_service_wrapper
         )
+
         async for event in orchestration_service.stream_paper_creation(
-            paper_data, db_manager, llm_db_manager, arxiv_client
+            paper_data, db_manager, llm_db_manager, arxiv_client, summary_client
         ):
             yield event
 

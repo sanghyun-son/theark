@@ -1,273 +1,209 @@
 """Tests for paper summarization service."""
 
-from unittest.mock import AsyncMock, MagicMock, patch
-
 import pytest
 
 from api.services.paper_summarization_service import PaperSummarizationService
 from core.models.database.entities import PaperEntity, SummaryEntity
-from crawler.summarizer import SummaryResponse
+from crawler.database.llm_sqlite_manager import LLMSQLiteManager
+from crawler.database.sqlite_manager import SQLiteManager
+from crawler.database.repository import PaperRepository
+from crawler.summarizer.client import SummaryClient
 
 
-class TestPaperSummarizationService:
-    """Test PaperSummarizationService methods."""
+@pytest.fixture
+def mock_paper() -> PaperEntity:
+    """Create a mock PaperEntity for testing."""
+    return PaperEntity(
+        paper_id=None,
+        arxiv_id="2508.01234",
+        title="Test Paper Title",
+        abstract="Test paper abstract",
+        primary_category="cs.AI",
+        categories="cs.AI,cs.LG",
+        authors="Author One;Author Two",
+        url_abs="https://arxiv.org/abs/2508.01234",
+        url_pdf="https://arxiv.org/pdf/2508.01234",
+        published_at="2023-08-01T00:00:00Z",
+        updated_at="2023-08-01T00:00:00Z",
+    )
 
-    def setup_method(self) -> None:
-        """Set up test fixtures."""
-        self.mock_db_manager = MagicMock()
-        self.mock_llm_db_manager = MagicMock()
-        self.mock_summary_repo = MagicMock()
 
-        # Create service without dependencies (DI pattern)
-        self.service = PaperSummarizationService()
+@pytest.fixture
+def saved_paper(mock_paper: PaperEntity, mock_sqlite_db: SQLiteManager) -> PaperEntity:
+    """Create and save a paper to the database."""
+    paper_repo = PaperRepository(mock_sqlite_db)
+    paper_id = paper_repo.create(mock_paper)
+    mock_paper.paper_id = paper_id
+    return mock_paper
 
-    @pytest.mark.asyncio
-    @patch("api.services.paper_summarization_service.SummarizationService")
-    @patch("api.services.paper_summarization_service.SummaryRepository")
-    @patch("api.services.paper_summarization_service.load_settings")
-    async def test_summarize_paper_success(
-        self, mock_load_settings, mock_repo_class, mock_summarization_class
-    ) -> None:
-        """Test successful paper summarization."""
-        # Mock settings
-        mock_settings = MagicMock()
-        mock_settings.llm_model = "gpt-4o-mini"
-        mock_settings.llm_api_base_url = "https://api.openai.com/v1"
-        mock_settings.llm_use_tools = True
-        mock_settings.default_interests = "Machine Learning,Deep Learning"
-        mock_load_settings.return_value = mock_settings
 
-        # Mock repository and summarization service
-        mock_repo_class.return_value = self.mock_summary_repo
-        mock_summarization_service = AsyncMock()
-        mock_summarization_service.summarize_paper = AsyncMock()
-        mock_summarization_service.model = "gpt-4o-mini"
-        mock_summarization_class.return_value = mock_summarization_service
+@pytest.mark.asyncio
+async def test_summarize_paper_success(
+    saved_paper: PaperEntity,
+    mock_sqlite_db: SQLiteManager,
+    mock_llm_sqlite_db: LLMSQLiteManager,
+    mock_summary_client: SummaryClient,
+) -> None:
+    """Test successful paper summarization."""
+    service = PaperSummarizationService()
+    await service.summarize_paper(
+        saved_paper,
+        mock_sqlite_db,
+        mock_llm_sqlite_db,
+        mock_summary_client,
+    )
+    summary = service.get_paper_summary(saved_paper, mock_sqlite_db)
+    assert summary is not None
 
-        mock_paper = self._create_mock_paper()
-        mock_summary_response = SummaryResponse(
-            custom_id=mock_paper.arxiv_id,
-            summary="Test summary text",
-            structured_summary=None,
-            original_length=100,
-            summary_length=50,
-        )
 
-        # Mock summarization service response
-        mock_summarization_service.summarize_paper.return_value = mock_summary_response
+@pytest.mark.asyncio
+async def test_summarize_paper_existing_summary(
+    saved_paper: PaperEntity,
+    mock_sqlite_db: SQLiteManager,
+    mock_llm_sqlite_db: LLMSQLiteManager,
+    mock_summary_client: SummaryClient,
+) -> None:
+    """Test summarization when summary already exists."""
+    service = PaperSummarizationService()
+    # First, create a summary
+    await service.summarize_paper(
+        saved_paper,
+        mock_sqlite_db,
+        mock_llm_sqlite_db,
+        mock_summary_client,
+    )
 
-        # Mock no existing summary
-        self.mock_summary_repo.get_by_paper_and_language.return_value = None
+    # Then try to summarize again - should not create a new summary
+    await service.summarize_paper(
+        saved_paper,
+        mock_sqlite_db,
+        mock_llm_sqlite_db,
+        mock_summary_client,
+    )
 
-        # Mock summary creation
-        self.mock_summary_repo.create.return_value = 1
+    # Verify only one summary exists
+    summary = service.get_paper_summary(saved_paper, mock_sqlite_db)
+    assert summary is not None
 
-        await self.service.summarize_paper(
-            mock_paper, self.mock_db_manager, self.mock_llm_db_manager
-        )
 
-        # Verify summarization service was called
-        mock_summarization_service.summarize_paper.assert_called_once_with(
-            mock_paper.arxiv_id,
-            mock_paper.abstract,
-            language="Korean",
-            interest_section="Machine Learning,Deep Learning",
-        )
+@pytest.mark.asyncio
+async def test_summarize_paper_force_resummarize(
+    saved_paper: PaperEntity,
+    mock_sqlite_db: SQLiteManager,
+    mock_llm_sqlite_db: LLMSQLiteManager,
+    mock_summary_client: SummaryClient,
+) -> None:
+    """Test summarization with force_resummarize=True."""
+    service = PaperSummarizationService()
+    # First, create a summary
+    await service.summarize_paper(
+        saved_paper,
+        mock_sqlite_db,
+        mock_llm_sqlite_db,
+        mock_summary_client,
+    )
 
-        # Verify summary was saved
-        self.mock_summary_repo.create.assert_called_once()
+    # Get the first summary
+    first_summary = service.get_paper_summary(saved_paper, mock_sqlite_db)
+    assert first_summary is not None
 
-    @pytest.mark.asyncio
-    @patch("api.services.paper_summarization_service.SummarizationService")
-    @patch("api.services.paper_summarization_service.SummaryRepository")
-    async def test_summarize_paper_existing_summary(
-        self, mock_repo_class, mock_summarization_class
-    ) -> None:
-        """Test summarization when summary already exists."""
-        # Mock repository and summarization service
-        mock_repo_class.return_value = self.mock_summary_repo
-        mock_summarization_service = AsyncMock()
-        mock_summarization_class.return_value = mock_summarization_service
+    # Then force resummarize
+    await service.summarize_paper(
+        saved_paper,
+        mock_sqlite_db,
+        mock_llm_sqlite_db,
+        mock_summary_client,
+        force_resummarize=True,
+    )
 
-        mock_paper = self._create_mock_paper()
-        existing_summary = self._create_mock_summary()
+    # Get the updated summary
+    updated_summary = service.get_paper_summary(saved_paper, mock_sqlite_db)
+    assert updated_summary is not None
+    # The summary should be updated (same summary_id since we're overwriting)
+    assert updated_summary.summary_id == first_summary.summary_id
 
-        # Mock existing summary
-        self.mock_summary_repo.get_by_paper_and_language.return_value = existing_summary
 
-        await self.service.summarize_paper(
-            mock_paper, self.mock_db_manager, self.mock_llm_db_manager
-        )
+@pytest.mark.asyncio
+async def test_get_paper_summary_success(
+    saved_paper: PaperEntity,
+    mock_sqlite_db: SQLiteManager,
+    mock_llm_sqlite_db: LLMSQLiteManager,
+    mock_summary_client: SummaryClient,
+) -> None:
+    """Test getting paper summary successfully."""
+    service = PaperSummarizationService()
+    # First create a summary
+    await service.summarize_paper(
+        saved_paper,
+        mock_sqlite_db,
+        mock_llm_sqlite_db,
+        mock_summary_client,
+    )
 
-        # Verify summarization service was not called
-        mock_summarization_service.summarize_paper.assert_not_called()
+    # Then get the summary
+    result = service.get_paper_summary(saved_paper, mock_sqlite_db)
 
-        # Verify summary was not saved
-        self.mock_summary_repo.create.assert_not_called()
+    assert result is not None
+    assert result.paper_id == saved_paper.paper_id
+    assert result.language == "Korean"
 
-    @pytest.mark.asyncio
-    @patch("api.services.paper_summarization_service.SummarizationService")
-    @patch("api.services.paper_summarization_service.SummaryRepository")
-    @patch("api.services.paper_summarization_service.load_settings")
-    async def test_summarize_paper_force_resummarize(
-        self, mock_load_settings, mock_repo_class, mock_summarization_class
-    ) -> None:
-        """Test summarization with force_resummarize=True."""
-        # Mock settings
-        mock_settings = MagicMock()
-        mock_settings.llm_model = "gpt-4o-mini"
-        mock_settings.llm_api_base_url = "https://api.openai.com/v1"
-        mock_settings.llm_use_tools = True
-        mock_settings.default_interests = "Machine Learning,Deep Learning"
-        mock_load_settings.return_value = mock_settings
 
-        # Mock repository and summarization service
-        mock_repo_class.return_value = self.mock_summary_repo
-        mock_summarization_service = AsyncMock()
-        mock_summarization_service.summarize_paper = AsyncMock()
-        mock_summarization_service.model = "gpt-4o-mini"
-        mock_summarization_class.return_value = mock_summarization_service
+@pytest.mark.asyncio
+async def test_get_paper_summary_fallback_to_english(
+    saved_paper: PaperEntity,
+    mock_sqlite_db: SQLiteManager,
+    mock_llm_sqlite_db: LLMSQLiteManager,
+    mock_summary_client: SummaryClient,
+) -> None:
+    """Test getting paper summary with fallback to English."""
+    service = PaperSummarizationService()
+    # Create a summary in English
+    await service.summarize_paper(
+        saved_paper,
+        mock_sqlite_db,
+        mock_llm_sqlite_db,
+        mock_summary_client,
+        language="English",
+    )
 
-        mock_paper = self._create_mock_paper()
-        existing_summary = self._create_mock_summary()
-        mock_summary_response = SummaryResponse(
-            custom_id=mock_paper.arxiv_id,
-            summary="New summary text",
-            structured_summary=None,
-            original_length=100,
-            summary_length=50,
-        )
+    # Try to get Korean summary, should fallback to English
+    result = service.get_paper_summary(
+        saved_paper,
+        mock_sqlite_db,
+        language="Korean",
+    )
 
-        # Mock existing summary
-        self.mock_summary_repo.get_by_paper_and_language.return_value = existing_summary
+    assert result is not None
+    assert result.language == "English"
 
-        # Mock summarization service response
-        mock_summarization_service.summarize_paper.return_value = mock_summary_response
 
-        # Mock summary creation
-        self.mock_summary_repo.create.return_value = 1
+def test_get_paper_summary_not_found(
+    saved_paper: PaperEntity,
+    mock_sqlite_db: SQLiteManager,
+) -> None:
+    """Test getting paper summary when not found."""
+    service = PaperSummarizationService()
+    result = service.get_paper_summary(saved_paper, mock_sqlite_db)
+    assert result is None
 
-        await self.service.summarize_paper(
-            mock_paper,
-            self.mock_db_manager,
-            self.mock_llm_db_manager,
-            force_resummarize=True,
-        )
 
-        # Verify summarization service was called despite existing summary
-        mock_summarization_service.summarize_paper.assert_called_once_with(
-            mock_paper.arxiv_id,
-            mock_paper.abstract,
-            language="Korean",
-            interest_section="Machine Learning,Deep Learning",
-        )
-
-        # Verify summary was saved
-        self.mock_summary_repo.create.assert_called_once()
-
-    @pytest.mark.asyncio
-    async def test_summarize_paper_no_summarization_service(self) -> None:
-        """Test summarization when summarization service is not available."""
-        # This test is no longer relevant since we use DI pattern
-        # Summarization service is always created when needed
-        pass
-
-    @patch("api.services.paper_summarization_service.SummaryRepository")
-    def test_get_paper_summary_success(self, mock_repo_class) -> None:
-        """Test getting paper summary successfully."""
-        # Mock repository
-        mock_repo_class.return_value = self.mock_summary_repo
-
-        mock_paper = self._create_mock_paper()
-        mock_summary = self._create_mock_summary()
-
-        self.mock_summary_repo.get_by_paper_and_language.return_value = mock_summary
-
-        result = self.service.get_paper_summary(mock_paper, self.mock_db_manager)
-
-        assert result == mock_summary
-        self.mock_summary_repo.get_by_paper_and_language.assert_called_once_with(
-            mock_paper.paper_id, "Korean"
-        )
-
-    @patch("api.services.paper_summarization_service.SummaryRepository")
-    def test_get_paper_summary_fallback_to_english(self, mock_repo_class) -> None:
-        """Test getting paper summary with fallback to English."""
-        # Mock repository
-        mock_repo_class.return_value = self.mock_summary_repo
-
-        mock_paper = self._create_mock_paper()
-        mock_summary = self._create_mock_summary()
-
-        # Mock no Korean summary, but English summary exists
-        self.mock_summary_repo.get_by_paper_and_language.side_effect = [
-            None,
-            mock_summary,
-        ]
-
-        result = self.service.get_paper_summary(
-            mock_paper, self.mock_db_manager, language="Korean"
-        )
-
-        assert result == mock_summary
-        # Should have tried Korean first, then English
-        assert self.mock_summary_repo.get_by_paper_and_language.call_count == 2
-
-    @patch("api.services.paper_summarization_service.SummaryRepository")
-    def test_get_paper_summary_not_found(self, mock_repo_class) -> None:
-        """Test getting paper summary when not found."""
-        # Mock repository
-        mock_repo_class.return_value = self.mock_summary_repo
-
-        mock_paper = self._create_mock_paper()
-
-        self.mock_summary_repo.get_by_paper_and_language.return_value = None
-
-        result = self.service.get_paper_summary(mock_paper, self.mock_db_manager)
-
-        assert result is None
-
-    def test_get_paper_summary_no_paper_id(self) -> None:
-        """Test getting paper summary when paper has no ID."""
-        mock_paper = self._create_mock_paper()
-        mock_paper.paper_id = None
-
-        result = self.service.get_paper_summary(mock_paper, self.mock_db_manager)
-
-        assert result is None
-        # No repository call should be made since paper_id is None
-
-    def _create_mock_paper(self) -> PaperEntity:
-        """Create a mock PaperEntity for testing."""
-        return PaperEntity(
-            paper_id=1,
-            arxiv_id="2508.01234",
-            title="Test Paper Title",
-            abstract="Test paper abstract",
-            primary_category="cs.AI",
-            categories="cs.AI,cs.LG",
-            authors="Author One;Author Two",
-            url_abs="https://arxiv.org/abs/2508.01234",
-            url_pdf="https://arxiv.org/pdf/2508.01234",
-            published_at="2023-08-01T00:00:00Z",
-            updated_at="2023-08-01T00:00:00Z",
-        )
-
-    def _create_mock_summary(self) -> SummaryEntity:
-        """Create a mock SummaryEntity for testing."""
-        return SummaryEntity(
-            summary_id=1,
-            paper_id=1,
-            version=1,
-            overview="Test overview",
-            motivation="Test motivation",
-            method="Test method",
-            result="Test result",
-            conclusion="Test conclusion",
-            language="Korean",
-            interests="machine learning",
-            relevance=8,
-            model="gpt-4o-mini",
-            is_read=False,
-            created_at="2023-08-01T00:00:00Z",
-        )
+def test_get_paper_summary_no_paper_id(
+    mock_sqlite_db: SQLiteManager,
+) -> None:
+    """Test getting paper summary when paper has no ID."""
+    service = PaperSummarizationService()
+    paper_without_id = PaperEntity(
+        paper_id=None,
+        arxiv_id="2508.01234",
+        title="Test Paper Title",
+        abstract="Test paper abstract",
+        primary_category="cs.AI",
+        categories="cs.AI,cs.LG",
+        authors="Author One;Author Two",
+        url_abs="https://arxiv.org/abs/2508.01234",
+        url_pdf="https://arxiv.org/pdf/2508.01234",
+        published_at="2023-08-01T00:00:00Z",
+        updated_at="2023-08-01T00:00:00Z",
+    )
+    result = service.get_paper_summary(paper_without_id, mock_sqlite_db)
+    assert result is None

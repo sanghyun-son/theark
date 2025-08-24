@@ -15,6 +15,8 @@ from core.models.api.responses import (
     PaperDeleteResponse,
     PaperListResponse,
     PaperResponse,
+    StarredPapersResponse,
+    StarResponse,
     SummaryReadResponse,
 )
 from core.models.api.streaming import (
@@ -67,6 +69,8 @@ __all__ = [
     "StreamingStatusEvent",
     "StreamingCompleteEvent",
     "StreamingErrorEvent",
+    "StarResponse",
+    "StarredPapersResponse",
     # Database models
     "PaperEntity",
     "SummaryEntity",

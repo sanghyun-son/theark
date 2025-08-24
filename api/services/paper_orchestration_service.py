@@ -18,6 +18,7 @@ from crawler.arxiv.client import ArxivClient
 from crawler.database.llm_sqlite_manager import LLMSQLiteManager
 from crawler.database.repository import SummaryRepository
 from crawler.database.sqlite_manager import SQLiteManager
+from crawler.summarizer.client import SummaryClient
 
 logger = get_logger(__name__)
 
@@ -39,11 +40,19 @@ class PaperOrchestrationService:
         paper_data: PaperCreate,
         db_manager: SQLiteManager,
         llm_db_manager: LLMSQLiteManager,
+        arxiv_client: ArxivClient,
+        summary_client: SummaryClient,
     ) -> PaperResponse:
         """Create paper with background summarization."""
-        paper = await self.creation_service.create_paper(paper_data, db_manager)
+        paper = await self.creation_service.create_paper_with_client(
+            paper_data, db_manager, arxiv_client
+        )
         self.summarization_service.start_background_summarization(
-            paper, db_manager, llm_db_manager, language=paper_data.summary_language
+            paper,
+            db_manager,
+            llm_db_manager,
+            summary_client,
+            language=paper_data.summary_language,
         )
         return PaperResponse.from_crawler_paper(paper, None)
 
@@ -51,15 +60,12 @@ class PaperOrchestrationService:
         self,
         paper_data: PaperCreate,
         db_manager: SQLiteManager,
-        arxiv_client: ArxivClient | None = None,
+        arxiv_client: ArxivClient,
     ) -> PaperResponse:
         """Create paper without background summarization (for streaming)."""
-        if arxiv_client:
-            paper = await self.creation_service.create_paper_with_client(
-                paper_data, db_manager, arxiv_client
-            )
-        else:
-            paper = await self.creation_service.create_paper(paper_data, db_manager)
+        paper = await self.creation_service.create_paper_with_client(
+            paper_data, db_manager, arxiv_client
+        )
         return PaperResponse.from_crawler_paper(paper, None)
 
     async def get_paper(
@@ -79,6 +85,7 @@ class PaperOrchestrationService:
         paper_identifier: str,
         db_manager: SQLiteManager,
         llm_db_manager: LLMSQLiteManager,
+        summary_client: SummaryClient,
         force_resummarize: bool = False,
         language: str = "Korean",
     ) -> None:
@@ -90,7 +97,12 @@ class PaperOrchestrationService:
             raise ValueError(f"Paper not found: {paper_identifier}")
 
         await self.summarization_service.summarize_paper(
-            paper, db_manager, llm_db_manager, force_resummarize, language
+            paper,
+            db_manager,
+            llm_db_manager,
+            summary_client,
+            force_resummarize,
+            language,
         )
 
     async def stream_paper_creation(
@@ -98,7 +110,8 @@ class PaperOrchestrationService:
         paper_data: PaperCreate,
         db_manager: SQLiteManager,
         llm_db_manager: LLMSQLiteManager,
-        arxiv_client: ArxivClient | None = None,
+        arxiv_client: ArxivClient,
+        summary_client: SummaryClient,
     ) -> AsyncGenerator[str, None]:
         """Stream paper creation and immediate summarization process.
 
@@ -146,6 +159,7 @@ class PaperOrchestrationService:
                 db_manager,
                 llm_db_manager,
                 paper_data.summary_language,
+                summary_client,
             ):
                 yield event
 
@@ -159,7 +173,8 @@ class PaperOrchestrationService:
         paper_response: PaperResponse,
         db_manager: SQLiteManager,
         llm_db_manager: LLMSQLiteManager,
-        language: str = "Korean",
+        language: str,
+        summary_client: SummaryClient,
     ) -> AsyncGenerator[str, None]:
         """Stream the immediate summarization process."""
         try:
@@ -172,6 +187,7 @@ class PaperOrchestrationService:
                 paper,
                 db_manager,
                 llm_db_manager,
+                summary_client,
                 force_resummarize=False,
                 language=language,
             )

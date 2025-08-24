@@ -67,7 +67,7 @@ class TestSummaryResponse:
             method="Proposed method",
             result="Experimental results",
             conclusion="Main conclusion",
-            relevance="High",
+            relevance=9,
         )
         response = SummaryResponse(
             custom_id="test-002",
@@ -104,14 +104,14 @@ class TestPaperAnalysis:
             method="Research method",
             result="Key results",
             conclusion="Main conclusion",
-            relevance="High",
+            relevance=9,
         )
         assert structured.tldr == "Brief summary"
         assert structured.motivation == "Paper motivation"
         assert structured.method == "Research method"
         assert structured.result == "Key results"
         assert structured.conclusion == "Main conclusion"
-        assert structured.relevance == "High"
+        assert structured.relevance == 9
 
 
 class TestAbstractSummarizer:

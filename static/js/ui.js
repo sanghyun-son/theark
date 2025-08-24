@@ -246,38 +246,78 @@ class UIService {
     }
 
     async toggleStar(paper, starButton) {
+        const isCurrentlyStarred = starButton.classList.contains('starred');
+        const newStarredState = !isCurrentlyStarred;
+        
         try {
-            const isCurrentlyStarred = starButton.textContent === '⭐';
-            
-            if (isCurrentlyStarred) {
-                // Remove star
-                await this.removeStar(paper.paper_id);
-                starButton.textContent = '☆';
-                starButton.classList.remove('starred');
-                starButton.title = 'Add to favorites';
-                paper.is_starred = false;
-            } else {
-                // Add star
+            if (newStarredState) {
                 await this.addStar(paper.paper_id);
-                starButton.textContent = '⭐';
-                starButton.classList.add('starred');
-                starButton.title = 'Remove from favorites';
-                paper.is_starred = true;
+            } else {
+                await this.removeStar(paper.paper_id);
             }
+            
+            // Update the specific button that was clicked
+            this.updateStarButton(starButton, newStarredState);
+            
+            // Update all other star buttons for this paper
+            this.updateAllStarButtons(paper.paper_id, newStarredState);
         } catch (error) {
             console.error('Failed to toggle star:', error);
-            // Revert visual state on error
-            const isCurrentlyStarred = starButton.textContent === '⭐';
-            if (isCurrentlyStarred) {
-                starButton.textContent = '☆';
-                starButton.classList.remove('starred');
-                starButton.title = 'Add to favorites';
-            } else {
-                starButton.textContent = '⭐';
-                starButton.classList.add('starred');
-                starButton.title = 'Remove from favorites';
+            // Revert to original state on error
+            this.updateStarButton(starButton, isCurrentlyStarred);
+        }
+    }
+
+
+
+    updateAllStarButtons(paperId, isStarred) {
+        // Update all star buttons for this paper in the paper list
+        const paperElements = document.querySelectorAll('.paper-item');
+        
+        for (const paperElement of paperElements) {
+            const idSpan = paperElement.querySelector('.paper-id');
+            if (idSpan && idSpan.textContent === `[${paperId}]`) {
+                const starButton = paperElement.querySelector('.star-button');
+                if (starButton) {
+                    this.updateStarButton(starButton, isStarred);
+                }
             }
         }
+        
+        // Update modal star button if it's for the same paper
+        const modal = document.querySelector('.modal');
+        if (modal && modal.style.display === 'block') {
+            const modalStarButton = modal.querySelector('.modal-star-button');
+            if (modalStarButton) {
+                // Check if the modal is showing the same paper
+                const modalTitle = modal.querySelector('.modal-title');
+                if (modalTitle) {
+                    const paperElements = document.querySelectorAll('.paper-item');
+                    for (const paperElement of paperElements) {
+                        const titleText = paperElement.querySelector('.paper-title-text');
+                        const idSpan = paperElement.querySelector('.paper-id');
+                        if (titleText && idSpan && 
+                            titleText.textContent === modalTitle.textContent &&
+                            idSpan.textContent === `[${paperId}]`) {
+                            this.updateStarButton(modalStarButton, isStarred);
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    updateStarButton(starButton, isStarred) {
+        starButton.textContent = isStarred ? '⭐' : '☆';
+        
+        if (isStarred) {
+            starButton.classList.add('starred');
+        } else {
+            starButton.classList.remove('starred');
+        }
+        
+        starButton.title = isStarred ? 'Remove from favorites' : 'Add to favorites';
     }
 
     async addStar(paperId) {
@@ -646,37 +686,25 @@ class SummaryModal {
     }
 
     async toggleModalStar(starButton) {
+        const isCurrentlyStarred = starButton.classList.contains('starred');
+        const newStarredState = !isCurrentlyStarred;
+        
         try {
-            const isCurrentlyStarred = starButton.classList.contains('starred');
-            
-            if (isCurrentlyStarred) {
-                // Remove star
-                await this.removeModalStar();
-                starButton.textContent = '☆';
-                starButton.classList.remove('starred');
-                starButton.title = 'Add to favorites';
-                this.paper.is_starred = false;
-            } else {
-                // Add star
+            if (newStarredState) {
                 await this.addModalStar();
-                starButton.textContent = '⭐';
-                starButton.classList.add('starred');
-                starButton.title = 'Remove from favorites';
-                this.paper.is_starred = true;
+            } else {
+                await this.removeModalStar();
             }
+            
+            // Update the specific button that was clicked
+            this.updateStarButton(starButton, newStarredState);
+            
+            // Update all other star buttons for this paper
+            window.UIService.prototype.updateAllStarButtons(this.paper.paper_id, newStarredState);
         } catch (error) {
             console.error('Failed to toggle star in modal:', error);
-            // Revert visual state on error
-            const isCurrentlyStarred = starButton.classList.contains('starred');
-            if (isCurrentlyStarred) {
-                starButton.textContent = '☆';
-                starButton.classList.remove('starred');
-                starButton.title = 'Add to favorites';
-            } else {
-                starButton.textContent = '⭐';
-                starButton.classList.add('starred');
-                starButton.title = 'Remove from favorites';
-            }
+            // Revert to original state on error
+            this.updateStarButton(starButton, isCurrentlyStarred);
         }
     }
 

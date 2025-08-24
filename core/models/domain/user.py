@@ -2,6 +2,9 @@
 
 from pydantic import BaseModel, Field, field_validator
 
+# Default user ID for testing and development
+DEFAULT_USER_ID = 1
+
 
 class User(BaseModel):
     """Application user model."""

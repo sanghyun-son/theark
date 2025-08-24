@@ -16,10 +16,10 @@ from core.models.external.openai import (
     PaperAnalysis,
 )
 
+from .client import SummaryClient
 from .llm_tracker import LLMRequestContext
 from .prompt import SYSTEM_PROMPT, USER_PROMPT
 from .summarizer import (
-    AbstractSummarizer,
     SummaryRequest,
     SummaryResponse,
 )
@@ -27,22 +27,38 @@ from .summarizer import (
 logger = get_logger(__name__)
 
 
-class OpenAISummarizer(AbstractSummarizer):
+class OpenAISummarizer(SummaryClient):
     """OpenAI-based implementation of abstract summarizer."""
 
     def __init__(
         self,
         api_key: str,
-        base_url: str = "https://api.openai.com/v1",
+        base_url: str | None = None,
         db_manager: Any = None,
         timeout: float = 60.0,
+        model: str = "gpt-4o-mini",
+        use_tools: bool = True,
     ):
         """Initialize the OpenAI summarizer."""
+        from core.config import settings
+
         self.api_key = api_key
-        self.base_url = base_url
+        self.base_url = base_url or settings.llm_api_base_url
         self.db_manager = db_manager
         self.timeout = timeout
+        self._model = model
+        self._use_tools = use_tools
         self.client = httpx.AsyncClient(timeout=httpx.Timeout(timeout))
+
+    @property
+    def model(self) -> str:
+        """Get the model name used by this client."""
+        return self._model
+
+    @property
+    def use_tools(self) -> bool:
+        """Get whether this client uses tools/function calling."""
+        return self._use_tools
 
     async def summarize(self, request: SummaryRequest) -> SummaryResponse:
         """Summarize the given abstract using OpenAI API."""
@@ -58,7 +74,10 @@ class OpenAISummarizer(AbstractSummarizer):
         ) as llm_context:
             # Build and send request
             payload = self._build_request_payload(request)
-            logger.debug(f"OpenAI Request: {payload.model_dump_json(indent=2)}")
+            logger.debug(
+                f"OpenAI Request to {self.base_url}:\n"
+                f"{payload.model_dump_json(indent=2)}"
+            )
             response = await self._make_api_request(payload)
 
             # Update tracking with response data
@@ -71,7 +90,7 @@ class OpenAISummarizer(AbstractSummarizer):
 
             # Parse response
             chat_response = ChatCompletionResponse(**response.json())
-            logger.debug(f"OpenAI Response: {chat_response.model_dump_json(indent=2)}")
+            logger.debug(f"OpenAI Response:\n{chat_response.model_dump_json(indent=2)}")
             self._update_token_tracking(llm_context, chat_response)
 
             return self._parse_response(request, chat_response)

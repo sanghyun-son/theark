@@ -9,6 +9,7 @@ from crawler.database import SummaryRepository
 from crawler.database.llm_sqlite_manager import LLMSQLiteManager
 from crawler.database.sqlite_manager import SQLiteManager
 from crawler.summarizer import SummaryResponse
+from crawler.summarizer.client import SummaryClient
 from crawler.summarizer.service import SummarizationService
 
 logger = get_logger(__name__)
@@ -19,13 +20,14 @@ class PaperSummarizationService:
 
     def __init__(self) -> None:
         """Initialize paper summarization service."""
-        pass
+        self.settings = load_settings()
 
     def start_background_summarization(
         self,
         paper: PaperEntity,
         db_manager: SQLiteManager,
         llm_db_manager: LLMSQLiteManager,
+        summary_client: SummaryClient,
         force_resummarize: bool = False,
         language: str = "Korean",
     ) -> None:
@@ -33,7 +35,12 @@ class PaperSummarizationService:
         try:
             asyncio.create_task(
                 self.summarize_paper(
-                    paper, db_manager, llm_db_manager, force_resummarize, language
+                    paper,
+                    db_manager,
+                    llm_db_manager,
+                    summary_client,
+                    force_resummarize,
+                    language,
                 )
             )
             logger.info(
@@ -50,6 +57,7 @@ class PaperSummarizationService:
         paper: PaperEntity,
         db_manager: SQLiteManager,
         llm_db_manager: LLMSQLiteManager,
+        summary_client: SummaryClient,
         force_resummarize: bool = False,
         language: str = "Korean",
     ) -> None:
@@ -61,13 +69,7 @@ class PaperSummarizationService:
             f"{getattr(db_manager, 'connection', 'No connection attr')}"
         )
 
-        settings = load_settings()
-        summarization_service = SummarizationService(
-            model=settings.llm_model,
-            base_url=settings.llm_api_base_url,
-            use_tools=settings.llm_use_tools,
-            db_manager=llm_db_manager,
-        )
+        summarization_service = SummarizationService()
 
         try:
             # Check if summary already exists and force_resummarize is False
@@ -79,17 +81,19 @@ class PaperSummarizationService:
                 )
                 return
 
-            # Create summary using summarization service
             summary_response = await summarization_service.summarize_paper(
                 paper.arxiv_id,
                 paper.abstract,
+                summary_client,
                 language=language,
-                interest_section=settings.default_interests,
+                interest_section=self.settings.default_interests,
             )
 
             # Save summary to database
             if summary_response:
-                self._save_summary(paper, summary_response, db_manager, language)
+                self._save_summary(
+                    paper, summary_response, db_manager, language, force_resummarize
+                )
                 logger.info(
                     f"Successfully summarized paper {paper.arxiv_id} in {language}"
                 )
@@ -136,6 +140,7 @@ class PaperSummarizationService:
         summary_response: SummaryResponse,
         db_manager: SQLiteManager,
         language: str,
+        force_resummarize: bool = False,
     ) -> None:
         """Save summary to database."""
         if not paper.paper_id:
@@ -148,12 +153,27 @@ class PaperSummarizationService:
             )
             summary_repo = SummaryRepository(db_manager)
 
-            # Parse summary response and create summary entity
-            summary_entity = self._create_summary_entity(
-                paper, summary_response, db_manager, language
+            # Check if summary already exists for this paper and language
+            existing_summary = summary_repo.get_by_paper_and_language(
+                paper.paper_id, language
             )
-            summary_repo.create(summary_entity)
-            logger.info(f"Saved summary for paper {paper.arxiv_id} in {language}")
+
+            if existing_summary and force_resummarize:
+                # Update existing summary
+                updated_summary = self._create_summary_entity(
+                    paper, summary_response, db_manager, language
+                )
+                updated_summary.summary_id = existing_summary.summary_id
+                updated_summary.version = existing_summary.version
+                summary_repo.update(updated_summary)
+                logger.info(f"Updated summary for paper {paper.arxiv_id} in {language}")
+            else:
+                # Create new summary
+                summary_entity = self._create_summary_entity(
+                    paper, summary_response, db_manager, language
+                )
+                summary_repo.create(summary_entity)
+                logger.info(f"Saved summary for paper {paper.arxiv_id} in {language}")
         except Exception as e:
             logger.error(f"Error saving summary for paper {paper.arxiv_id}: {e}")
             raise
@@ -169,8 +189,6 @@ class PaperSummarizationService:
         if not paper.paper_id:
             raise ValueError("Paper must have an ID")
 
-        settings = load_settings()
-
         # Extract structured summary from response
         analysis = summary_response.structured_summary
         if analysis:
@@ -183,9 +201,9 @@ class PaperSummarizationService:
                 result=analysis.result or "No result available",
                 conclusion=analysis.conclusion or "No conclusion available",
                 language=language,
-                interests=settings.default_interests,
+                interests=self.settings.default_interests,
                 relevance=analysis.relevance,
-                model=settings.llm_model,
+                model=self.settings.llm_model,
                 is_read=False,
             )
         else:
@@ -200,9 +218,9 @@ class PaperSummarizationService:
                 result="No structured result available",
                 conclusion="No structured conclusion available",
                 language=language,
-                interests=settings.default_interests,
+                interests=self.settings.default_interests,
                 relevance=5,  # Default relevance
-                model=settings.llm_model,
+                model=self.settings.llm_model,
                 is_read=False,
             )
 

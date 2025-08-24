@@ -81,7 +81,7 @@ class SummaryEntity(BaseModel):
 class UserEntity(BaseModel):
     """User database entity model."""
 
-    user_id: int | None = None
+    user_id: int = Field(..., gt=0)
     email: str = Field(..., description="User email address")
     display_name: str | None = None
 

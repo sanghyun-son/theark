@@ -7,7 +7,6 @@ import httpx
 from core import AsyncRateLimiter, get_logger
 
 from .constants import (
-    ARXIV_API_BASE_URL,
     DEFAULT_RATE_LIMIT,
     DEFAULT_TIMEOUT,
     DEFAULT_USER_AGENT,
@@ -25,13 +24,15 @@ logger = get_logger(__name__)
 class ArxivClient:
     """ArXiv API client for fetching papers."""
 
-    def __init__(self, base_url: str = ARXIV_API_BASE_URL):
+    def __init__(self, base_url: str | None = None):
         """Initialize ArXiv client.
 
         Args:
-            base_url: Base URL for arXiv API
+            base_url: Base URL for arXiv API (defaults to environment variable)
         """
-        self.base_url = base_url
+        from core.config import settings
+
+        self.base_url = base_url or f"{settings.arxiv_api_base_url}/api/query"
         self.rate_limiter = AsyncRateLimiter(requests_per_second=DEFAULT_RATE_LIMIT)
         self._client: httpx.AsyncClient | None = None
 

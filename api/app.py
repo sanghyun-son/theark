@@ -24,27 +24,42 @@ logger = get_logger(__name__)
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Application lifespan context manager."""
     current_settings = load_settings()
-    logger.info(f"TheArk API server starting up in {current_settings.environment} mode")
+    logger.info(f"TheArk: {current_settings.environment}")
     logger.info(f"Authentication required: {current_settings.auth_required}")
 
     from api.services.paper_service import PaperService
+    from crawler.arxiv.client import ArxivClient
     from crawler.database import LLMSQLiteManager
     from crawler.database.config import get_database_path, get_llm_database_path
     from crawler.database.sqlite_manager import SQLiteManager
+    from crawler.summarizer.openai_summarizer import OpenAISummarizer
 
     # Use current environment for database paths
     current_environment = current_settings.environment
     db_path = get_database_path(current_environment)
     db_manager = SQLiteManager(db_path)
     db_manager.connect()
+    db_manager.create_tables()
 
     llm_db_path = get_llm_database_path(current_environment)
     llm_db_manager = LLMSQLiteManager(llm_db_path)
     llm_db_manager.connect()
+    llm_db_manager.create_tables()
+
+    arxiv_url = current_settings.arxiv_api_base_url
+    openai_url = current_settings.llm_api_base_url
+    arxiv_client = ArxivClient(base_url=arxiv_url)
+    summary_client = OpenAISummarizer(
+        api_key="test-api-key",
+        base_url=openai_url,
+        db_manager=llm_db_manager,
+    )
 
     app.state.db_manager = db_manager
     app.state.llm_db_manager = llm_db_manager
     app.state.paper_service = PaperService()
+    app.state.arxiv_client = arxiv_client
+    app.state.summary_client = summary_client
     logger.info("Database and LLM database initialized successfully")
 
     yield

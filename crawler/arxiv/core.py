@@ -273,14 +273,7 @@ class ArxivCrawlerCore:
             and self.config.summarization.summarize_immediately
         ):
             try:
-                from core.config import settings
-
-                return SummarizationService(
-                    base_url=settings.llm_api_base_url,
-                    use_tools=self.config.summarization.use_tools,
-                    model=self.config.summarization.model,
-                    db_manager=llm_db_manager,
-                )
+                return SummarizationService()
             except Exception as e:
                 logger.error(f"Failed to create summarization service: {e}")
                 return None

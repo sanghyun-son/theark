@@ -509,6 +509,22 @@ class UserRepository:
             return self._row_to_user(row)
         return None
 
+    def get_user_by_id(self, user_id: int) -> UserEntity | None:
+        """Get user by ID.
+
+        Args:
+            user_id: User ID
+
+        Returns:
+            User model or None if not found
+        """
+        query = "SELECT * FROM app_user WHERE user_id = ?"
+        row = self.db.fetch_one(query, (user_id,))
+
+        if row:
+            return self._row_to_user(row)
+        return None
+
     def add_interest(self, interest: UserInterestEntity) -> None:
         """Add or update user interest.
 
