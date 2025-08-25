@@ -103,7 +103,7 @@ async def favicon() -> HTMLResponse | FileResponse:
     "/.well-known/appspecific/com.chrome.devtools.json",
     include_in_schema=False,
 )
-def devtools_probe():
+def devtools_probe() -> JSONResponse:
     return JSONResponse(
         content={},
         media_type="application/json",

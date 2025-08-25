@@ -55,7 +55,7 @@ class Settings(BaseModel):
 
     # ArXiv Settings
     arxiv_api_base_url: str = Field(
-        default="https://export.arxiv.org", description="ArXiv API base URL"
+        default="https://export.arxiv.org/api/query", description="ArXiv API full URL"
     )
 
     # LLM Settings
@@ -90,6 +90,15 @@ class Settings(BaseModel):
     def is_testing(self) -> bool:
         """Check if running in testing mode."""
         return self.environment == Environment.TESTING
+
+    @property
+    def arxiv_url(self) -> str:
+        """Get the correct arXiv URL based on environment.
+
+        For dev/prod: returns the full URL from arxiv_api_base_url
+        For testing: should be overridden by test fixtures
+        """
+        return self.arxiv_api_base_url
 
 
 def load_settings() -> Settings:
@@ -130,7 +139,7 @@ def load_settings() -> Settings:
         ),
         preset_categories=preset_categories,
         arxiv_api_base_url=os.getenv(
-            "THEARK_ARXIV_API_BASE_URL", "https://export.arxiv.org"
+            "THEARK_ARXIV_API_BASE_URL", "https://export.arxiv.org/api/query"
         ),
         llm_model=os.getenv("THEARK_LLM_MODEL", "gpt-4o-mini"),
         llm_api_base_url=os.getenv(

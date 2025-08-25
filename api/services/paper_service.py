@@ -2,9 +2,6 @@
 
 from typing import AsyncGenerator
 
-from api.services.paper_creation_service import PaperCreationService
-from api.services.paper_orchestration_service import PaperOrchestrationService
-from api.services.paper_summarization_service import PaperSummarizationService
 from core import get_logger
 from core.config import load_settings
 from core.models import PaperCreateRequest as PaperCreate
@@ -29,6 +26,8 @@ from crawler.database.sqlite_manager import SQLiteManager
 from crawler.summarizer.client import SummaryClient
 from crawler.summarizer.service import SummarizationService
 
+from .paper_orchestration_service import PaperOrchestrationService
+
 logger = get_logger(__name__)
 
 
@@ -38,6 +37,7 @@ class PaperService:
     def __init__(self) -> None:
         """Initialize paper service."""
         self.settings = load_settings()
+        self.orchestration_service = PaperOrchestrationService()
 
     def _initialize_summarization_service(
         self, llm_db_manager: LLMSQLiteManager
@@ -63,20 +63,20 @@ class PaperService:
         skip_auto_summarization: bool = False,
     ) -> PaperResponse:
         """Create a new paper using new architecture."""
-        creation_service = PaperCreationService()
-        summarization_service_wrapper = PaperSummarizationService()
-        orchestration_service = PaperOrchestrationService(
-            creation_service, summarization_service_wrapper
-        )
-
         if skip_auto_summarization:
-            return await orchestration_service.create_paper_streaming(
-                paper_data, db_manager, arxiv_client
+            return await self.orchestration_service.create_paper_streaming(
+                paper_data,
+                db_manager,
+                arxiv_client,
             )
-        else:
-            return await orchestration_service.create_paper_normal(
-                paper_data, db_manager, llm_db_manager, arxiv_client, summary_client
-            )
+
+        return await self.orchestration_service.create_paper_normal(
+            paper_data,
+            db_manager,
+            llm_db_manager,
+            arxiv_client,
+            summary_client,
+        )
 
     async def get_paper(
         self,
@@ -85,12 +85,7 @@ class PaperService:
         llm_db_manager: LLMSQLiteManager,
     ) -> PaperResponse:
         """Get a paper by ID or arXiv ID."""
-        creation_service = PaperCreationService()
-        summarization_service_wrapper = PaperSummarizationService()
-        orchestration_service = PaperOrchestrationService(
-            creation_service, summarization_service_wrapper
-        )
-        return await orchestration_service.get_paper(paper_identifier, db_manager)
+        return await self.orchestration_service.get_paper(paper_identifier, db_manager)
 
     async def create_paper_streaming(
         self,
@@ -101,13 +96,7 @@ class PaperService:
         summary_client: SummaryClient,
     ) -> AsyncGenerator[str, None]:
         """Create a paper with streaming response."""
-        creation_service = PaperCreationService()
-        summarization_service_wrapper = PaperSummarizationService()
-        orchestration_service = PaperOrchestrationService(
-            creation_service, summarization_service_wrapper
-        )
-
-        async for event in orchestration_service.stream_paper_creation(
+        async for event in self.orchestration_service.stream_paper_creation(
             paper_data, db_manager, llm_db_manager, arxiv_client, summary_client
         ):
             yield event
@@ -116,13 +105,13 @@ class PaperService:
         self, paper_identifier: str, db_manager: SQLiteManager
     ) -> PaperDeleteResponse:
         """Delete a paper by ID or arXiv ID."""
-        paper_repo = PaperRepository(db_manager)
-        paper = self._get_paper_by_identifier(paper_identifier, paper_repo)
+        paper = self._get_paper_by_identifier(paper_identifier, db_manager)
         if not paper:
             raise ValueError("Paper not found")
 
         # Delete paper (this will cascade to summaries due to foreign key constraints)
         if paper.paper_id is not None:
+            paper_repo = PaperRepository(db_manager)
             paper_repo.delete(paper.paper_id)
         else:
             raise ValueError("Paper has no ID")
@@ -306,9 +295,7 @@ class PaperService:
 
         return StarredPapersResponse(
             papers=papers,
-            total_count=len(
-                papers
-            ),  # This should be the total count, not just current page
+            total_count=len(papers),
             limit=limit,
             offset=offset,
         )
@@ -352,9 +339,11 @@ class PaperService:
             )
 
     def _get_paper_by_identifier(
-        self, paper_identifier: str, paper_repo: PaperRepository
+        self, paper_identifier: str, db_manager: SQLiteManager
     ) -> PaperEntity | None:
-        """Get paper by ID or arXiv ID."""
+        """Get paper by identifier using db_manager."""
+        paper_repo = PaperRepository(db_manager)
+
         # Try to get by arXiv ID first
         paper = paper_repo.get_by_arxiv_id(paper_identifier)
         if paper:
@@ -417,11 +406,7 @@ class PaperService:
         summary_client: SummaryClient,
     ) -> AsyncGenerator[str, None]:
         """Stream paper creation and summarization process."""
-        creation_service = PaperCreationService()
-        summarization_service_wrapper = PaperSummarizationService()
-        orchestration_service = PaperOrchestrationService(
-            creation_service, summarization_service_wrapper
-        )
+        orchestration_service = PaperOrchestrationService()
 
         async for event in orchestration_service.stream_paper_creation(
             paper_data, db_manager, llm_db_manager, arxiv_client, summary_client

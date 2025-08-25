@@ -1,6 +1,7 @@
 """Main FastAPI application."""
 
 import logging
+import os
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
@@ -46,13 +47,16 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     llm_db_manager.connect()
     llm_db_manager.create_tables()
 
-    arxiv_url = current_settings.arxiv_api_base_url
-    openai_url = current_settings.llm_api_base_url
-    arxiv_client = ArxivClient(base_url=arxiv_url)
+    arxiv_client = ArxivClient(base_url=current_settings.arxiv_url)
+
+    fake_key = "*"
+    openai_api_key = os.getenv("OPENAI_API_KEY", fake_key)
+    if openai_api_key == fake_key:
+        logger.warning("OPENAI_API_KEY is not set.")
+
     summary_client = OpenAISummarizer(
-        api_key="test-api-key",
-        base_url=openai_url,
-        db_manager=llm_db_manager,
+        api_key=openai_api_key,
+        base_url=current_settings.llm_api_base_url,
     )
 
     app.state.db_manager = db_manager
@@ -104,4 +108,4 @@ app = create_app()
 async def global_exception_handler(request: Request, exc: Exception) -> None:
     """Global exception handler."""
     logger.error(f"Unhandled exception: {exc}", exc_info=True)
-    raise HTTPException(status_code=500, detail="Internal server error")
+    raise HTTPException(status_code=500, detail=str(exc))

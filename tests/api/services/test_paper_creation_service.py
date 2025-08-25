@@ -1,6 +1,6 @@
 """Tests for paper creation service."""
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -9,138 +9,147 @@ from core.models import PaperCreateRequest as PaperCreate
 from core.models.database.entities import PaperEntity
 
 
-class TestPaperCreationService:
-    """Test PaperCreationService methods."""
+def test_extract_arxiv_id_from_request():
+    """Test extracting arXiv ID from request."""
+    service = PaperCreationService()
+    paper_data = PaperCreate(url="https://arxiv.org/abs/2508.01234")
+    arxiv_id = service._extract_arxiv_id(paper_data)
+    assert arxiv_id == "2508.01234"
 
-    def setup_method(self) -> None:
-        """Set up test fixtures."""
-        self.mock_db_manager = MagicMock()
-        self.mock_paper_repo = MagicMock()
 
-        # Create service without database manager (DI pattern)
-        self.service = PaperCreationService()
+def test_extract_arxiv_id_error_no_identifier():
+    """Test error when no identifier is provided."""
 
-    def test_extract_arxiv_id_from_request(self) -> None:
-        """Test extracting arXiv ID from request."""
-        paper_data = PaperCreate(url="https://arxiv.org/abs/2508.01234")
-        arxiv_id = self.service._extract_arxiv_id(paper_data)
-        assert arxiv_id == "2508.01234"
+    class MockPaperData:
+        def __init__(self):
+            self.url = None
 
-    def test_extract_arxiv_id_error_no_identifier(self) -> None:
-        """Test error when no identifier is provided."""
+    service = PaperCreationService()
+    paper_data = MockPaperData()
+    with pytest.raises(ValueError, match="No URL provided"):
+        service._extract_arxiv_id(paper_data)
 
-        class MockPaperData:
-            def __init__(self):
-                self.url = None
 
-        paper_data = MockPaperData()
-        with pytest.raises(ValueError, match="No URL provided"):
-            self.service._extract_arxiv_id(paper_data)
+@pytest.fixture
+def paper_creation_service():
+    """Create a PaperCreationService instance for testing."""
+    return PaperCreationService()
 
-    @pytest.mark.asyncio
-    @patch("api.services.paper_creation_service.OnDemandCrawler")
-    @patch("api.services.paper_creation_service.OnDemandCrawlConfig")
-    @patch("api.services.paper_creation_service.PaperRepository")
-    async def test_create_paper_new_paper(
-        self, mock_repo_class, mock_config_class, mock_crawler_class
-    ) -> None:
-        """Test creating a new paper."""
-        # Mock repository
-        mock_repo_class.return_value = self.mock_paper_repo
 
-        # Mock existing paper check
-        self.mock_paper_repo.get_by_arxiv_id.return_value = None
+@pytest.fixture
+def mock_paper():
+    """Create a mock PaperEntity for testing."""
+    return PaperEntity(
+        paper_id=1,
+        arxiv_id="2508.01234",
+        title="Test Paper Title",
+        abstract="Test paper abstract",
+        primary_category="cs.AI",
+        categories="cs.AI,cs.LG",
+        authors="Author One;Author Two",
+        url_abs="https://arxiv.org/abs/2508.01234",
+        url_pdf="https://arxiv.org/pdf/2508.01234",
+        published_at="2023-08-01T00:00:00Z",
+        updated_at="2023-08-01T00:00:00Z",
+    )
 
-        # Mock crawler
-        mock_crawler = AsyncMock()
-        mock_crawler.crawl_single_paper.return_value = self._create_mock_paper()
-        mock_crawler_class.return_value.__aenter__.return_value = mock_crawler
 
-        paper_data = PaperCreate(url="https://arxiv.org/abs/2508.01234")
-        result = await self.service.create_paper(paper_data, self.mock_db_manager)
+@pytest.mark.asyncio
+@patch("api.services.paper_creation_service.PaperRepository")
+async def test_create_paper_new_paper(
+    mock_repo_class,
+    paper_creation_service,
+    mock_sqlite_db,
+    mock_arxiv_client,
+    mock_paper,
+):
+    """Test creating a new paper."""
+    # Mock repository
+    mock_repo = mock_repo_class.return_value
+    mock_repo.get_by_arxiv_id.return_value = None
 
-        assert isinstance(result, PaperEntity)
-        assert result.arxiv_id == "2508.01234"
-        assert result.title == "Test Paper Title"
+    # Mock the crawler to return our mock paper
+    async def mock_crawl_single_paper(identifier, db_manager, arxiv_client):
+        return mock_paper
 
-    @pytest.mark.asyncio
-    @patch("api.services.paper_creation_service.PaperRepository")
-    async def test_create_paper_existing_paper(self, mock_repo_class) -> None:
-        """Test creating paper when it already exists."""
-        # Mock repository
-        mock_repo_class.return_value = self.mock_paper_repo
+    # Override the service's _crawl_paper method
+    paper_creation_service._crawl_paper = mock_crawl_single_paper
 
-        # Mock existing paper
-        existing_paper = self._create_mock_paper()
-        self.mock_paper_repo.get_by_arxiv_id.return_value = existing_paper
+    paper_data = PaperCreate(url="https://arxiv.org/abs/2508.01234")
+    result = await paper_creation_service.create_paper(
+        paper_data, mock_sqlite_db, mock_arxiv_client
+    )
 
-        paper_data = PaperCreate(url="https://arxiv.org/abs/2508.01234")
-        result = await self.service.create_paper(paper_data, self.mock_db_manager)
+    assert isinstance(result, PaperEntity)
+    assert result.arxiv_id == "2508.01234"
+    assert result.title == "Test Paper Title"
 
-        assert isinstance(result, PaperEntity)
-        assert result.arxiv_id == "2508.01234"
-        # Should return existing paper without crawling
-        self.mock_paper_repo.get_by_arxiv_id.assert_called_once_with("2508.01234")
 
-    @patch("api.services.paper_creation_service.PaperRepository")
-    def test_get_paper_by_identifier_arxiv_id(self, mock_repo_class) -> None:
-        """Test getting paper by arXiv ID."""
-        # Mock repository
-        mock_repo_class.return_value = self.mock_paper_repo
+@pytest.mark.asyncio
+@patch("api.services.paper_creation_service.PaperRepository")
+async def test_create_paper_existing_paper(
+    mock_repo_class,
+    paper_creation_service,
+    mock_sqlite_db,
+    mock_arxiv_client,
+    mock_paper,
+):
+    """Test creating paper when it already exists."""
+    # Mock repository
+    mock_repo = mock_repo_class.return_value
+    mock_repo.get_by_arxiv_id.return_value = mock_paper
 
-        mock_paper = self._create_mock_paper()
-        self.mock_paper_repo.get_by_arxiv_id.return_value = mock_paper
+    paper_data = PaperCreate(url="https://arxiv.org/abs/2508.01234")
+    result = await paper_creation_service.create_paper(
+        paper_data, mock_sqlite_db, mock_arxiv_client
+    )
 
-        result = self.service.get_paper_by_identifier(
-            "2508.01234", self.mock_db_manager
-        )
+    assert isinstance(result, PaperEntity)
+    assert result.arxiv_id == "2508.01234"
+    # Should return existing paper without crawling
 
-        assert result == mock_paper
-        self.mock_paper_repo.get_by_arxiv_id.assert_called_once_with("2508.01234")
 
-    @patch("api.services.paper_creation_service.PaperRepository")
-    def test_get_paper_by_identifier_paper_id(self, mock_repo_class) -> None:
-        """Test getting paper by paper ID."""
-        # Mock repository
-        mock_repo_class.return_value = self.mock_paper_repo
+@patch("api.services.paper_creation_service.PaperRepository")
+def test_get_paper_by_identifier_arxiv_id(
+    mock_repo_class, paper_creation_service, mock_sqlite_db, mock_paper
+):
+    """Test getting paper by arXiv ID."""
+    mock_repo = mock_repo_class.return_value
+    mock_repo.get_by_arxiv_id.return_value = mock_paper
 
-        mock_paper = self._create_mock_paper()
-        # Mock arXiv ID lookup to return None first, then paper ID lookup to return paper
-        self.mock_paper_repo.get_by_arxiv_id.return_value = None
-        self.mock_paper_repo.get_by_id.return_value = mock_paper
+    result = paper_creation_service.get_paper_by_identifier(
+        "2508.01234", mock_sqlite_db
+    )
 
-        result = self.service.get_paper_by_identifier("1", self.mock_db_manager)
+    assert result == mock_paper
 
-        assert result == mock_paper
-        self.mock_paper_repo.get_by_id.assert_called_once_with(1)
 
-    @patch("api.services.paper_creation_service.PaperRepository")
-    def test_get_paper_by_identifier_not_found(self, mock_repo_class) -> None:
-        """Test getting paper by identifier when not found."""
-        # Mock repository
-        mock_repo_class.return_value = self.mock_paper_repo
+@patch("api.services.paper_creation_service.PaperRepository")
+def test_get_paper_by_identifier_paper_id(
+    mock_repo_class, paper_creation_service, mock_sqlite_db, mock_paper
+):
+    """Test getting paper by paper ID."""
+    mock_repo = mock_repo_class.return_value
+    # Mock arXiv ID lookup to return None first, then paper ID lookup to return paper
+    mock_repo.get_by_arxiv_id.return_value = None
+    mock_repo.get_by_id.return_value = mock_paper
 
-        self.mock_paper_repo.get_by_arxiv_id.return_value = None
-        self.mock_paper_repo.get_by_id.return_value = None
+    result = paper_creation_service.get_paper_by_identifier("1", mock_sqlite_db)
 
-        result = self.service.get_paper_by_identifier(
-            "nonexistent", self.mock_db_manager
-        )
+    assert result == mock_paper
 
-        assert result is None
 
-    def _create_mock_paper(self) -> PaperEntity:
-        """Create a mock PaperEntity for testing."""
-        return PaperEntity(
-            paper_id=1,
-            arxiv_id="2508.01234",
-            title="Test Paper Title",
-            abstract="Test paper abstract",
-            primary_category="cs.AI",
-            categories="cs.AI,cs.LG",
-            authors="Author One;Author Two",
-            url_abs="https://arxiv.org/abs/2508.01234",
-            url_pdf="https://arxiv.org/pdf/2508.01234",
-            published_at="2023-08-01T00:00:00Z",
-            updated_at="2023-08-01T00:00:00Z",
-        )
+@patch("api.services.paper_creation_service.PaperRepository")
+def test_get_paper_by_identifier_not_found(
+    mock_repo_class, paper_creation_service, mock_sqlite_db
+):
+    """Test getting paper by identifier when not found."""
+    mock_repo = mock_repo_class.return_value
+    mock_repo.get_by_arxiv_id.return_value = None
+    mock_repo.get_by_id.return_value = None
+
+    result = paper_creation_service.get_paper_by_identifier(
+        "nonexistent", mock_sqlite_db
+    )
+
+    assert result is None

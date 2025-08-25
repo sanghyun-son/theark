@@ -32,7 +32,7 @@ class ArxivClient:
         """
         from core.config import settings
 
-        self.base_url = base_url or f"{settings.arxiv_api_base_url}/api/query"
+        self.base_url = base_url or settings.arxiv_url
         self.rate_limiter = AsyncRateLimiter(requests_per_second=DEFAULT_RATE_LIMIT)
         self._client: httpx.AsyncClient | None = None
 

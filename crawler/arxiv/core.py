@@ -91,7 +91,6 @@ class ArxivCrawlerCore:
         config: CrawlConfig | None = None,
         on_paper_crawled: Callable[[PaperEntity], Awaitable[None]] | None = None,
         on_error: Callable[[Exception], Awaitable[None]] | None = None,
-        arxiv_client: ArxivClient | None = None,
     ):
         """Initialize the core crawler.
 
@@ -99,12 +98,10 @@ class ArxivCrawlerCore:
             config: Crawler configuration
             on_paper_crawled: Callback when paper is successfully crawled
             on_error: Callback when error occurs
-            arxiv_client: Optional ArxivClient instance for dependency injection
         """
         self.config = config or CrawlConfig()
         self.on_paper_crawled = on_paper_crawled
         self.on_error = on_error
-        self.arxiv_client = arxiv_client
 
         self.rate_limiter = AsyncRateLimiter(self.config.requests_per_second)
         self.parser = ArxivParser()
@@ -145,13 +142,14 @@ class ArxivCrawlerCore:
         logger.info("ArxivCrawlerCore stopped")
 
     async def crawl_single_paper(
-        self, identifier: str, db_manager: DatabaseManager
+        self, identifier: str, db_manager: DatabaseManager, arxiv_client: ArxivClient
     ) -> PaperEntity | None:
         """Crawl a single paper by ID or URL.
 
         Args:
             identifier: arXiv ID, abstract URL, or PDF URL
             db_manager: Database manager instance
+            arxiv_client: ArxivClient instance for dependency injection
 
         Returns:
             Crawled paper or None if failed
@@ -166,7 +164,9 @@ class ArxivCrawlerCore:
             await self._record_crawl_event("FOUND", identifier, event_repo)
 
             # Crawl the paper
-            paper = await self._crawl_paper(identifier, db_manager, paper_repo)
+            paper = await self._crawl_paper(
+                identifier, db_manager, paper_repo, arxiv_client
+            )
 
             if paper:
                 self.stats.papers_crawled += 1
@@ -187,13 +187,17 @@ class ArxivCrawlerCore:
             return None
 
     async def crawl_papers_batch(
-        self, identifiers: list[str], db_manager: DatabaseManager
+        self,
+        identifiers: list[str],
+        db_manager: DatabaseManager,
+        arxiv_client: ArxivClient,
     ) -> list[PaperEntity]:
         """Crawl multiple papers in a batch.
 
         Args:
             identifiers: List of arXiv IDs, abstract URLs, or PDF URLs
             db_manager: Database manager instance
+            arxiv_client: ArxivClient instance for dependency injection
 
         Returns:
             List of successfully crawled papers
@@ -205,7 +209,7 @@ class ArxivCrawlerCore:
         # Use rate limiter for concurrent crawling
         async def crawl_with_rate_limit(identifier: str) -> PaperEntity | None:
             await self.rate_limiter.wait()
-            return await self.crawl_single_paper(identifier, db_manager)
+            return await self.crawl_single_paper(identifier, db_manager, arxiv_client)
 
         # Crawl papers concurrently
         tasks = [crawl_with_rate_limit(identifier) for identifier in identifiers]
@@ -280,7 +284,11 @@ class ArxivCrawlerCore:
         return None
 
     async def _crawl_paper(
-        self, identifier: str, db_manager: DatabaseManager, paper_repo: PaperRepository
+        self,
+        identifier: str,
+        db_manager: DatabaseManager,
+        paper_repo: PaperRepository,
+        arxiv_client: ArxivClient,
     ) -> PaperEntity | None:
         """Crawl a single paper and store in database.
 
@@ -288,6 +296,7 @@ class ArxivCrawlerCore:
             identifier: arXiv ID, abstract URL, or PDF URL
             db_manager: Database manager instance
             paper_repo: Paper repository instance
+            arxiv_client: ArxivClient instance for dependency injection
 
         Returns:
             Crawled paper or None if failed
@@ -296,21 +305,10 @@ class ArxivCrawlerCore:
             logger.warning("Empty identifier provided")
             return None
 
-        # Use injected client or create a new one
-        if self.arxiv_client:
-            # Use injected client (already managed externally)
-            return await self._crawl_with_client(
-                self.arxiv_client, identifier, db_manager, paper_repo
-            )
-        else:
-            # Create new client with settings
-            from core.config import settings
-
-            base_url = f"{settings.arxiv_api_base_url}/api/query"
-            client = ArxivClient(base_url=base_url)
-            return await self._crawl_with_client(
-                client, identifier, db_manager, paper_repo
-            )
+        # Use injected client
+        return await self._crawl_with_client(
+            arxiv_client, identifier, db_manager, paper_repo
+        )
 
     async def _crawl_with_client(
         self,

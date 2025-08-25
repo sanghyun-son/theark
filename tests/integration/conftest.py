@@ -66,7 +66,6 @@ def integration_client(
         summary_client = OpenAISummarizer(
             api_key="test-api-key",
             base_url=openai_url,
-            db_manager=llm_db_manager,
         )
 
         app.state.db_manager = db_manager

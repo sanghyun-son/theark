@@ -2,10 +2,11 @@
 
 import time
 from datetime import datetime
-from typing import Any, Dict
+from typing import Dict
 
 from core import get_logger
 from crawler.database import LLMRequest
+from crawler.database.llm_sqlite_manager import LLMSQLiteManager
 
 logger = get_logger(__name__)
 
@@ -13,31 +14,29 @@ logger = get_logger(__name__)
 class LLMTracker:
     """Wrapper for tracking LLM API requests."""
 
-    def __init__(self, custom_id: str | None = None, db_manager: Any = None):
+    def __init__(self, custom_id: str | None = None):
         """Initialize LLM tracker.
 
         Args:
             custom_id: Custom ID for tracking related requests
-            db_manager: LLM database manager instance (required)
         """
         self.custom_id = custom_id
-        if db_manager is None:
-            raise ValueError("db_manager is required for LLMTracker")
-        self.db_manager = db_manager
 
     def start_request(
         self,
         model: str,
+        db_manager: LLMSQLiteManager,
         provider: str = "openai",
         endpoint: str = "/v1/chat/completions",
         is_batched: bool = False,
         request_type: str = "chat",
-        metadata: Dict[str, Any] | None = None,
+        metadata: Dict[str, str] | None = None,
     ) -> int:
         """Start tracking a new LLM request.
 
         Args:
             model: Model name (e.g., "gpt-4o-mini")
+            db_manager: LLM database manager instance (required)
             provider: Provider name (e.g., "openai")
             endpoint: API endpoint
             is_batched: Whether this is a batch request
@@ -48,12 +47,9 @@ class LLMTracker:
             Request ID for tracking
         """
         # Ensure database is connected
-        if (
-            hasattr(self.db_manager, "connection")
-            and self.db_manager.connection is None
-        ):
+        if hasattr(db_manager, "connection") and db_manager.connection is None:
             logger.debug("LLM database connection lost, attempting to reconnect")
-            self.db_manager.connect()
+            db_manager.connect()
 
         request = LLMRequest(
             timestamp=datetime.now().isoformat(),
@@ -67,13 +63,14 @@ class LLMTracker:
             metadata=metadata,
         )
 
-        request_id = self.db_manager.repository.create(request)
+        request_id = db_manager.repository.create(request)
         logger.debug(f"Started tracking LLM request {request_id}")
         return int(request_id)
 
     def complete_request(
         self,
         request_id: int,
+        db_manager: LLMSQLiteManager,
         success: bool,
         response_time_ms: int,
         tokens: Dict[str, int] | None = None,
@@ -85,6 +82,7 @@ class LLMTracker:
 
         Args:
             request_id: Request ID from start_request
+            db_manager: LLM database manager instance (required)
             success: Whether the request succeeded
             response_time_ms: Response time in milliseconds
             tokens: Token usage dict (prompt_tokens, completion_tokens, total_tokens)
@@ -93,16 +91,13 @@ class LLMTracker:
             estimated_cost_usd: Estimated cost in USD
         """
         # Ensure database is connected
-        if (
-            hasattr(self.db_manager, "connection")
-            and self.db_manager.connection is None
-        ):
+        if hasattr(db_manager, "connection") and db_manager.connection is None:
             logger.debug("LLM database connection lost, attempting to reconnect")
-            self.db_manager.connect()
+            db_manager.connect()
 
         status = "success" if success else "error"
 
-        self.db_manager.repository.update_status(
+        db_manager.repository.update_status(
             request_id=request_id,
             status=status,
             response_time_ms=response_time_ms,
@@ -133,8 +128,7 @@ class LLMRequestContext:
         endpoint: str = "/v1/chat/completions",
         is_batched: bool = False,
         request_type: str = "chat",
-        metadata: Dict[str, Any] | None = None,
-        db_manager: Any = None,
+        metadata: Dict[str, str] | None = None,
     ):
         """Initialize LLM request context.
 
@@ -146,9 +140,8 @@ class LLMRequestContext:
             is_batched: Whether this is a batch request
             request_type: Type of request
             metadata: Additional metadata
-            db_manager: Optional LLM database manager instance
         """
-        self.tracker = LLMTracker(custom_id, db_manager)
+        self.tracker = LLMTracker(custom_id)
         self.model = model
         self.provider = provider
         self.endpoint = endpoint
@@ -157,13 +150,17 @@ class LLMRequestContext:
         self.metadata = metadata
         self.request_id: int | None = None
         self.start_time: float | None = None
-        self.db_manager = db_manager
+        self.db_manager: LLMSQLiteManager | None = None
 
     def __enter__(self) -> "LLMRequestContext":
         """Enter context manager."""
+        if self.db_manager is None:
+            raise ValueError("db_manager must be set before entering context")
+
         self.start_time = time.time()
         self.request_id = self.tracker.start_request(
             model=self.model,
+            db_manager=self.db_manager,
             provider=self.provider,
             endpoint=self.endpoint,
             is_batched=self.is_batched,
@@ -176,10 +173,14 @@ class LLMRequestContext:
         self,
         exc_type: type[BaseException] | None,
         exc_val: BaseException | None,
-        exc_tb: Any,
+        exc_tb: object,
     ) -> None:
         """Exit context manager."""
-        if self.request_id is None or self.start_time is None:
+        if (
+            self.request_id is None
+            or self.start_time is None
+            or self.db_manager is None
+        ):
             return
 
         end_time = time.time()
@@ -190,18 +191,22 @@ class LLMRequestContext:
 
         self.tracker.complete_request(
             request_id=self.request_id,
+            db_manager=self.db_manager,
             success=success,
             response_time_ms=response_time_ms,
             error_message=error_message,
         )
 
-    def update_tokens(self, tokens: Dict[str, int]) -> None:
+    def update_tokens(
+        self, tokens: Dict[str, int], db_manager: LLMSQLiteManager
+    ) -> None:
         """Update token usage for the request.
 
         Args:
             tokens: Token usage dict (prompt_tokens, completion_tokens, total_tokens)
+            db_manager: LLM database manager instance
         """
-        if self.request_id is not None and self.db_manager:
+        if self.request_id is not None:
             # Calculate cost based on tokens
             estimated_cost = None
             if "prompt_tokens" in tokens and "completion_tokens" in tokens:
@@ -214,21 +219,24 @@ class LLMRequestContext:
                 )
                 estimated_cost = temp_request.calculate_cost()
 
-            self.db_manager.repository.update_status(
+            db_manager.repository.update_status(
                 request_id=self.request_id,
                 status="success",  # Keep current status
                 tokens=tokens,
                 estimated_cost_usd=estimated_cost,
             )
 
-    def update_http_status(self, status_code: int) -> None:
+    def update_http_status(
+        self, status_code: int, db_manager: LLMSQLiteManager
+    ) -> None:
         """Update HTTP status code for the request.
 
         Args:
             status_code: HTTP status code
+            db_manager: LLM database manager instance
         """
-        if self.request_id is not None and self.db_manager:
-            self.db_manager.repository.update_status(
+        if self.request_id is not None:
+            db_manager.repository.update_status(
                 request_id=self.request_id,
                 status="success" if 200 <= status_code < 300 else "error",
                 http_status_code=status_code,

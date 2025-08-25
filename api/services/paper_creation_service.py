@@ -39,29 +39,12 @@ class PaperCreationService:
         return paper_repo.get_by_arxiv_id(arxiv_id)
 
     async def create_paper(
-        self, paper_data: PaperCreate, db_manager: SQLiteManager
-    ) -> PaperEntity:
-        """Create a new paper and return the paper entity."""
-        arxiv_id = self._extract_arxiv_id(paper_data)
-        paper_repo = PaperRepository(db_manager)
-
-        # Check if paper already exists
-        existing_paper = self._get_paper_by_arxiv_id(arxiv_id, paper_repo)
-        if existing_paper:
-            logger.info(f"Paper {arxiv_id} already exists, returning existing paper")
-            return existing_paper
-
-        # Crawl the paper
-        crawled_paper = await self._crawl_paper(arxiv_id, db_manager)
-        return crawled_paper
-
-    async def create_paper_with_client(
         self,
         paper_data: PaperCreate,
         db_manager: SQLiteManager,
         arxiv_client: ArxivClient,
     ) -> PaperEntity:
-        """Create a paper with injected ArxivClient (for testing)."""
+        """Create a paper with injected ArxivClient."""
         arxiv_id = self._extract_arxiv_id(paper_data)
 
         paper_repo = PaperRepository(db_manager)
@@ -80,14 +63,14 @@ class PaperCreationService:
         self,
         arxiv_id: str,
         db_manager: SQLiteManager,
-        arxiv_client: ArxivClient | None = None,
+        arxiv_client: ArxivClient,
     ) -> PaperEntity:
         """Crawl a single paper from arXiv."""
         crawler_config = OnDemandCrawlConfig()
-        async with OnDemandCrawler(
-            config=crawler_config, arxiv_client=arxiv_client
-        ) as crawler:
-            crawled_paper = await crawler.crawl_single_paper(arxiv_id, db_manager)
+        async with OnDemandCrawler(config=crawler_config) as crawler:
+            crawled_paper = await crawler.crawl_single_paper(
+                arxiv_id, db_manager, arxiv_client
+            )
             if not crawled_paper:
                 raise ValueError(f"Failed to crawl paper {arxiv_id}")
 

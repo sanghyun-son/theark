@@ -6,6 +6,7 @@ from typing import Any, Awaitable, Callable
 
 from core import get_logger
 from core.models.database.entities import PaperEntity
+from crawler.arxiv.client import ArxivClient
 from crawler.arxiv.core import SummarizationConfig
 from crawler.arxiv.on_demand_crawler import (
     OnDemandCrawlConfig,
@@ -171,7 +172,7 @@ class ArxivCrawler:
         logger.info("Background crawling loop stopped")
 
     async def crawl_single_paper(
-        self, identifier: str, db_manager: DatabaseManager
+        self, identifier: str, db_manager: DatabaseManager, arxiv_client: "ArxivClient"
     ) -> PaperEntity | None:
         """Crawl a single paper by ID or URL.
 
@@ -182,18 +183,23 @@ class ArxivCrawler:
         Returns:
             Crawled paper or None if failed
         """
-        return await self.on_demand_crawler.crawl_single_paper(identifier, db_manager)
+        return await self.on_demand_crawler.crawl_single_paper(
+            identifier, db_manager, arxiv_client
+        )
 
-    async def crawl_recent_papers(self, limit: int | None = None) -> list[PaperEntity]:
+    async def crawl_recent_papers(
+        self, arxiv_client: "ArxivClient", limit: int | None = None
+    ) -> list[PaperEntity]:
         """Crawl the most recent papers.
 
         Args:
+            arxiv_client: ArxivClient instance for dependency injection
             limit: Maximum number of papers to crawl
 
         Returns:
             List of crawled papers
         """
-        return await self.on_demand_crawler.crawl_recent_papers(limit)
+        return await self.on_demand_crawler.crawl_recent_papers(limit, arxiv_client)
 
     async def crawl_monthly_papers(
         self, year: int, month: int, limit: int | None = None

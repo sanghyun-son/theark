@@ -145,7 +145,6 @@ def mock_arxiv_client(mock_arxiv_server: HTTPServer) -> ArxivClient:
 @pytest.fixture(scope="function")
 def mock_summary_client(
     mock_openai_server: HTTPServer,
-    mock_llm_sqlite_db: LLMSQLiteManager,
 ) -> OpenAISummarizer:
     """Provide a mock OpenAISummarizer instance."""
 
@@ -153,7 +152,6 @@ def mock_summary_client(
     return OpenAISummarizer(
         api_key="test-api-key",
         base_url=base_url,
-        db_manager=mock_llm_sqlite_db,
         timeout=60.0,
         model="super-ai-model",
         use_tools=True,

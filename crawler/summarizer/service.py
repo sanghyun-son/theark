@@ -5,6 +5,7 @@ import asyncio
 import httpx
 
 from core import get_logger
+from crawler.database.llm_sqlite_manager import LLMSQLiteManager
 from crawler.summarizer import (
     SummaryRequest,
     SummaryResponse,
@@ -25,6 +26,7 @@ class SummarizationService:
         paper_id: str,
         abstract: str,
         summary_client: SummaryClient,
+        db_manager: LLMSQLiteManager,
         language: str = "English",
         interest_section: str = "",
     ) -> SummaryResponse | None:
@@ -33,6 +35,8 @@ class SummarizationService:
         Args:
             paper_id: Unique identifier for the paper
             abstract: The paper's abstract text
+            summary_client: Summary client instance
+            db_manager: LLM database manager instance
             language: Language for the summary
             interest_section: User's interest section for relevance scoring
 
@@ -53,7 +57,7 @@ class SummarizationService:
             max_retries = 3
             for attempt in range(max_retries):
                 try:
-                    response = await summary_client.summarize(request)
+                    response = await summary_client.summarize(request, db_manager)
                     logger.info(f"Successfully summarized paper {paper_id}")
                     return response
                 except httpx.ReadTimeout as e:

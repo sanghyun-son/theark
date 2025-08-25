@@ -63,12 +63,6 @@ class PaperSummarizationService:
     ) -> None:
         """Summarize a paper asynchronously."""
         logger.debug(f"Starting summarization for paper {paper.arxiv_id}")
-        logger.debug(f"DB manager type: {type(db_manager)}")
-        logger.debug(
-            f"DB manager connection: "
-            f"{getattr(db_manager, 'connection', 'No connection attr')}"
-        )
-
         summarization_service = SummarizationService()
 
         try:
@@ -85,6 +79,7 @@ class PaperSummarizationService:
                 paper.arxiv_id,
                 paper.abstract,
                 summary_client,
+                llm_db_manager,
                 language=language,
                 interest_section=self.settings.default_interests,
             )

@@ -26,14 +26,10 @@ logger = get_logger(__name__)
 class PaperOrchestrationService:
     """Service for orchestrating paper creation and summarization."""
 
-    def __init__(
-        self,
-        creation_service: PaperCreationService,
-        summarization_service: PaperSummarizationService,
-    ) -> None:
+    def __init__(self) -> None:
         """Initialize paper orchestration service."""
-        self.creation_service = creation_service
-        self.summarization_service = summarization_service
+        self.creation_service = PaperCreationService()
+        self.summarization_service = PaperSummarizationService()
 
     async def create_paper_normal(
         self,
@@ -44,7 +40,7 @@ class PaperOrchestrationService:
         summary_client: SummaryClient,
     ) -> PaperResponse:
         """Create paper with background summarization."""
-        paper = await self.creation_service.create_paper_with_client(
+        paper = await self.creation_service.create_paper(
             paper_data, db_manager, arxiv_client
         )
         self.summarization_service.start_background_summarization(
@@ -63,7 +59,7 @@ class PaperOrchestrationService:
         arxiv_client: ArxivClient,
     ) -> PaperResponse:
         """Create paper without background summarization (for streaming)."""
-        paper = await self.creation_service.create_paper_with_client(
+        paper = await self.creation_service.create_paper(
             paper_data, db_manager, arxiv_client
         )
         return PaperResponse.from_crawler_paper(paper, None)

@@ -15,6 +15,7 @@ from core.models.external.openai import (
     OpenAIToolChoice,
     PaperAnalysis,
 )
+from crawler.database.llm_sqlite_manager import LLMSQLiteManager
 
 from .client import SummaryClient
 from .llm_tracker import LLMRequestContext
@@ -34,7 +35,6 @@ class OpenAISummarizer(SummaryClient):
         self,
         api_key: str,
         base_url: str | None = None,
-        db_manager: Any = None,
         timeout: float = 60.0,
         model: str = "gpt-4o-mini",
         use_tools: bool = True,
@@ -44,7 +44,6 @@ class OpenAISummarizer(SummaryClient):
 
         self.api_key = api_key
         self.base_url = base_url or settings.llm_api_base_url
-        self.db_manager = db_manager
         self.timeout = timeout
         self._model = model
         self._use_tools = use_tools
@@ -60,9 +59,11 @@ class OpenAISummarizer(SummaryClient):
         """Get whether this client uses tools/function calling."""
         return self._use_tools
 
-    async def summarize(self, request: SummaryRequest) -> SummaryResponse:
+    async def summarize(
+        self, request: SummaryRequest, db_manager: LLMSQLiteManager
+    ) -> SummaryResponse:
         """Summarize the given abstract using OpenAI API."""
-        with LLMRequestContext(
+        llm_context = LLMRequestContext(
             model=request.model,
             custom_id=request.custom_id,
             provider="openai",
@@ -70,8 +71,10 @@ class OpenAISummarizer(SummaryClient):
             is_batched=False,
             request_type="chat",
             metadata=self._create_request_metadata(request),
-            db_manager=self.db_manager,
-        ) as llm_context:
+        )
+        llm_context.db_manager = db_manager
+
+        with llm_context as context:
             # Build and send request
             payload = self._build_request_payload(request)
             logger.debug(
@@ -81,7 +84,7 @@ class OpenAISummarizer(SummaryClient):
             response = await self._make_api_request(payload)
 
             # Update tracking with response data
-            llm_context.update_http_status(response.status_code)
+            context.update_http_status(response.status_code, db_manager)
 
             if response.status_code != 200:
                 raise Exception(
@@ -91,7 +94,7 @@ class OpenAISummarizer(SummaryClient):
             # Parse response
             chat_response = ChatCompletionResponse(**response.json())
             logger.debug(f"OpenAI Response:\n{chat_response.model_dump_json(indent=2)}")
-            self._update_token_tracking(llm_context, chat_response)
+            self._update_token_tracking(context, chat_response, db_manager)
 
             return self._parse_response(request, chat_response)
 
@@ -164,7 +167,10 @@ class OpenAISummarizer(SummaryClient):
         )
 
     def _update_token_tracking(
-        self, llm_context: LLMRequestContext, chat_response: ChatCompletionResponse
+        self,
+        llm_context: LLMRequestContext,
+        chat_response: ChatCompletionResponse,
+        db_manager: LLMSQLiteManager,
     ) -> None:
         """Update token usage tracking."""
         if chat_response.usage:
@@ -173,7 +179,8 @@ class OpenAISummarizer(SummaryClient):
                     "prompt_tokens": chat_response.usage.prompt_tokens,
                     "completion_tokens": chat_response.usage.completion_tokens,
                     "total_tokens": chat_response.usage.total_tokens,
-                }
+                },
+                db_manager,
             )
 
     def _parse_response(

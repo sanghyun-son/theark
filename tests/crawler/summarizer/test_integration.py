@@ -10,6 +10,7 @@ from core.models.external.openai import PaperAnalysis
 @pytest.mark.asyncio
 async def test_summarization_service_summarize_paper_success(
     mock_summary_client,
+    mock_llm_sqlite_db,
 ) -> None:
     """Test successful paper summarization."""
     service = SummarizationService()
@@ -19,6 +20,7 @@ async def test_summarization_service_summarize_paper_success(
         paper_id="test-paper-001",
         abstract="This is a test abstract about machine learning.",
         summary_client=mock_summary_client,
+        db_manager=mock_llm_sqlite_db,
         language="English",
         interest_section="AI and ML",
     )
@@ -36,6 +38,7 @@ async def test_summarization_service_summarize_paper_success(
 @pytest.mark.asyncio
 async def test_summarization_service_summarize_paper_failure(
     mock_summary_client,
+    mock_llm_sqlite_db,
 ) -> None:
     """Test paper summarization failure."""
     service = SummarizationService()
@@ -45,6 +48,7 @@ async def test_summarization_service_summarize_paper_failure(
         paper_id="test-paper-001",
         abstract="This is a test abstract about machine learning.",
         summary_client=mock_summary_client,
+        db_manager=mock_llm_sqlite_db,
         language="English",
         interest_section="AI and ML",
     )
