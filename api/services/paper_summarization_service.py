@@ -4,10 +4,10 @@ import asyncio
 
 from core import get_logger
 from core.config import load_settings
+from core.database.llm_sqlite_manager import LLMSQLiteManager
+from core.database.repository import SummaryRepository
+from core.database.sqlite_manager import SQLiteManager
 from core.models.database.entities import PaperEntity, SummaryEntity
-from crawler.database import SummaryRepository
-from crawler.database.llm_sqlite_manager import LLMSQLiteManager
-from crawler.database.sqlite_manager import SQLiteManager
 from crawler.summarizer import SummaryResponse
 from crawler.summarizer.client import SummaryClient
 from crawler.summarizer.service import SummarizationService

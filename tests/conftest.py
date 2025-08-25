@@ -12,8 +12,8 @@ from werkzeug.wrappers import Request, Response
 
 from core import setup_test_logging
 from crawler.arxiv.client import ArxivClient
-from crawler.database import LLMSQLiteManager
-from crawler.database.sqlite_manager import SQLiteManager
+from core.database.llm_sqlite_manager import LLMSQLiteManager
+from core.database.sqlite_manager import SQLiteManager
 from crawler.summarizer.openai_summarizer import OpenAISummarizer
 from tests.shared_test_data import ARXIV_RESPONSES, OPENAI_RESPONSES
 

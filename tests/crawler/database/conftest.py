@@ -6,7 +6,7 @@ import pytest
 
 from core.models.database.entities import PaperEntity
 from crawler.database import SQLiteManager
-from crawler.database.repository import (
+from core.database.repository import (
     CrawlEventRepository,
     FeedRepository,
     PaperRepository,

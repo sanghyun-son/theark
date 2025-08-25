@@ -4,6 +4,7 @@ from typing import Any
 
 import httpx
 
+from core.database.llm_sqlite_manager import LLMSQLiteManager
 from core.log import get_logger
 from core.models.external.openai import (
     ChatCompletionRequest,
@@ -15,7 +16,6 @@ from core.models.external.openai import (
     OpenAIToolChoice,
     PaperAnalysis,
 )
-from crawler.database.llm_sqlite_manager import LLMSQLiteManager
 
 from .client import SummaryClient
 from .llm_tracker import LLMRequestContext

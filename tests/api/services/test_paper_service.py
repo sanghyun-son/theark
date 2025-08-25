@@ -6,7 +6,7 @@ from api.services.paper_service import PaperService
 from core.models.database.entities import PaperEntity, UserEntity
 from core.models.domain.user import User
 from core.models.api.responses import StarResponse, StarredPapersResponse
-from crawler.database import PaperRepository, UserRepository
+from core.database.repository import PaperRepository, UserRepository
 
 
 @pytest.fixture

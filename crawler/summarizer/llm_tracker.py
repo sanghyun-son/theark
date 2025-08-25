@@ -5,8 +5,8 @@ from datetime import datetime
 from typing import Dict
 
 from core import get_logger
-from crawler.database import LLMRequest
-from crawler.database.llm_sqlite_manager import LLMSQLiteManager
+from core.database.llm_sqlite_manager import LLMSQLiteManager
+from core.models import LLMRequest
 
 logger = get_logger(__name__)
 

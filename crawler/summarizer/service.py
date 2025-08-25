@@ -5,7 +5,7 @@ import asyncio
 import httpx
 
 from core import get_logger
-from crawler.database.llm_sqlite_manager import LLMSQLiteManager
+from core.database.llm_sqlite_manager import LLMSQLiteManager
 from crawler.summarizer import (
     SummaryRequest,
     SummaryResponse,

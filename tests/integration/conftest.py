@@ -10,9 +10,9 @@ from pytest_httpserver import HTTPServer
 from fastapi.testclient import TestClient
 
 from api.app import create_app
-from crawler.database import LLMSQLiteManager
-from crawler.database.sqlite_manager import SQLiteManager
-from crawler.database.repository import UserRepository
+from core.database.llm_sqlite_manager import LLMSQLiteManager
+from core.database.sqlite_manager import SQLiteManager
+from core.database.repository import UserRepository
 from core.models.domain.user import DEFAULT_USER_ID
 
 

@@ -2,7 +2,7 @@
 
 from abc import ABC, abstractmethod
 
-from crawler.database.llm_sqlite_manager import LLMSQLiteManager
+from core.database.llm_sqlite_manager import LLMSQLiteManager
 
 from .summarizer import SummaryRequest, SummaryResponse
 

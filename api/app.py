@@ -29,10 +29,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     logger.info(f"Authentication required: {current_settings.auth_required}")
 
     from api.services.paper_service import PaperService
+    from core.database.llm_sqlite_manager import LLMSQLiteManager
+    from core.database.sqlite_manager import SQLiteManager
     from crawler.arxiv.client import ArxivClient
-    from crawler.database import LLMSQLiteManager
     from crawler.database.config import get_database_path, get_llm_database_path
-    from crawler.database.sqlite_manager import SQLiteManager
     from crawler.summarizer.openai_summarizer import OpenAISummarizer
 
     # Use current environment for database paths

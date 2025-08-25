@@ -1,12 +1,12 @@
 """Paper creation service for handling paper creation logic."""
 
 from core import get_logger
+from core.database.repository import PaperRepository
+from core.database.sqlite_manager import SQLiteManager
 from core.models import PaperCreateRequest as PaperCreate
 from core.models.database.entities import PaperEntity
 from crawler.arxiv.client import ArxivClient
 from crawler.arxiv.on_demand_crawler import OnDemandCrawlConfig, OnDemandCrawler
-from crawler.database import PaperRepository
-from crawler.database.sqlite_manager import SQLiteManager
 
 logger = get_logger(__name__)
 

@@ -4,9 +4,9 @@ import pytest
 
 from api.services.paper_summarization_service import PaperSummarizationService
 from core.models.database.entities import PaperEntity, SummaryEntity
-from crawler.database.llm_sqlite_manager import LLMSQLiteManager
-from crawler.database.sqlite_manager import SQLiteManager
-from crawler.database.repository import PaperRepository
+from core.database.llm_sqlite_manager import LLMSQLiteManager
+from core.database.sqlite_manager import SQLiteManager
+from core.database.repository import PaperRepository
 from crawler.summarizer.client import SummaryClient
 
 
