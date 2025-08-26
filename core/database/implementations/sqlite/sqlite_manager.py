@@ -9,6 +9,7 @@ from core.database.interfaces.repository import Repository
 from core.log import get_logger
 from core.types import DatabaseParamType
 
+from .query_builder import SQLiteQueryBuilder
 from .sqlite_connection import SQLiteConnection
 
 T = TypeVar("T")
@@ -30,6 +31,7 @@ class SQLiteManager(DatabaseManager):
         super().__init__(str(db_path), **kwargs)
         self.db_path = Path(db_path)
         self._connection = SQLiteConnection(self.db_path)
+        self._query_builder = SQLiteQueryBuilder()
 
     async def connect(self) -> None:
         """Establish SQLite database connection."""
@@ -397,94 +399,51 @@ class SQLiteManager(DatabaseManager):
         model: str | None = None,
         error_message: str | None = None,
     ) -> None:
-        """Track LLM request status."""
+        """Track LLM request status using query builder."""
 
-        query = """
-            INSERT INTO llm_tracking (
-                model_name, prompt_tokens, completion_tokens,
-                total_tokens, cost_usd, request_time, response_time,
-                success, error_message
-            ) VALUES (
-                :model_name,
-                :prompt_tokens,
-                :completion_tokens,
-                :total_tokens,
-                :cost_usd,
-                :request_time,
-                :response_time,
-                :success,
-                :error_message
-            )
-        """
+        data = {
+            "model_name": model or "unknown",
+            "prompt_tokens": 0,
+            "completion_tokens": 0,
+            "total_tokens": 0,
+            "cost_usd": 0.0,
+            "success": 1 if status.lower() == "success" else 0,
+            "error_message": error_message,
+        }
 
-        import time
-
-        current_time = time.time()
-        success = status.lower() == "success"
-
-        try:
-            await self._connection.execute(
-                query,
-                {
-                    "model_name": model or "unknown",
-                    "prompt_tokens": 0,
-                    "completion_tokens": 0,
-                    "total_tokens": 0,
-                    "cost_usd": 0.0,
-                    "request_time": current_time,
-                    "response_time": current_time,
-                    "success": success,
-                    "error_message": error_message,
-                },
-            )
-            logger.debug(f"Tracked request status: {request_id} - {status}")
-        except Exception as e:
-            logger.error(f"Failed to track request status: {e}")
-            raise
+        query, params = self._query_builder.insert("llm_tracking", data)
+        await self._connection.execute(query, params)
 
     async def get_request_history(
-        self,
-        request_id: str | None = None,
-        status: str | None = None,
-        limit: int = 100,
+        self, request_id: str | None = None, status: str | None = None, limit: int = 100
     ) -> list[dict[str, Any]]:
-        """Get request history."""
+        """Get request history using query builder."""
 
-        where_conditions = []
-        params: dict[str, Any] = {"limit": limit}
-
+        where_conditions: dict[str, Any] = {}
         if request_id:
-            where_conditions.append("request_id = :request_id")
-            params["request_id"] = request_id
-
+            where_conditions["tracking_id"] = request_id
         if status:
-            where_conditions.append("success = :success")
-            params["success"] = status.lower() == "success"
+            where_conditions["success"] = 1 if status.lower() == "success" else 0
 
-        where_clause = " AND ".join(where_conditions) if where_conditions else "1=1"
+        query, params = self._query_builder.select(
+            "llm_tracking",
+            columns=[
+                "tracking_id as request_id",
+                "model_name",
+                "prompt_tokens",
+                "completion_tokens",
+                "total_tokens",
+                "cost_usd",
+                "request_time",
+                "response_time",
+                "success",
+                "error_message",
+                "created_at",
+            ],
+            where=where_conditions,
+            order_by=["created_at DESC"],
+            limit=limit,
+        )
 
-        query = f"""
-            SELECT
-                tracking_id as request_id,
-                model_name,
-                prompt_tokens,
-                completion_tokens,
-                total_tokens,
-                cost_usd,
-                request_time,
-                response_time,
-                success,
-                error_message,
-                created_at
-            FROM llm_tracking
-            WHERE {where_clause}
-            ORDER BY created_at DESC
-            LIMIT :limit
-        """
-
-        try:
-            results = await self._connection.fetch_all(query, params)
-            return results
-        except Exception as e:
-            logger.error(f"Failed to get request history: {e}")
-            raise
+        results = await self._connection.fetch_all(query, params)
+        return results
