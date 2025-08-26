@@ -5,7 +5,7 @@ import asyncio
 import httpx
 
 from core import get_logger
-from crawler.database.llm_sqlite_manager import LLMSQLiteManager
+from core.database.interfaces import DatabaseManager
 from crawler.summarizer import (
     SummaryRequest,
     SummaryResponse,
@@ -26,7 +26,7 @@ class SummarizationService:
         paper_id: str,
         abstract: str,
         summary_client: SummaryClient,
-        db_manager: LLMSQLiteManager,
+        db_manager: DatabaseManager,
         language: str = "English",
         interest_section: str = "",
     ) -> SummaryResponse | None:

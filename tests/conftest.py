@@ -4,16 +4,17 @@ import json
 from logging import Logger
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
-from typing import Generator
+from typing import AsyncGenerator
 
 import pytest
+import pytest_asyncio
 from pytest_httpserver import HTTPServer
 from werkzeug.wrappers import Request, Response
 
 from core import setup_test_logging
-from crawler.arxiv.client import ArxivClient
-from crawler.database import LLMSQLiteManager
-from crawler.database.sqlite_manager import SQLiteManager
+
+from core.database.interfaces import DatabaseManager
+from core.extractors.concrete.arxiv_extractor import ArxivExtractor
 from crawler.summarizer.openai_summarizer import OpenAISummarizer
 from tests.shared_test_data import ARXIV_RESPONSES, OPENAI_RESPONSES
 
@@ -113,33 +114,22 @@ def mock_arxiv_server(httpserver: HTTPServer) -> HTTPServer:
 
 
 @pytest.fixture(scope="function")
-def mock_sqlite_db(tmp_path: Path) -> Generator[SQLiteManager, None, None]:
-    """Provide a temporary SQLite database path for tests."""
-    db_path = tmp_path / "test.db"
-    db_manager = SQLiteManager(db_path)
-    db_manager.connect()
-    db_manager.create_tables()
-    yield db_manager
-    db_manager.disconnect()
-
-
-@pytest.fixture(scope="function")
-def mock_llm_sqlite_db(tmp_path: Path) -> Generator[LLMSQLiteManager, None, None]:
-    """Provide a temporary LLM SQLite database path for tests."""
-    llm_db_path = tmp_path / "test_llm.db"
-    db_manager = LLMSQLiteManager(llm_db_path)
-    db_manager.connect()
-    db_manager.create_tables()
-    yield db_manager
-    db_manager.disconnect()
-
-
-@pytest.fixture(scope="function")
-def mock_arxiv_client(mock_arxiv_server: HTTPServer) -> ArxivClient:
-    """Provide a mock ArxivClient instance."""
-
+def mock_arxiv_extractor(mock_arxiv_server: HTTPServer) -> ArxivExtractor:
+    """Provide a mock ArxivExtractor instance configured with mock server."""
     base_url = f"http://{mock_arxiv_server.host}:{mock_arxiv_server.port}/api/query"
-    return ArxivClient(base_url=base_url)
+    return ArxivExtractor(api_base_url=base_url)
+
+
+@pytest_asyncio.fixture(scope="function")
+async def mock_db_manager(tmp_path: Path) -> AsyncGenerator[DatabaseManager, None]:
+    """Provide a real SQLite database manager for tests using temporary path."""
+    from core.database.implementations.sqlite import SQLiteManager
+
+    db_path = tmp_path / "test.db"
+    db_manager: DatabaseManager = SQLiteManager(db_path)
+    async with db_manager:
+        await db_manager.create_tables()
+        yield db_manager
 
 
 @pytest.fixture(scope="function")

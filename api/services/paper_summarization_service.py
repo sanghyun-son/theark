@@ -4,10 +4,9 @@ import asyncio
 
 from core import get_logger
 from core.config import load_settings
+from core.database.interfaces import DatabaseManager
+from core.database.repository import SummaryRepository
 from core.models.database.entities import PaperEntity, SummaryEntity
-from crawler.database import SummaryRepository
-from crawler.database.llm_sqlite_manager import LLMSQLiteManager
-from crawler.database.sqlite_manager import SQLiteManager
 from crawler.summarizer import SummaryResponse
 from crawler.summarizer.client import SummaryClient
 from crawler.summarizer.service import SummarizationService
@@ -25,8 +24,7 @@ class PaperSummarizationService:
     def start_background_summarization(
         self,
         paper: PaperEntity,
-        db_manager: SQLiteManager,
-        llm_db_manager: LLMSQLiteManager,
+        db_manager: DatabaseManager,
         summary_client: SummaryClient,
         force_resummarize: bool = False,
         language: str = "Korean",
@@ -37,7 +35,6 @@ class PaperSummarizationService:
                 self.summarize_paper(
                     paper,
                     db_manager,
-                    llm_db_manager,
                     summary_client,
                     force_resummarize,
                     language,
@@ -55,8 +52,7 @@ class PaperSummarizationService:
     async def summarize_paper(
         self,
         paper: PaperEntity,
-        db_manager: SQLiteManager,
-        llm_db_manager: LLMSQLiteManager,
+        db_manager: DatabaseManager,
         summary_client: SummaryClient,
         force_resummarize: bool = False,
         language: str = "Korean",
@@ -67,7 +63,7 @@ class PaperSummarizationService:
 
         try:
             # Check if summary already exists and force_resummarize is False
-            if not force_resummarize and self._has_existing_summary(
+            if not force_resummarize and await self._has_existing_summary(
                 paper, db_manager, language
             ):
                 logger.info(
@@ -79,14 +75,14 @@ class PaperSummarizationService:
                 paper.arxiv_id,
                 paper.abstract,
                 summary_client,
-                llm_db_manager,
+                db_manager,
                 language=language,
                 interest_section=self.settings.default_interests,
             )
 
             # Save summary to database
             if summary_response:
-                self._save_summary(
+                await self._save_summary(
                     paper, summary_response, db_manager, language, force_resummarize
                 )
                 logger.info(
@@ -101,8 +97,8 @@ class PaperSummarizationService:
             logger.error(f"Error summarizing paper {paper.arxiv_id}: {e}")
             raise
 
-    def _has_existing_summary(
-        self, paper: PaperEntity, db_manager: SQLiteManager, language: str
+    async def _has_existing_summary(
+        self, paper: PaperEntity, db_manager: DatabaseManager, language: str
     ) -> bool:
         """Check if paper already has a summary in the specified language."""
         if not paper.paper_id:
@@ -119,7 +115,7 @@ class PaperSummarizationService:
             logger.debug(f"Creating SummaryRepository with db_manager: {db_manager}")
             summary_repo = SummaryRepository(db_manager)
 
-            existing_summary = summary_repo.get_by_paper_and_language(
+            existing_summary = await summary_repo.get_by_paper_and_language(
                 paper.paper_id, language
             )
             return existing_summary is not None
@@ -129,11 +125,11 @@ class PaperSummarizationService:
             )
             return False
 
-    def _save_summary(
+    async def _save_summary(
         self,
         paper: PaperEntity,
         summary_response: SummaryResponse,
-        db_manager: SQLiteManager,
+        db_manager: DatabaseManager,
         language: str,
         force_resummarize: bool = False,
     ) -> None:
@@ -149,7 +145,7 @@ class PaperSummarizationService:
             summary_repo = SummaryRepository(db_manager)
 
             # Check if summary already exists for this paper and language
-            existing_summary = summary_repo.get_by_paper_and_language(
+            existing_summary = await summary_repo.get_by_paper_and_language(
                 paper.paper_id, language
             )
 
@@ -160,14 +156,14 @@ class PaperSummarizationService:
                 )
                 updated_summary.summary_id = existing_summary.summary_id
                 updated_summary.version = existing_summary.version
-                summary_repo.update(updated_summary)
+                await summary_repo.update(updated_summary)
                 logger.info(f"Updated summary for paper {paper.arxiv_id} in {language}")
             else:
                 # Create new summary
                 summary_entity = self._create_summary_entity(
                     paper, summary_response, db_manager, language
                 )
-                summary_repo.create(summary_entity)
+                await summary_repo.create(summary_entity)
                 logger.info(f"Saved summary for paper {paper.arxiv_id} in {language}")
         except Exception as e:
             logger.error(f"Error saving summary for paper {paper.arxiv_id}: {e}")
@@ -177,7 +173,7 @@ class PaperSummarizationService:
         self,
         paper: PaperEntity,
         summary_response: SummaryResponse,
-        db_manager: SQLiteManager,
+        db_manager: DatabaseManager,
         language: str,
     ) -> SummaryEntity:
         """Create summary entity from summary response."""
@@ -219,10 +215,10 @@ class PaperSummarizationService:
                 is_read=False,
             )
 
-    def get_paper_summary(
+    async def get_paper_summary(
         self,
         paper: PaperEntity,
-        db_manager: SQLiteManager,
+        db_manager: DatabaseManager,
         language: str = "Korean",
     ) -> SummaryEntity | None:
         """Get summary for a paper in specified language."""
@@ -232,11 +228,11 @@ class PaperSummarizationService:
         summary_repo = SummaryRepository(db_manager)
 
         try:
-            summary_obj = summary_repo.get_by_paper_and_language(
+            summary_obj = await summary_repo.get_by_paper_and_language(
                 paper.paper_id, language
             )
             if not summary_obj and language != "English":
-                summary_obj = summary_repo.get_by_paper_and_language(
+                summary_obj = await summary_repo.get_by_paper_and_language(
                     paper.paper_id, "English"
                 )
 

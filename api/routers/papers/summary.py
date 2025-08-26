@@ -2,16 +2,15 @@
 
 from typing import AsyncGenerator
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 
 from api.dependencies import (
-    ArxivClientDep,
     DBManager,
-    LLMDBManager,
-    PaperServiceDep,
     SummaryClientDep,
 )
+from api.literals import CONTENT_TYPE_EVENT_STREAM, EventType
+from api.services.paper_service import PaperService
 from api.utils.error_handler import handle_async_api_operation
 from core.models import PaperCreateRequest as PaperCreate
 from core.models import SummaryEntity, SummaryReadResponse
@@ -21,12 +20,8 @@ router = APIRouter()
 
 @router.post("/stream-summary")
 async def stream_paper_summary(
-    request: Request,
-    paper_service: PaperServiceDep,
     paper_data: PaperCreate,
     db_manager: DBManager,
-    llm_db_manager: LLMDBManager,
-    arxiv_client: ArxivClientDep,
     summary_client: SummaryClientDep,
 ) -> StreamingResponse:
     """Stream paper creation and summarization process.
@@ -43,20 +38,23 @@ async def stream_paper_summary(
 
     async def generate_stream() -> AsyncGenerator[str, None]:
         try:
+            paper_service = PaperService()
             async for event in paper_service.create_paper_streaming(
-                paper_data, db_manager, llm_db_manager, arxiv_client, summary_client
+                paper_data,
+                db_manager,
+                summary_client,
             ):
                 yield f"{event}\n\n"
         except Exception as e:
             error_event = {
-                "type": "error",
+                "type": EventType.ERROR,
                 "message": str(e),
             }
             yield f"data: {error_event}\n\n"
 
     return StreamingResponse(
         generate_stream(),
-        media_type="text/event-stream",
+        media_type=CONTENT_TYPE_EVENT_STREAM,
         headers={
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
@@ -66,7 +64,6 @@ async def stream_paper_summary(
 
 @router.get("/{paper_id}/summary/{summary_id}", response_model=SummaryEntity)
 async def get_summary(
-    paper_service: PaperServiceDep,
     paper_id: int,
     summary_id: int,
     db_manager: DBManager,
@@ -85,6 +82,7 @@ async def get_summary(
     """
 
     async def get_summary_operation() -> SummaryEntity:
+        paper_service = PaperService()
         return await paper_service.get_summary(paper_id, summary_id, db_manager)
 
     return await handle_async_api_operation(
@@ -98,7 +96,6 @@ async def get_summary(
     "/{paper_id}/summary/{summary_id}/read", response_model=SummaryReadResponse
 )
 async def mark_summary_as_read(
-    paper_service: PaperServiceDep,
     paper_id: int,
     summary_id: int,
     db_manager: DBManager,
@@ -117,6 +114,7 @@ async def mark_summary_as_read(
     """
 
     async def mark_read_operation() -> SummaryReadResponse:
+        paper_service = PaperService()
         return await paper_service.mark_summary_as_read(
             paper_id, summary_id, db_manager
         )

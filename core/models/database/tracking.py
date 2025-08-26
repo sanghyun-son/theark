@@ -1,5 +1,6 @@
 """Database models for tracking external service usage."""
 
+import json
 from datetime import datetime
 from typing import Any
 
@@ -77,6 +78,33 @@ class LLMRequest(BaseModel):
         if v not in valid_statuses:
             raise ValueError(f"Invalid status. Must be one of: {valid_statuses}")
         return v
+
+    @classmethod
+    def from_tuple(cls, row: tuple[Any, ...]) -> "LLMRequest":
+        """Create LLMRequest from database tuple row."""
+        metadata = None
+        if row[16]:  # metadata column index
+            metadata = json.loads(row[16])
+
+        return cls(
+            request_id=row[0],  # request_id
+            timestamp=row[1],  # timestamp
+            model=row[2],  # model
+            provider=row[3],  # provider
+            endpoint=row[4],  # endpoint
+            is_batched=bool(row[5]),  # is_batched
+            request_type=row[6],  # request_type
+            custom_id=row[7],  # custom_id
+            prompt_tokens=row[8],  # prompt_tokens
+            completion_tokens=row[9],  # completion_tokens
+            total_tokens=row[10],  # total_tokens
+            response_time_ms=row[11],  # response_time_ms
+            status=row[12],  # status
+            error_message=row[13],  # error_message
+            http_status_code=row[14],  # http_status_code
+            estimated_cost_usd=row[15],  # estimated_cost_usd
+            metadata=metadata,
+        )
 
     def calculate_cost(self) -> float:
         """Calculate the estimated cost based on OpenAI's current pricing.

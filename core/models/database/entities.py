@@ -1,6 +1,7 @@
 """Database entity models that map directly to database tables."""
 
 from datetime import datetime
+from typing import Any
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -47,6 +48,23 @@ class PaperEntity(BaseModel):
         except ValueError:
             raise ValueError("Invalid ISO8601 datetime format")
 
+    @classmethod
+    def from_tuple(cls, row: tuple[Any, ...]) -> "PaperEntity":
+        """Create PaperEntity from database tuple row."""
+        return cls(
+            paper_id=row[0],
+            arxiv_id=row[1],
+            title=row[2],
+            authors=row[3],
+            abstract=row[4],
+            primary_category=row[5].split(".")[0],
+            categories=row[5],
+            published_at=row[6],
+            updated_at=row[7],
+            url_abs=row[8],
+            url_pdf=row[9],
+        )
+
 
 class SummaryEntity(BaseModel):
     """Summary database entity model."""
@@ -77,6 +95,26 @@ class SummaryEntity(BaseModel):
             raise ValueError(f"Invalid language. Must be one of: {valid_languages}")
         return v
 
+    @classmethod
+    def from_tuple(cls, row: tuple[Any, ...]) -> "SummaryEntity":
+        """Create SummaryEntity from database tuple row."""
+        return cls(
+            summary_id=row[0],
+            paper_id=row[1],
+            version=row[2],
+            overview=row[3],
+            motivation=row[4],
+            method=row[5],
+            result=row[6],
+            conclusion=row[7],
+            language=row[8],
+            interests=row[9],
+            relevance=row[10],
+            model=row[11],
+            is_read=bool(row[12]),
+            created_at=row[13],
+        )
+
 
 class UserEntity(BaseModel):
     """User database entity model."""
@@ -92,6 +130,15 @@ class UserEntity(BaseModel):
         if "@" not in v or "." not in v:
             raise ValueError("Invalid email format")
         return v.lower()
+
+    @classmethod
+    def from_tuple(cls, row: tuple[Any, ...]) -> "UserEntity":
+        """Create UserEntity from database tuple row."""
+        return cls(
+            user_id=row[0],
+            email=row[1],
+            display_name=row[2],
+        )
 
 
 class UserInterestEntity(BaseModel):
@@ -111,6 +158,16 @@ class UserInterestEntity(BaseModel):
             raise ValueError(f"Invalid kind. Must be one of: {valid_kinds}")
         return v
 
+    @classmethod
+    def from_tuple(cls, row: tuple[Any, ...]) -> "UserInterestEntity":
+        """Create UserInterestEntity from database tuple row."""
+        return cls(
+            user_id=row[0],
+            kind=row[1],
+            value=row[2],
+            weight=row[3],
+        )
+
 
 class UserStarEntity(BaseModel):
     """User star/bookmark database entity model."""
@@ -119,6 +176,16 @@ class UserStarEntity(BaseModel):
     paper_id: int = Field(..., gt=0)
     note: str | None = None
     created_at: str | None = None
+
+    @classmethod
+    def from_tuple(cls, row: tuple[Any, ...]) -> "UserStarEntity":
+        """Create UserStarEntity from database tuple row."""
+        return cls(
+            user_id=row[0],
+            paper_id=row[1],
+            note=row[2],
+            created_at=row[3],
+        )
 
 
 class FeedItem(BaseModel):
@@ -141,6 +208,18 @@ class FeedItem(BaseModel):
         except ValueError:
             raise ValueError("Invalid date format. Use YYYY-MM-DD")
 
+    @classmethod
+    def from_tuple(cls, row: tuple[Any, ...]) -> "FeedItem":
+        """Create FeedItem from database tuple row."""
+        return cls(
+            feed_item_id=row[0],
+            user_id=row[1],
+            paper_id=row[2],
+            score=row[3],
+            feed_date=row[4],
+            created_at=row[5],
+        )
+
 
 class CrawlEvent(BaseModel):
     """Crawl event database entity model."""
@@ -161,3 +240,14 @@ class CrawlEvent(BaseModel):
         if v not in valid_types:
             raise ValueError(f"Invalid event type. Must be one of: {valid_types}")
         return v
+
+    @classmethod
+    def from_tuple(cls, row: tuple[Any, ...]) -> "CrawlEvent":
+        """Create CrawlEvent from database tuple row."""
+        return cls(
+            event_id=row[0],
+            arxiv_id=row[1],
+            event_type=row[2],
+            detail=row[3],
+            created_at=row[4],
+        )

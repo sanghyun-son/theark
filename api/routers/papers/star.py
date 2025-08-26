@@ -2,7 +2,8 @@
 
 from fastapi import APIRouter, Query
 
-from api.dependencies import CurrentUser, DBManager, PaperServiceDep
+from api.dependencies import CurrentUser, DBManager
+from api.services.paper_service import PaperService
 from api.utils.error_handler import handle_async_api_operation
 from core.models.api.requests import StarRequest
 from core.models.api.responses import StarredPapersResponse, StarResponse
@@ -12,7 +13,6 @@ router = APIRouter()
 
 @router.post("/{paper_id}/star", response_model=StarResponse)
 async def add_star(
-    paper_service: PaperServiceDep,
     paper_id: int,
     star_data: StarRequest,
     db_manager: DBManager,
@@ -33,6 +33,7 @@ async def add_star(
     """
 
     async def add_star_operation() -> StarResponse:
+        paper_service = PaperService()
         return await paper_service.add_star(
             paper_id, db_manager, current_user, star_data.note
         )
@@ -46,7 +47,6 @@ async def add_star(
 
 @router.get("/starred/", response_model=StarredPapersResponse)
 async def get_starred_papers(
-    paper_service: PaperServiceDep,
     db_manager: DBManager,
     current_user: CurrentUser,
     limit: int = Query(
@@ -69,6 +69,7 @@ async def get_starred_papers(
     """
 
     async def get_starred_papers_operation() -> StarredPapersResponse:
+        paper_service = PaperService()
         return await paper_service.get_starred_papers(
             db_manager, current_user, limit=limit, offset=offset
         )
@@ -80,7 +81,6 @@ async def get_starred_papers(
 
 @router.delete("/{paper_id}/star", response_model=StarResponse)
 async def remove_star(
-    paper_service: PaperServiceDep,
     paper_id: int,
     db_manager: DBManager,
     current_user: CurrentUser,
@@ -99,6 +99,7 @@ async def remove_star(
     """
 
     async def remove_star_operation() -> StarResponse:
+        paper_service = PaperService()
         return await paper_service.remove_star(paper_id, db_manager, current_user)
 
     return await handle_async_api_operation(
@@ -110,7 +111,6 @@ async def remove_star(
 
 @router.get("/{paper_id}/star", response_model=StarResponse)
 async def get_star_status(
-    paper_service: PaperServiceDep,
     paper_id: int,
     db_manager: DBManager,
     current_user: CurrentUser,
@@ -129,6 +129,7 @@ async def get_star_status(
     """
 
     async def get_star_status_operation() -> StarResponse:
+        paper_service = PaperService()
         return await paper_service.is_paper_starred(paper_id, db_manager, current_user)
 
     return await handle_async_api_operation(

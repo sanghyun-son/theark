@@ -7,6 +7,7 @@ from fastapi import APIRouter, HTTPException, Request, status
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from pydantic import BaseModel
 
+from api.literals import HEALTH_ENDPOINT, HTML_HEADERS, HTTPStatus
 from core import get_logger
 from core.config import load_settings
 from core.models import AuthError
@@ -34,7 +35,7 @@ async def root() -> HTMLResponse:
     return HTMLResponse(content=html_content)
 
 
-@router.get("/health", response_model=HealthResponse)
+@router.get(HEALTH_ENDPOINT, response_model=HealthResponse)
 async def health_check() -> HealthResponse:
     """Health check endpoint."""
     current_settings = load_settings()
@@ -94,8 +95,8 @@ async def favicon() -> HTMLResponse | FileResponse:
         placeholder_content = "<!-- Placeholder favicon -->"
         return HTMLResponse(
             content=placeholder_content,
-            status_code=200,
-            headers={"Content-Type": "text/html"},
+            status_code=HTTPStatus.OK,
+            headers=HTML_HEADERS,
         )
 
 

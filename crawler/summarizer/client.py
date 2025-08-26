@@ -2,7 +2,7 @@
 
 from abc import ABC, abstractmethod
 
-from crawler.database.llm_sqlite_manager import LLMSQLiteManager
+from core.database.interfaces import DatabaseManager
 
 from .summarizer import SummaryRequest, SummaryResponse
 
@@ -24,7 +24,9 @@ class SummaryClient(ABC):
 
     @abstractmethod
     async def summarize(
-        self, request: SummaryRequest, db_manager: LLMSQLiteManager
+        self,
+        request: SummaryRequest,
+        db_manager: DatabaseManager,
     ) -> SummaryResponse:
         """Summarize content using the client."""
         pass

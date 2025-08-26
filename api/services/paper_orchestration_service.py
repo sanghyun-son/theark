@@ -6,6 +6,8 @@ from typing import AsyncGenerator
 from api.services.paper_creation_service import PaperCreationService
 from api.services.paper_summarization_service import PaperSummarizationService
 from core import get_logger
+from core.database.interfaces import DatabaseManager
+from core.database.repository import SummaryRepository
 from core.models import PaperCreateRequest as PaperCreate
 from core.models import PaperResponse
 from core.models.api.streaming import (
@@ -14,10 +16,6 @@ from core.models.api.streaming import (
     StreamingStatusEvent,
 )
 from core.models.database.entities import PaperEntity
-from crawler.arxiv.client import ArxivClient
-from crawler.database.llm_sqlite_manager import LLMSQLiteManager
-from crawler.database.repository import SummaryRepository
-from crawler.database.sqlite_manager import SQLiteManager
 from crawler.summarizer.client import SummaryClient
 
 logger = get_logger(__name__)
@@ -34,41 +32,37 @@ class PaperOrchestrationService:
     async def create_paper_normal(
         self,
         paper_data: PaperCreate,
-        db_manager: SQLiteManager,
-        llm_db_manager: LLMSQLiteManager,
-        arxiv_client: ArxivClient,
+        db_manager: DatabaseManager,
         summary_client: SummaryClient,
     ) -> PaperResponse:
         """Create paper with background summarization."""
-        paper = await self.creation_service.create_paper(
-            paper_data, db_manager, arxiv_client
-        )
-        self.summarization_service.start_background_summarization(
-            paper,
-            db_manager,
-            llm_db_manager,
-            summary_client,
-            language=paper_data.summary_language,
-        )
+        paper = await self.creation_service.create_paper(paper_data, db_manager)
+
+        # Only start background summarization if not skipped
+        if not getattr(paper_data, "skip_auto_summarization", False):
+            self.summarization_service.start_background_summarization(
+                paper,
+                db_manager,
+                summary_client,
+                language=paper_data.summary_language,
+            )
+
         return PaperResponse.from_crawler_paper(paper, None)
 
     async def create_paper_streaming(
         self,
         paper_data: PaperCreate,
-        db_manager: SQLiteManager,
-        arxiv_client: ArxivClient,
+        db_manager: DatabaseManager,
     ) -> PaperResponse:
         """Create paper without background summarization (for streaming)."""
-        paper = await self.creation_service.create_paper(
-            paper_data, db_manager, arxiv_client
-        )
+        paper = await self.creation_service.create_paper(paper_data, db_manager)
         return PaperResponse.from_crawler_paper(paper, None)
 
     async def get_paper(
-        self, paper_identifier: str, db_manager: SQLiteManager
+        self, paper_identifier: str, db_manager: DatabaseManager
     ) -> PaperResponse:
         """Get a paper by ID or arXiv ID."""
-        paper = self.creation_service.get_paper_by_identifier(
+        paper = await self.creation_service.get_paper_by_identifier(
             paper_identifier, db_manager
         )
         if not paper:
@@ -79,14 +73,13 @@ class PaperOrchestrationService:
     async def summarize_paper(
         self,
         paper_identifier: str,
-        db_manager: SQLiteManager,
-        llm_db_manager: LLMSQLiteManager,
+        db_manager: DatabaseManager,
         summary_client: SummaryClient,
         force_resummarize: bool = False,
         language: str = "Korean",
     ) -> None:
         """Summarize a paper synchronously."""
-        paper = self.creation_service.get_paper_by_identifier(
+        paper = await self.creation_service.get_paper_by_identifier(
             paper_identifier, db_manager
         )
         if not paper:
@@ -95,7 +88,6 @@ class PaperOrchestrationService:
         await self.summarization_service.summarize_paper(
             paper,
             db_manager,
-            llm_db_manager,
             summary_client,
             force_resummarize,
             language,
@@ -104,9 +96,7 @@ class PaperOrchestrationService:
     async def stream_paper_creation(
         self,
         paper_data: PaperCreate,
-        db_manager: SQLiteManager,
-        llm_db_manager: LLMSQLiteManager,
-        arxiv_client: ArxivClient,
+        db_manager: DatabaseManager,
         summary_client: SummaryClient,
     ) -> AsyncGenerator[str, None]:
         """Stream paper creation and immediate summarization process.
@@ -117,9 +107,7 @@ class PaperOrchestrationService:
             yield self._create_event(StreamingStatusEvent(message="Creating paper..."))
             logger.info(f"Creating paper: {paper_data.url}")
 
-            paper_response = await self.create_paper_streaming(
-                paper_data, db_manager, arxiv_client
-            )
+            paper_response = await self.create_paper_streaming(paper_data, db_manager)
             yield self._create_event(StreamingCompleteEvent(paper=paper_response))
             logger.info(f"Paper created successfully: {paper_response.arxiv_id}")
 
@@ -130,7 +118,7 @@ class PaperOrchestrationService:
                 f"{getattr(db_manager, 'connection', 'No connection attr')}"
             )
 
-            paper = self.creation_service.get_paper_by_identifier(
+            paper = await self.creation_service.get_paper_by_identifier(
                 paper_response.arxiv_id, db_manager
             )
             if not paper:
@@ -140,20 +128,10 @@ class PaperOrchestrationService:
                 logger.error(f"Paper is not created: {paper_response.arxiv_id}")
                 return
 
-            logger.debug(f"Starting immediate summarization for paper {paper.arxiv_id}")
-            logger.debug(
-                f"LLM db_manager type before summarization: {type(llm_db_manager)}"
-            )
-            logger.debug(
-                f"LLM db_manager connection before summarization: "
-                f"{getattr(llm_db_manager, 'connection', 'No connection attr')}"
-            )
-
             async for event in self._stream_immediate_summarization(
                 paper,
                 paper_response,
                 db_manager,
-                llm_db_manager,
                 paper_data.summary_language,
                 summary_client,
             ):
@@ -167,8 +145,7 @@ class PaperOrchestrationService:
         self,
         paper: PaperEntity,
         paper_response: PaperResponse,
-        db_manager: SQLiteManager,
-        llm_db_manager: LLMSQLiteManager,
+        db_manager: DatabaseManager,
         language: str,
         summary_client: SummaryClient,
     ) -> AsyncGenerator[str, None]:
@@ -182,7 +159,6 @@ class PaperOrchestrationService:
             await self.summarization_service.summarize_paper(
                 paper,
                 db_manager,
-                llm_db_manager,
                 summary_client,
                 force_resummarize=False,
                 language=language,
@@ -192,7 +168,7 @@ class PaperOrchestrationService:
             summary_repo = SummaryRepository(db_manager)
             summary = None
             if paper.paper_id is not None:
-                summary = summary_repo.get_by_paper_and_language(
+                summary = await summary_repo.get_by_paper_and_language(
                     paper.paper_id, language
                 )
             updated_paper = PaperResponse.from_crawler_paper(paper, summary)

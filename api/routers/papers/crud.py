@@ -3,13 +3,11 @@
 from fastapi import APIRouter, Query
 
 from api.dependencies import (
-    ArxivClientDep,
     CurrentUser,
     DBManager,
-    LLMDBManager,
-    PaperServiceDep,
     SummaryClientDep,
 )
+from api.services.paper_service import PaperService
 from api.utils.error_handler import handle_async_api_operation
 from core.models import PaperCreateRequest as PaperCreate
 from core.models import (
@@ -23,7 +21,6 @@ router = APIRouter()
 
 @router.get("/", response_model=PaperListResponse)
 async def get_papers(
-    paper_service: PaperServiceDep,
     db_manager: DBManager,
     current_user: CurrentUser,
     limit: int = Query(
@@ -47,8 +44,13 @@ async def get_papers(
     """
 
     async def get_papers_operation() -> PaperListResponse:
+        paper_service = PaperService()
         return await paper_service.get_papers(
-            db_manager, current_user, limit=limit, offset=offset, language=language
+            db_manager,
+            current_user,
+            limit=limit,
+            offset=offset,
+            language=language,
         )
 
     return await handle_async_api_operation(
@@ -58,11 +60,8 @@ async def get_papers(
 
 @router.post("/", response_model=PaperResponse, status_code=201)
 async def create_paper(
-    paper_service: PaperServiceDep,
     paper_data: PaperCreate,
     db_manager: DBManager,
-    llm_db_manager: LLMDBManager,
-    arxiv_client: ArxivClientDep,
     summary_client: SummaryClientDep,
 ) -> PaperResponse:
     """Create a new paper.
@@ -78,9 +77,8 @@ async def create_paper(
     """
 
     async def create_paper_operation() -> PaperResponse:
-        return await paper_service.create_paper(
-            paper_data, db_manager, llm_db_manager, arxiv_client, summary_client
-        )
+        paper_service = PaperService()
+        return await paper_service.create_paper(paper_data, db_manager, summary_client)
 
     return await handle_async_api_operation(
         create_paper_operation, error_message="Failed to create paper"
@@ -93,7 +91,7 @@ async def create_paper(
     operation_id="delete_paper_by_identifier",
 )
 async def delete_paper(
-    paper_service: PaperServiceDep, paper_identifier: str, db_manager: DBManager
+    paper_identifier: str, db_manager: DBManager
 ) -> PaperDeleteResponse:
     """Delete a paper by ID or arXiv ID.
 
@@ -108,6 +106,7 @@ async def delete_paper(
     """
 
     async def delete_paper_operation() -> PaperDeleteResponse:
+        paper_service = PaperService()
         return await paper_service.delete_paper(paper_identifier, db_manager)
 
     return await handle_async_api_operation(
@@ -119,10 +118,8 @@ async def delete_paper(
 
 @router.get("/{paper_identifier}", response_model=PaperResponse)
 async def get_paper(
-    paper_service: PaperServiceDep,
     paper_identifier: str,
     db_manager: DBManager,
-    llm_db_manager: LLMDBManager,
 ) -> PaperResponse:
     """Get a paper by ID or arXiv ID.
 
@@ -137,9 +134,8 @@ async def get_paper(
     """
 
     async def get_paper_operation() -> PaperResponse:
-        return await paper_service.get_paper(
-            paper_identifier, db_manager, llm_db_manager
-        )
+        paper_service = PaperService()
+        return await paper_service.get_paper(paper_identifier, db_manager)
 
     return await handle_async_api_operation(
         get_paper_operation,
