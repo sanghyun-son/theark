@@ -6,7 +6,6 @@ from api.dependencies import (
     ArxivClientDep,
     CurrentUser,
     DBManager,
-    LLMDBManager,
     PaperServiceDep,
     SummaryClientDep,
 )
@@ -61,7 +60,6 @@ async def create_paper(
     paper_service: PaperServiceDep,
     paper_data: PaperCreate,
     db_manager: DBManager,
-    llm_db_manager: LLMDBManager,
     arxiv_client: ArxivClientDep,
     summary_client: SummaryClientDep,
 ) -> PaperResponse:
@@ -79,7 +77,7 @@ async def create_paper(
 
     async def create_paper_operation() -> PaperResponse:
         return await paper_service.create_paper(
-            paper_data, db_manager, llm_db_manager, arxiv_client, summary_client
+            paper_data, db_manager, arxiv_client, summary_client
         )
 
     return await handle_async_api_operation(
@@ -122,7 +120,6 @@ async def get_paper(
     paper_service: PaperServiceDep,
     paper_identifier: str,
     db_manager: DBManager,
-    llm_db_manager: LLMDBManager,
 ) -> PaperResponse:
     """Get a paper by ID or arXiv ID.
 
@@ -137,9 +134,7 @@ async def get_paper(
     """
 
     async def get_paper_operation() -> PaperResponse:
-        return await paper_service.get_paper(
-            paper_identifier, db_manager, llm_db_manager
-        )
+        return await paper_service.get_paper(paper_identifier, db_manager)
 
     return await handle_async_api_operation(
         get_paper_operation,

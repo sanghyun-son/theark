@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 """Demonstration of the arXiv crawler database system."""
 
-from core.log import get_logger, setup_test_logging
-from crawler.database import (
+from core.database import (
     AppUser,
     CrawlEvent,
     CrawlEventRepository,
@@ -18,6 +17,7 @@ from crawler.database import (
     UserStar,
     setup_database_environment,
 )
+from core.log import get_logger, setup_test_logging
 
 
 def main() -> None:
@@ -34,43 +34,46 @@ def main() -> None:
 
     try:
         # Initialize database
-        with SQLiteManager(db_path) as db_manager:
-            logger.info("Database initialized successfully")
+        import asyncio
 
-            # Create tables
-            db_manager.create_tables()
-            logger.info("Database tables created")
+        async def run_demo():
+            async with SQLiteManager(db_path) as db_manager:
+                logger.info("Database initialized successfully")
 
-            # Create repositories
-            paper_repo = PaperRepository(db_manager)
-            summary_repo = SummaryRepository(db_manager)
-            user_repo = UserRepository(db_manager)
-            feed_repo = FeedRepository(db_manager)
-            event_repo = CrawlEventRepository(db_manager)
+                # Create tables
+                await db_manager.create_tables()
+                logger.info("Database tables created")
 
-            # Demo 1: Paper operations
-            logger.info("=== Demo 1: Paper Operations ===")
+                # Create repositories
+                paper_repo = PaperRepository(db_manager)
+                summary_repo = SummaryRepository(db_manager)
+                user_repo = UserRepository(db_manager)
+                feed_repo = FeedRepository(db_manager)
+                event_repo = CrawlEventRepository(db_manager)
 
-            # Create a paper
-            paper = Paper(
-                arxiv_id="2101.00099",
-                title="Attention Is All You Need (Demo)",
-                abstract="The dominant sequence transduction models are based on complex recurrent or convolutional neural networks...",
-                primary_category="cs.CL",
-                categories="cs.CL,cs.LG",
-                authors="Ashish Vaswani;Noam Shazeer;Niki Parmar",
-                url_abs="https://arxiv.org/abs/2101.00001",
-                url_pdf="https://arxiv.org/pdf/2101.00001",
-                published_at="2021-01-01T00:00:00Z",
-                updated_at="2021-01-01T00:00:00Z",
-            )
+                # Demo 1: Paper operations
+                logger.info("=== Demo 1: Paper Operations ===")
 
-            paper_id = paper_repo.create(paper)
-            logger.info(f"Created paper with ID: {paper_id}")
+                # Create a paper
+                paper = Paper(
+                    arxiv_id="2101.00099",
+                    title="Attention Is All You Need (Demo)",
+                    abstract="The dominant sequence transduction models are based on complex recurrent or convolutional neural networks...",
+                    primary_category="cs.CL",
+                    categories="cs.CL,cs.LG",
+                    authors="Ashish Vaswani;Noam Shazeer;Niki Parmar",
+                    url_abs="https://arxiv.org/abs/2101.00001",
+                    url_pdf="https://arxiv.org/pdf/2101.00001",
+                    published_at="2021-01-01T00:00:00Z",
+                    updated_at="2021-01-01T00:00:00Z",
+                )
 
-            # Retrieve the paper
-            retrieved_paper = paper_repo.get_by_arxiv_id("2101.00099")
-            logger.info(f"Retrieved paper: {retrieved_paper.title}")
+                paper_id = await paper_repo.create(paper)
+                logger.info(f"Created paper with ID: {paper_id}")
+
+                # Retrieve the paper
+                retrieved_paper = await paper_repo.get_by_arxiv_id("2101.00099")
+                logger.info(f"Retrieved paper: {retrieved_paper.title}")
 
             # Demo 2: Summary operations
             logger.info("=== Demo 2: Summary Operations ===")
@@ -240,6 +243,9 @@ def main() -> None:
                 )
 
                 logger.info("Database demonstration completed successfully")
+
+        # Run the async demo
+        asyncio.run(run_demo())
 
     except Exception as e:
         logger.error(f"Error during demonstration: {e}")

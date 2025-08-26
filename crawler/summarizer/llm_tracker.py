@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import Dict
 
 from core import get_logger
-from core.database.llm_sqlite_manager import LLMSQLiteManager
+from core.database.interfaces import DatabaseManager
 from core.models import LLMRequest
 
 logger = get_logger(__name__)
@@ -22,10 +22,10 @@ class LLMTracker:
         """
         self.custom_id = custom_id
 
-    def start_request(
+    async def start_request(
         self,
         model: str,
-        db_manager: LLMSQLiteManager,
+        db_manager: DatabaseManager,
         provider: str = "openai",
         endpoint: str = "/v1/chat/completions",
         is_batched: bool = False,
@@ -46,11 +46,6 @@ class LLMTracker:
         Returns:
             Request ID for tracking
         """
-        # Ensure database is connected
-        if hasattr(db_manager, "connection") and db_manager.connection is None:
-            logger.debug("LLM database connection lost, attempting to reconnect")
-            db_manager.connect()
-
         request = LLMRequest(
             timestamp=datetime.now().isoformat(),
             model=model,
@@ -63,14 +58,17 @@ class LLMTracker:
             metadata=metadata,
         )
 
-        request_id = db_manager.repository.create(request)
+        from core.database.repository.llm import LLMRequestRepository
+
+        llm_repo = LLMRequestRepository(db_manager)
+        request_id = await llm_repo.create(request)
         logger.debug(f"Started tracking LLM request {request_id}")
         return int(request_id)
 
-    def complete_request(
+    async def complete_request(
         self,
         request_id: int,
-        db_manager: LLMSQLiteManager,
+        db_manager: DatabaseManager,
         success: bool,
         response_time_ms: int,
         tokens: Dict[str, int] | None = None,
@@ -90,14 +88,12 @@ class LLMTracker:
             http_status_code: HTTP status code
             estimated_cost_usd: Estimated cost in USD
         """
-        # Ensure database is connected
-        if hasattr(db_manager, "connection") and db_manager.connection is None:
-            logger.debug("LLM database connection lost, attempting to reconnect")
-            db_manager.connect()
-
         status = "success" if success else "error"
 
-        db_manager.repository.update_status(
+        from core.database.repository.llm import LLMRequestRepository
+
+        llm_repo = LLMRequestRepository(db_manager)
+        await llm_repo.update_status(
             request_id=request_id,
             status=status,
             response_time_ms=response_time_ms,
@@ -123,6 +119,7 @@ class LLMRequestContext:
     def __init__(
         self,
         model: str,
+        db_manager: DatabaseManager,
         custom_id: str | None = None,
         provider: str = "openai",
         endpoint: str = "/v1/chat/completions",
@@ -134,6 +131,7 @@ class LLMRequestContext:
 
         Args:
             model: Model name
+            db_manager: Database manager for tracking
             custom_id: Custom ID for tracking
             provider: Provider name
             endpoint: API endpoint
@@ -148,17 +146,14 @@ class LLMRequestContext:
         self.is_batched = is_batched
         self.request_type = request_type
         self.metadata = metadata
+        self.db_manager = db_manager
         self.request_id: int | None = None
         self.start_time: float | None = None
-        self.db_manager: LLMSQLiteManager | None = None
 
-    def __enter__(self) -> "LLMRequestContext":
-        """Enter context manager."""
-        if self.db_manager is None:
-            raise ValueError("db_manager must be set before entering context")
-
+    async def __aenter__(self) -> "LLMRequestContext":
+        """Enter async context manager."""
         self.start_time = time.time()
-        self.request_id = self.tracker.start_request(
+        self.request_id = await self.tracker.start_request(
             model=self.model,
             db_manager=self.db_manager,
             provider=self.provider,
@@ -169,18 +164,14 @@ class LLMRequestContext:
         )
         return self
 
-    def __exit__(
+    async def __aexit__(
         self,
         exc_type: type[BaseException] | None,
         exc_val: BaseException | None,
         exc_tb: object,
     ) -> None:
         """Exit context manager."""
-        if (
-            self.request_id is None
-            or self.start_time is None
-            or self.db_manager is None
-        ):
+        if self.request_id is None or self.start_time is None:
             return
 
         end_time = time.time()
@@ -189,7 +180,8 @@ class LLMRequestContext:
         success = exc_type is None
         error_message = str(exc_val) if exc_val else None
 
-        self.tracker.complete_request(
+        # Since this is now an async context manager, we can directly await
+        await self.tracker.complete_request(
             request_id=self.request_id,
             db_manager=self.db_manager,
             success=success,
@@ -197,8 +189,8 @@ class LLMRequestContext:
             error_message=error_message,
         )
 
-    def update_tokens(
-        self, tokens: Dict[str, int], db_manager: LLMSQLiteManager
+    async def update_tokens(
+        self, tokens: Dict[str, int], db_manager: DatabaseManager
     ) -> None:
         """Update token usage for the request.
 
@@ -219,15 +211,18 @@ class LLMRequestContext:
                 )
                 estimated_cost = temp_request.calculate_cost()
 
-            db_manager.repository.update_status(
+            from core.database.repository.llm import LLMRequestRepository
+
+            llm_repo = LLMRequestRepository(db_manager)
+            await llm_repo.update_status(
                 request_id=self.request_id,
                 status="success",  # Keep current status
                 tokens=tokens,
                 estimated_cost_usd=estimated_cost,
             )
 
-    def update_http_status(
-        self, status_code: int, db_manager: LLMSQLiteManager
+    async def update_http_status(
+        self, status_code: int, db_manager: DatabaseManager
     ) -> None:
         """Update HTTP status code for the request.
 
@@ -236,8 +231,14 @@ class LLMRequestContext:
             db_manager: LLM database manager instance
         """
         if self.request_id is not None:
-            db_manager.repository.update_status(
+            from core.database.repository.llm import LLMRequestRepository
+
+            # Ensure status is a string, not a coroutine
+            status = "success" if 200 <= status_code < 300 else "error"
+
+            llm_repo = LLMRequestRepository(db_manager)
+            await llm_repo.update_status(
                 request_id=self.request_id,
-                status="success" if 200 <= status_code < 300 else "error",
+                status=status,
                 http_status_code=status_code,
             )

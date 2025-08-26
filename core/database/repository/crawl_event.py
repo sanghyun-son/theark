@@ -1,9 +1,8 @@
 """Repository for crawl event operations."""
 
-from typing import Any
-
-from core.database.base import DatabaseManager
+from core.database.interfaces import DatabaseManager
 from core.models import CrawlEvent
+from core.types import RepositoryRowType
 
 
 class CrawlEventRepository:
@@ -13,24 +12,21 @@ class CrawlEventRepository:
         """Initialize repository with database manager."""
         self.db = db_manager
 
-    def _row_to_crawl_event(self, row: tuple[Any, ...]) -> CrawlEvent:
+    def _row_to_crawl_event(self, row: RepositoryRowType) -> CrawlEvent:
         """Convert database row to CrawlEvent model.
 
         Args:
-            row: Database row tuple
+            row: Database row tuple or dict
 
         Returns:
             CrawlEvent model instance
         """
-        return CrawlEvent(
-            event_id=row[0],
-            arxiv_id=row[1],
-            event_type=row[2],
-            detail=row[3],
-            created_at=row[4],
-        )
+        if isinstance(row, dict):
+            return CrawlEvent.model_validate(row)
 
-    def log_event(self, event: CrawlEvent) -> int:
+        return CrawlEvent.from_tuple(row)
+
+    async def log_event(self, event: CrawlEvent) -> int:
         """Log a crawl event.
 
         Args:
@@ -45,10 +41,10 @@ class CrawlEventRepository:
         """
         params = (event.arxiv_id, event.event_type, event.detail)
 
-        cursor = self.db.execute(query, params)
+        cursor = await self.db.execute(query, params)
         return cursor.lastrowid  # type: ignore
 
-    def get_recent_events(self, limit: int = 100) -> list[CrawlEvent]:
+    async def get_recent_events(self, limit: int = 100) -> list[CrawlEvent]:
         """Get recent crawl events.
 
         Args:
@@ -63,7 +59,7 @@ class CrawlEventRepository:
         LIMIT ?
         """
 
-        rows = self.db.fetch_all(query, (limit,))
+        rows = await self.db.fetch_all(query, (limit,))
         events = []
 
         for row in rows:

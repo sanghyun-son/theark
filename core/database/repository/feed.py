@@ -1,9 +1,8 @@
 """Repository for feed operations."""
 
-from typing import Any
-
-from core.database.base import DatabaseManager
+from core.database.interfaces import DatabaseManager
 from core.models import FeedItem
+from core.types import RepositoryRowType
 
 
 class FeedRepository:
@@ -13,25 +12,21 @@ class FeedRepository:
         """Initialize repository with database manager."""
         self.db = db_manager
 
-    def _row_to_feed_item(self, row: tuple[Any, ...]) -> FeedItem:
+    def _row_to_feed_item(self, row: RepositoryRowType) -> FeedItem:
         """Convert database row to FeedItem model.
 
         Args:
-            row: Database row tuple
+            row: Database row tuple or dict
 
         Returns:
             FeedItem model instance
         """
-        return FeedItem(
-            feed_item_id=row[0],
-            user_id=row[1],
-            paper_id=row[2],
-            score=row[3],
-            feed_date=row[4],
-            created_at=row[5],
-        )
+        if isinstance(row, dict):
+            return FeedItem.model_validate(row)
 
-    def add_feed_item(self, feed_item: FeedItem) -> int:
+        return FeedItem.from_tuple(row)
+
+    async def add_feed_item(self, feed_item: FeedItem) -> int:
         """Add a feed item.
 
         Args:
@@ -51,10 +46,10 @@ class FeedRepository:
             feed_item.feed_date,
         )
 
-        cursor = self.db.execute(query, params)
+        cursor = await self.db.execute(query, params)
         return cursor.lastrowid  # type: ignore
 
-    def get_user_feed(
+    async def get_user_feed(
         self, user_id: int, feed_date: str, limit: int = 50
     ) -> list[FeedItem]:
         """Get feed items for a user on a specific date.
@@ -74,7 +69,7 @@ class FeedRepository:
         LIMIT ?
         """
 
-        rows = self.db.fetch_all(query, (user_id, feed_date, limit))
+        rows = await self.db.fetch_all(query, (user_id, feed_date, limit))
         feed_items = []
 
         for row in rows:

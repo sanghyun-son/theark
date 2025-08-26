@@ -4,9 +4,8 @@ import pytest
 
 from api.services.paper_summarization_service import PaperSummarizationService
 from core.models.database.entities import PaperEntity, SummaryEntity
-from core.database.llm_sqlite_manager import LLMSQLiteManager
-from core.database.sqlite_manager import SQLiteManager
-from core.database.repository import PaperRepository
+from core.database.interfaces import DatabaseManager
+from core.database.repository import PaperRepository, SummaryRepository
 from crawler.summarizer.client import SummaryClient
 
 
@@ -29,95 +28,118 @@ def mock_paper() -> PaperEntity:
 
 
 @pytest.fixture
-def saved_paper(mock_paper: PaperEntity, mock_sqlite_db: SQLiteManager) -> PaperEntity:
+async def saved_paper(
+    mock_paper: PaperEntity, mock_db_manager: DatabaseManager
+) -> PaperEntity:
     """Create and save a paper to the database."""
-    paper_repo = PaperRepository(mock_sqlite_db)
-    paper_id = paper_repo.create(mock_paper)
+    paper_repo = PaperRepository(mock_db_manager)
+    paper_id = await paper_repo.create(mock_paper)
     mock_paper.paper_id = paper_id
     return mock_paper
 
 
 @pytest.mark.asyncio
 async def test_summarize_paper_success(
-    saved_paper: PaperEntity,
-    mock_sqlite_db: SQLiteManager,
-    mock_llm_sqlite_db: LLMSQLiteManager,
+    mock_paper: PaperEntity,
+    mock_db_manager: DatabaseManager,
     mock_summary_client: SummaryClient,
 ) -> None:
     """Test successful paper summarization."""
     service = PaperSummarizationService()
+
+    # Save paper to database first
+    paper_repo = PaperRepository(mock_db_manager)
+    paper_id = await paper_repo.create(mock_paper)
+    paper = mock_paper
+    paper.paper_id = paper_id
+
     await service.summarize_paper(
-        saved_paper,
-        mock_sqlite_db,
-        mock_llm_sqlite_db,
+        paper,
+        mock_db_manager,
         mock_summary_client,
     )
-    summary = service.get_paper_summary(saved_paper, mock_sqlite_db)
+
+    # Debug: Check what's in the database
+    summary_repo = SummaryRepository(mock_db_manager)
+    all_summaries = await summary_repo.get_by_paper_id(paper.paper_id)
+    print(f"Found {len(all_summaries)} summaries for paper {paper.paper_id}")
+    for s in all_summaries:
+        print(f"Summary: {s.summary_id}, language: {s.language}")
+
+    summary = await service.get_paper_summary(paper, mock_db_manager)
     assert summary is not None
 
 
 @pytest.mark.asyncio
 async def test_summarize_paper_existing_summary(
-    saved_paper: PaperEntity,
-    mock_sqlite_db: SQLiteManager,
-    mock_llm_sqlite_db: LLMSQLiteManager,
+    mock_paper: PaperEntity,
+    mock_db_manager: DatabaseManager,
     mock_summary_client: SummaryClient,
 ) -> None:
     """Test summarization when summary already exists."""
     service = PaperSummarizationService()
+
+    # Save paper to database first
+    paper_repo = PaperRepository(mock_db_manager)
+    paper_id = await paper_repo.create(mock_paper)
+    paper = mock_paper
+    paper.paper_id = paper_id
+
     # First, create a summary
     await service.summarize_paper(
-        saved_paper,
-        mock_sqlite_db,
-        mock_llm_sqlite_db,
+        paper,
+        mock_db_manager,
         mock_summary_client,
     )
 
     # Then try to summarize again - should not create a new summary
     await service.summarize_paper(
-        saved_paper,
-        mock_sqlite_db,
-        mock_llm_sqlite_db,
+        paper,
+        mock_db_manager,
         mock_summary_client,
     )
 
     # Verify only one summary exists
-    summary = service.get_paper_summary(saved_paper, mock_sqlite_db)
+    summary = await service.get_paper_summary(paper, mock_db_manager)
     assert summary is not None
 
 
 @pytest.mark.asyncio
 async def test_summarize_paper_force_resummarize(
-    saved_paper: PaperEntity,
-    mock_sqlite_db: SQLiteManager,
-    mock_llm_sqlite_db: LLMSQLiteManager,
+    mock_paper: PaperEntity,
+    mock_db_manager: DatabaseManager,
     mock_summary_client: SummaryClient,
 ) -> None:
     """Test summarization with force_resummarize=True."""
     service = PaperSummarizationService()
+
+    # Save paper to database first
+    paper_repo = PaperRepository(mock_db_manager)
+    paper_id = await paper_repo.create(mock_paper)
+    paper = mock_paper
+    paper.paper_id = paper_id
+
     # First, create a summary
     await service.summarize_paper(
-        saved_paper,
-        mock_sqlite_db,
-        mock_llm_sqlite_db,
+        paper,
+        mock_db_manager,
         mock_summary_client,
     )
 
     # Get the first summary
-    first_summary = service.get_paper_summary(saved_paper, mock_sqlite_db)
+    first_summary = await service.get_paper_summary(paper, mock_db_manager)
     assert first_summary is not None
 
     # Then force resummarize
     await service.summarize_paper(
-        saved_paper,
-        mock_sqlite_db,
-        mock_llm_sqlite_db,
+        paper,
+        mock_db_manager,
         mock_summary_client,
         force_resummarize=True,
     )
 
     # Get the updated summary
-    updated_summary = service.get_paper_summary(saved_paper, mock_sqlite_db)
+    updated_summary = await service.get_paper_summary(paper, mock_db_manager)
     assert updated_summary is not None
     # The summary should be updated (same summary_id since we're overwriting)
     assert updated_summary.summary_id == first_summary.summary_id
@@ -125,51 +147,61 @@ async def test_summarize_paper_force_resummarize(
 
 @pytest.mark.asyncio
 async def test_get_paper_summary_success(
-    saved_paper: PaperEntity,
-    mock_sqlite_db: SQLiteManager,
-    mock_llm_sqlite_db: LLMSQLiteManager,
+    mock_paper: PaperEntity,
+    mock_db_manager: DatabaseManager,
     mock_summary_client: SummaryClient,
 ) -> None:
     """Test getting paper summary successfully."""
     service = PaperSummarizationService()
+
+    # Save paper to database first
+    paper_repo = PaperRepository(mock_db_manager)
+    paper_id = await paper_repo.create(mock_paper)
+    paper = mock_paper
+    paper.paper_id = paper_id
+
     # First create a summary
     await service.summarize_paper(
-        saved_paper,
-        mock_sqlite_db,
-        mock_llm_sqlite_db,
+        paper,
+        mock_db_manager,
         mock_summary_client,
     )
 
     # Then get the summary
-    result = service.get_paper_summary(saved_paper, mock_sqlite_db)
+    result = await service.get_paper_summary(paper, mock_db_manager)
 
     assert result is not None
-    assert result.paper_id == saved_paper.paper_id
+    assert result.paper_id == paper.paper_id
     assert result.language == "Korean"
 
 
 @pytest.mark.asyncio
 async def test_get_paper_summary_fallback_to_english(
-    saved_paper: PaperEntity,
-    mock_sqlite_db: SQLiteManager,
-    mock_llm_sqlite_db: LLMSQLiteManager,
+    mock_paper: PaperEntity,
+    mock_db_manager: DatabaseManager,
     mock_summary_client: SummaryClient,
 ) -> None:
     """Test getting paper summary with fallback to English."""
     service = PaperSummarizationService()
+
+    # Save paper to database first
+    paper_repo = PaperRepository(mock_db_manager)
+    paper_id = await paper_repo.create(mock_paper)
+    paper = mock_paper
+    paper.paper_id = paper_id
+
     # Create a summary in English
     await service.summarize_paper(
-        saved_paper,
-        mock_sqlite_db,
-        mock_llm_sqlite_db,
+        paper,
+        mock_db_manager,
         mock_summary_client,
         language="English",
     )
 
     # Try to get Korean summary, should fallback to English
-    result = service.get_paper_summary(
-        saved_paper,
-        mock_sqlite_db,
+    result = await service.get_paper_summary(
+        paper,
+        mock_db_manager,
         language="Korean",
     )
 
@@ -177,18 +209,27 @@ async def test_get_paper_summary_fallback_to_english(
     assert result.language == "English"
 
 
-def test_get_paper_summary_not_found(
-    saved_paper: PaperEntity,
-    mock_sqlite_db: SQLiteManager,
+@pytest.mark.asyncio
+async def test_get_paper_summary_not_found(
+    mock_paper: PaperEntity,
+    mock_db_manager: DatabaseManager,
 ) -> None:
     """Test getting paper summary when not found."""
     service = PaperSummarizationService()
-    result = service.get_paper_summary(saved_paper, mock_sqlite_db)
+
+    # Save paper to database first
+    paper_repo = PaperRepository(mock_db_manager)
+    paper_id = await paper_repo.create(mock_paper)
+    paper = mock_paper
+    paper.paper_id = paper_id
+
+    result = await service.get_paper_summary(paper, mock_db_manager)
     assert result is None
 
 
-def test_get_paper_summary_no_paper_id(
-    mock_sqlite_db: SQLiteManager,
+@pytest.mark.asyncio
+async def test_get_paper_summary_no_paper_id(
+    mock_db_manager: DatabaseManager,
 ) -> None:
     """Test getting paper summary when paper has no ID."""
     service = PaperSummarizationService()
@@ -205,5 +246,5 @@ def test_get_paper_summary_no_paper_id(
         published_at="2023-08-01T00:00:00Z",
         updated_at="2023-08-01T00:00:00Z",
     )
-    result = service.get_paper_summary(paper_without_id, mock_sqlite_db)
+    result = await service.get_paper_summary(paper_without_id, mock_db_manager)
     assert result is None

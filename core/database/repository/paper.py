@@ -1,9 +1,8 @@
 """Repository for paper operations."""
 
-from typing import Any
-
-from core.database.base import DatabaseManager
+from core.database.interfaces import DatabaseManager
 from core.models.database.entities import PaperEntity
+from core.types import RepositoryRowType
 
 
 class PaperRepository:
@@ -13,31 +12,21 @@ class PaperRepository:
         """Initialize repository with database manager."""
         self.db = db_manager
 
-    def _row_to_paper(self, row: tuple[Any, ...]) -> PaperEntity:
+    def _row_to_paper(self, row: RepositoryRowType) -> PaperEntity:
         """Convert database row to Paper model.
 
         Args:
-            row: Database row tuple
+            row: Database row tuple or dict
 
         Returns:
             Paper model instance
         """
-        return PaperEntity(
-            paper_id=row[0],
-            arxiv_id=row[1],
-            latest_version=row[2],
-            title=row[3],
-            abstract=row[4],
-            primary_category=row[5],
-            categories=row[6],
-            authors=row[7],
-            url_abs=row[8],
-            url_pdf=row[9],
-            published_at=row[10],
-            updated_at=row[11],
-        )
+        if isinstance(row, dict):
+            return PaperEntity.model_validate(row)
 
-    def create(self, paper: PaperEntity) -> int:
+        return PaperEntity.from_tuple(row)
+
+    async def create(self, paper: PaperEntity) -> int:
         """Create a new paper record.
 
         Args:
@@ -66,10 +55,10 @@ class PaperRepository:
             paper.updated_at,
         )
 
-        cursor = self.db.execute(query, params)
+        cursor = await self.db.execute(query, params)
         return cursor.lastrowid  # type: ignore
 
-    def get_by_arxiv_id(self, arxiv_id: str) -> PaperEntity | None:
+    async def get_by_arxiv_id(self, arxiv_id: str) -> PaperEntity | None:
         """Get paper by arXiv ID.
 
         Args:
@@ -79,13 +68,13 @@ class PaperRepository:
             Paper model or None if not found
         """
         query = "SELECT * FROM paper WHERE arxiv_id = ?"
-        row = self.db.fetch_one(query, (arxiv_id,))
+        row = await self.db.fetch_one(query, (arxiv_id,))
 
         if row:
             return self._row_to_paper(row)
         return None
 
-    def get_by_id(self, paper_id: int) -> PaperEntity | None:
+    async def get_by_id(self, paper_id: int) -> PaperEntity | None:
         """Get paper by ID.
 
         Args:
@@ -95,13 +84,13 @@ class PaperRepository:
             Paper model or None if not found
         """
         query = "SELECT * FROM paper WHERE paper_id = ?"
-        row = self.db.fetch_one(query, (paper_id,))
+        row = await self.db.fetch_one(query, (paper_id,))
 
         if row:
             return self._row_to_paper(row)
         return None
 
-    def update(self, paper: PaperEntity) -> bool:
+    async def update(self, paper: PaperEntity) -> bool:
         """Update an existing paper.
 
         Args:
@@ -132,10 +121,10 @@ class PaperRepository:
             paper.paper_id,
         )
 
-        cursor = self.db.execute(query, params)
+        cursor = await self.db.execute(query, params)
         return bool(cursor.rowcount > 0)
 
-    def delete(self, paper_id: int) -> bool:
+    async def delete(self, paper_id: int) -> bool:
         """Delete a paper by ID.
 
         Args:
@@ -145,10 +134,12 @@ class PaperRepository:
             True if deleted, False if not found
         """
         query = "DELETE FROM paper WHERE paper_id = ?"
-        cursor = self.db.execute(query, (paper_id,))
+        cursor = await self.db.execute(query, (paper_id,))
         return bool(cursor.rowcount > 0)
 
-    def search_by_keywords(self, keywords: str, limit: int = 50) -> list[PaperEntity]:
+    async def search_by_keywords(
+        self, keywords: str, limit: int = 50
+    ) -> list[PaperEntity]:
         """Search papers by keywords using simple LIKE search.
 
         Args:
@@ -166,7 +157,7 @@ class PaperRepository:
         """
 
         search_pattern = f"%{keywords}%"
-        rows = self.db.fetch_all(query, (search_pattern, search_pattern, limit))
+        rows = await self.db.fetch_all(query, (search_pattern, search_pattern, limit))
         papers = []
 
         for row in rows:
@@ -174,7 +165,7 @@ class PaperRepository:
 
         return papers
 
-    def get_recent_papers(self, limit: int = 100) -> list[PaperEntity]:
+    async def get_recent_papers(self, limit: int = 100) -> list[PaperEntity]:
         """Get recent papers ordered by publication date.
 
         Args:
@@ -189,7 +180,7 @@ class PaperRepository:
         LIMIT ?
         """
 
-        rows = self.db.fetch_all(query, (limit,))
+        rows = await self.db.fetch_all(query, (limit,))
         papers = []
 
         for row in rows:
@@ -197,7 +188,7 @@ class PaperRepository:
 
         return papers
 
-    def get_papers_paginated(
+    async def get_papers_paginated(
         self, limit: int = 20, offset: int = 0
     ) -> tuple[list[PaperEntity], int]:
         """Get papers with pagination, ordered by latest first.
@@ -211,11 +202,11 @@ class PaperRepository:
         """
         # Get total count
         count_query = "SELECT COUNT(*) FROM paper"
-        count_row = self.db.fetch_one(count_query, ())
+        count_row = await self.db.fetch_one(count_query, ())
         if count_row is None:
             total_count = 0
         else:
-            total_count = count_row[0]
+            total_count = count_row["COUNT(*)"]
 
         # Get papers with pagination
         query = """
@@ -224,7 +215,7 @@ class PaperRepository:
         LIMIT ? OFFSET ?
         """
 
-        rows = self.db.fetch_all(query, (limit, offset))
+        rows = await self.db.fetch_all(query, (limit, offset))
         papers = []
 
         for row in rows:

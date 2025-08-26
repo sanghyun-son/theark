@@ -1,6 +1,7 @@
 """Tests for PaperService star functionality."""
 
 import pytest
+from unittest.mock import Mock
 
 from api.services.paper_service import PaperService
 from core.models.database.entities import PaperEntity, UserEntity
@@ -49,27 +50,26 @@ async def test_add_star_success(
     paper_service: PaperService,
     sample_paper: PaperEntity,
     sample_user: User,
-    mock_sqlite_db,
+    mock_db_manager,
 ) -> None:
     """Test successful star addition."""
-    # Create real repositories
-    paper_repo = PaperRepository(mock_sqlite_db)
-    user_repo = UserRepository(mock_sqlite_db)
-
-    # Save the paper to the database
-    paper_id = paper_repo.create(sample_paper)
-
-    # Create the default user in the database
-    default_user = UserEntity(
-        user_id=1,
-        email="default@theark.local",
-        display_name="Default User",
+    # Save user to database first
+    user_repo = UserRepository(mock_db_manager)
+    user_entity = UserEntity(
+        user_id=sample_user.user_id,
+        email=sample_user.email,
+        display_name=sample_user.display_name,
     )
-    user_repo.create_user(default_user)
+    user_id = await user_repo.create_user(user_entity)
+
+    # Save paper to database
+    paper_repo = PaperRepository(mock_db_manager)
+    paper_id = await paper_repo.create(sample_paper)
+    sample_paper.paper_id = paper_id
 
     # Test
     result = await paper_service.add_star(
-        paper_id, mock_sqlite_db, sample_user, note="Interesting paper"
+        paper_id, mock_db_manager, sample_user, note="Interesting paper"
     )
 
     # Assertions
@@ -85,11 +85,11 @@ async def test_add_star_success(
 async def test_add_star_paper_not_found(
     paper_service: PaperService,
     sample_user: User,
-    mock_sqlite_db,
+    mock_db_manager,
 ) -> None:
     """Test star addition with non-existent paper."""
     with pytest.raises(ValueError, match="Paper 999 not found"):
-        await paper_service.add_star(999, mock_sqlite_db, sample_user)
+        await paper_service.add_star(999, mock_db_manager, sample_user)
 
 
 @pytest.mark.asyncio
@@ -97,31 +97,30 @@ async def test_remove_star_success(
     paper_service: PaperService,
     sample_paper: PaperEntity,
     sample_user: User,
-    mock_sqlite_db,
+    mock_db_manager,
 ) -> None:
     """Test successful star removal."""
-    # Create real repositories
-    paper_repo = PaperRepository(mock_sqlite_db)
-    user_repo = UserRepository(mock_sqlite_db)
-
-    # Save the paper to the database
-    paper_id = paper_repo.create(sample_paper)
-
-    # Create the default user in the database
-    default_user = UserEntity(
-        user_id=1,
-        email="default@theark.local",
-        display_name="Default User",
+    # Save user to database first
+    user_repo = UserRepository(mock_db_manager)
+    user_entity = UserEntity(
+        user_id=sample_user.user_id,
+        email=sample_user.email,
+        display_name=sample_user.display_name,
     )
-    user_repo.create_user(default_user)
+    user_id = await user_repo.create_user(user_entity)
 
-    # Add a star first
+    # Save paper to database
+    paper_repo = PaperRepository(mock_db_manager)
+    paper_id = await paper_repo.create(sample_paper)
+    sample_paper.paper_id = paper_id
+
+    # Add a star first, then remove it
     await paper_service.add_star(
-        paper_id, mock_sqlite_db, sample_user, note="Test note"
+        paper_id, mock_db_manager, sample_user, note="Test note"
     )
 
     # Test removal
-    result = await paper_service.remove_star(paper_id, mock_sqlite_db, sample_user)
+    result = await paper_service.remove_star(paper_id, mock_db_manager, sample_user)
 
     # Assertions
     assert isinstance(result, StarResponse)
@@ -136,11 +135,11 @@ async def test_remove_star_success(
 async def test_remove_star_paper_not_found(
     paper_service: PaperService,
     sample_user: User,
-    mock_sqlite_db,
+    mock_db_manager,
 ) -> None:
     """Test star removal with non-existent paper."""
     with pytest.raises(ValueError, match="Paper 999 not found"):
-        await paper_service.remove_star(999, mock_sqlite_db, sample_user)
+        await paper_service.remove_star(999, mock_db_manager, sample_user)
 
 
 @pytest.mark.asyncio
@@ -148,31 +147,32 @@ async def test_is_paper_starred_true(
     paper_service: PaperService,
     sample_paper: PaperEntity,
     sample_user: User,
-    mock_sqlite_db,
+    mock_db_manager,
 ) -> None:
     """Test checking if a paper is starred (when it is)."""
-    # Create real repositories
-    paper_repo = PaperRepository(mock_sqlite_db)
-    user_repo = UserRepository(mock_sqlite_db)
-
-    # Save the paper to the database
-    paper_id = paper_repo.create(sample_paper)
-
-    # Create the default user in the database
-    default_user = UserEntity(
-        user_id=1,
-        email="default@theark.local",
-        display_name="Default User",
+    # Save user to database first
+    user_repo = UserRepository(mock_db_manager)
+    user_entity = UserEntity(
+        user_id=sample_user.user_id,
+        email=sample_user.email,
+        display_name=sample_user.display_name,
     )
-    user_repo.create_user(default_user)
+    user_id = await user_repo.create_user(user_entity)
 
-    # Add a star
+    # Save paper to database
+    paper_repo = PaperRepository(mock_db_manager)
+    paper_id = await paper_repo.create(sample_paper)
+    sample_paper.paper_id = paper_id
+
+    # Add a star first
     await paper_service.add_star(
-        paper_id, mock_sqlite_db, sample_user, note="Test note"
+        paper_id, mock_db_manager, sample_user, note="Test note"
     )
 
     # Test checking star status
-    result = await paper_service.is_paper_starred(paper_id, mock_sqlite_db, sample_user)
+    result = await paper_service.is_paper_starred(
+        paper_id, mock_db_manager, sample_user
+    )
 
     # Assertions
     assert isinstance(result, StarResponse)
@@ -188,26 +188,27 @@ async def test_is_paper_starred_false(
     paper_service: PaperService,
     sample_paper: PaperEntity,
     sample_user: User,
-    mock_sqlite_db,
+    mock_db_manager,
 ) -> None:
     """Test checking if a paper is starred (when it is not)."""
-    # Create real repositories
-    paper_repo = PaperRepository(mock_sqlite_db)
-    user_repo = UserRepository(mock_sqlite_db)
-
-    # Save the paper to the database
-    paper_id = paper_repo.create(sample_paper)
-
-    # Create the default user in the database
-    default_user = UserEntity(
-        user_id=1,
-        email="default@theark.local",
-        display_name="Default User",
+    # Save user to database first
+    user_repo = UserRepository(mock_db_manager)
+    user_entity = UserEntity(
+        user_id=sample_user.user_id,
+        email=sample_user.email,
+        display_name=sample_user.display_name,
     )
-    user_repo.create_user(default_user)
+    user_id = await user_repo.create_user(user_entity)
+
+    # Save paper to database
+    paper_repo = PaperRepository(mock_db_manager)
+    paper_id = await paper_repo.create(sample_paper)
+    sample_paper.paper_id = paper_id
 
     # Test checking star status (without adding a star)
-    result = await paper_service.is_paper_starred(paper_id, mock_sqlite_db, sample_user)
+    result = await paper_service.is_paper_starred(
+        paper_id, mock_db_manager, sample_user
+    )
 
     # Assertions
     assert isinstance(result, StarResponse)

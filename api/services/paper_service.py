@@ -4,13 +4,12 @@ from typing import AsyncGenerator
 
 from core import get_logger
 from core.config import load_settings
-from core.database.llm_sqlite_manager import LLMSQLiteManager
+from core.database.interfaces import DatabaseManager
 from core.database.repository import (
     PaperRepository,
     SummaryRepository,
     UserRepository,
 )
-from core.database.sqlite_manager import SQLiteManager
 from core.models import PaperCreateRequest as PaperCreate
 from core.models import (
     PaperDeleteResponse,
@@ -40,7 +39,7 @@ class PaperService:
         self.orchestration_service = PaperOrchestrationService()
 
     def _initialize_summarization_service(
-        self, llm_db_manager: LLMSQLiteManager
+        self, llm_db_manager: DatabaseManager
     ) -> SummarizationService:
         """Initialize summarization service."""
         try:
@@ -56,8 +55,7 @@ class PaperService:
     async def create_paper(
         self,
         paper_data: PaperCreate,
-        db_manager: SQLiteManager,
-        llm_db_manager: LLMSQLiteManager,
+        db_manager: DatabaseManager,
         arxiv_client: ArxivClient,
         summary_client: SummaryClient,
         skip_auto_summarization: bool = False,
@@ -73,7 +71,6 @@ class PaperService:
         return await self.orchestration_service.create_paper_normal(
             paper_data,
             db_manager,
-            llm_db_manager,
             arxiv_client,
             summary_client,
         )
@@ -81,8 +78,7 @@ class PaperService:
     async def get_paper(
         self,
         paper_identifier: str,
-        db_manager: SQLiteManager,
-        llm_db_manager: LLMSQLiteManager,
+        db_manager: DatabaseManager,
     ) -> PaperResponse:
         """Get a paper by ID or arXiv ID."""
         return await self.orchestration_service.get_paper(paper_identifier, db_manager)
@@ -90,29 +86,28 @@ class PaperService:
     async def create_paper_streaming(
         self,
         paper_data: PaperCreate,
-        db_manager: SQLiteManager,
-        llm_db_manager: LLMSQLiteManager,
+        db_manager: DatabaseManager,
         arxiv_client: ArxivClient,
         summary_client: SummaryClient,
     ) -> AsyncGenerator[str, None]:
         """Create a paper with streaming response."""
         async for event in self.orchestration_service.stream_paper_creation(
-            paper_data, db_manager, llm_db_manager, arxiv_client, summary_client
+            paper_data, db_manager, arxiv_client, summary_client
         ):
             yield event
 
     async def delete_paper(
-        self, paper_identifier: str, db_manager: SQLiteManager
+        self, paper_identifier: str, db_manager: DatabaseManager
     ) -> PaperDeleteResponse:
         """Delete a paper by ID or arXiv ID."""
-        paper = self._get_paper_by_identifier(paper_identifier, db_manager)
+        paper = await self._get_paper_by_identifier(paper_identifier, db_manager)
         if not paper:
             raise ValueError("Paper not found")
 
         # Delete paper (this will cascade to summaries due to foreign key constraints)
         if paper.paper_id is not None:
             paper_repo = PaperRepository(db_manager)
-            paper_repo.delete(paper.paper_id)
+            await paper_repo.delete(paper.paper_id)
         else:
             raise ValueError("Paper has no ID")
 
@@ -123,7 +118,7 @@ class PaperService:
 
     async def get_papers(
         self,
-        db_manager: SQLiteManager,
+        db_manager: DatabaseManager,
         user: User,
         limit: int = 20,
         offset: int = 0,
@@ -135,17 +130,17 @@ class PaperService:
         user_repo = UserRepository(db_manager)
 
         try:
-            papers, total_count = paper_repo.get_papers_paginated(limit, offset)
+            papers, total_count = await paper_repo.get_papers_paginated(limit, offset)
             paper_responses = []
 
             # Get user's starred papers for efficient lookup
             user_stars = []
             if user.user_id is not None:
-                user_stars = user_repo.get_user_stars(user.user_id, limit=1000)
+                user_stars = await user_repo.get_user_stars(user.user_id, limit=1000)
                 starred_paper_ids = {star.paper_id for star in user_stars}
 
             for paper in papers:
-                summary = self._get_paper_summary(paper, summary_repo, language)
+                summary = await self._get_paper_summary(paper, summary_repo, language)
 
                 # Check if this paper is starred by the user
                 is_starred = False
@@ -172,11 +167,11 @@ class PaperService:
             raise ValueError(f"Failed to get papers: {e}")
 
     async def mark_summary_as_read(
-        self, paper_id: int, summary_id: int, db_manager: SQLiteManager
+        self, paper_id: int, summary_id: int, db_manager: DatabaseManager
     ) -> SummaryReadResponse:
         """Mark a summary as read."""
         summary_repo = SummaryRepository(db_manager)
-        summary = summary_repo.get_by_id(summary_id)
+        summary = await summary_repo.get_by_id(summary_id)
         if not summary:
             raise ValueError(f"Summary {summary_id} not found")
 
@@ -187,7 +182,7 @@ class PaperService:
 
         # Update the summary to mark it as read
         summary.is_read = True
-        summary_repo.update(summary)
+        await summary_repo.update(summary)
 
         return SummaryReadResponse(
             success=True,
@@ -200,7 +195,7 @@ class PaperService:
     async def add_star(
         self,
         paper_id: int,
-        db_manager: SQLiteManager,
+        db_manager: DatabaseManager,
         user: User,
         note: str | None = None,
     ) -> StarResponse:
@@ -209,7 +204,7 @@ class PaperService:
             raise ValueError("User ID is required")
 
         paper_repo = PaperRepository(db_manager)
-        paper = paper_repo.get_by_id(paper_id)
+        paper = await paper_repo.get_by_id(paper_id)
         if not paper:
             raise ValueError(f"Paper {paper_id} not found")
 
@@ -221,7 +216,7 @@ class PaperService:
 
         # Add star to database
         user_repo = UserRepository(db_manager)
-        user_repo.add_star(star)
+        await user_repo.add_star(star)
 
         return StarResponse(
             success=True,
@@ -233,19 +228,19 @@ class PaperService:
         )
 
     async def remove_star(
-        self, paper_id: int, db_manager: SQLiteManager, user: User
+        self, paper_id: int, db_manager: DatabaseManager, user: User
     ) -> StarResponse:
         """Remove a star from a paper."""
         if user.user_id is None:
             raise ValueError("User ID is required")
 
         paper_repo = PaperRepository(db_manager)
-        paper = paper_repo.get_by_id(paper_id)
+        paper = await paper_repo.get_by_id(paper_id)
         if not paper:
             raise ValueError(f"Paper {paper_id} not found")
 
         user_repo = UserRepository(db_manager)
-        user_repo.remove_star(user.user_id, paper_id)
+        await user_repo.remove_star(user.user_id, paper_id)
 
         return StarResponse(
             success=True,
@@ -258,7 +253,7 @@ class PaperService:
 
     async def get_starred_papers(
         self,
-        db_manager: SQLiteManager,
+        db_manager: DatabaseManager,
         user: User,
         limit: int = 20,
         offset: int = 0,
@@ -271,7 +266,7 @@ class PaperService:
         summary_repo = SummaryRepository(db_manager)
 
         user_repo = UserRepository(db_manager)
-        stars = user_repo.get_user_stars(user.user_id, limit=limit + offset)
+        stars = await user_repo.get_user_stars(user.user_id, limit=limit + offset)
 
         # Apply offset
         stars = stars[offset : offset + limit]
@@ -279,11 +274,11 @@ class PaperService:
         # Get paper details for each star
         papers = []
         for star in stars:
-            paper = paper_repo.get_by_id(star.paper_id)
+            paper = await paper_repo.get_by_id(star.paper_id)
             if paper:
                 # Get summary if available
                 summary = None
-                summaries = summary_repo.get_by_paper_id(star.paper_id)
+                summaries = await summary_repo.get_by_paper_id(star.paper_id)
                 if summaries:
                     summary = summaries[0]  # Get the first summary
 
@@ -301,7 +296,7 @@ class PaperService:
         )
 
     async def is_paper_starred(
-        self, paper_id: int, db_manager: SQLiteManager, user: User
+        self, paper_id: int, db_manager: DatabaseManager, user: User
     ) -> StarResponse:
         """Check if a paper is starred by the current user."""
         if user.user_id is None:
@@ -310,11 +305,13 @@ class PaperService:
         user_repo = UserRepository(db_manager)
         paper_repo = PaperRepository(db_manager)
 
-        paper = paper_repo.get_by_id(paper_id)
+        paper = await paper_repo.get_by_id(paper_id)
         if not paper:
             raise ValueError(f"Paper {paper_id} not found")
 
-        stars = user_repo.get_user_stars(user.user_id, limit=1000)  # Get all stars
+        stars = await user_repo.get_user_stars(
+            user.user_id, limit=1000
+        )  # Get all stars
         starred_paper = next(
             (star for star in stars if star.paper_id == paper_id), None
         )
@@ -338,25 +335,25 @@ class PaperService:
                 created_at=None,
             )
 
-    def _get_paper_by_identifier(
-        self, paper_identifier: str, db_manager: SQLiteManager
+    async def _get_paper_by_identifier(
+        self, paper_identifier: str, db_manager: DatabaseManager
     ) -> PaperEntity | None:
         """Get paper by identifier using db_manager."""
         paper_repo = PaperRepository(db_manager)
 
         # Try to get by arXiv ID first
-        paper = paper_repo.get_by_arxiv_id(paper_identifier)
+        paper = await paper_repo.get_by_arxiv_id(paper_identifier)
         if paper:
             return paper
 
         # Try to get by paper ID
         try:
             paper_id = int(paper_identifier)
-            return paper_repo.get_by_id(paper_id)
+            return await paper_repo.get_by_id(paper_id)
         except ValueError:
             return None
 
-    def _get_paper_summary(
+    async def _get_paper_summary(
         self,
         paper: PaperEntity,
         summary_repo: SummaryRepository,
@@ -367,11 +364,11 @@ class PaperService:
             return None
 
         try:
-            summary_obj = summary_repo.get_by_paper_and_language(
+            summary_obj = await summary_repo.get_by_paper_and_language(
                 paper.paper_id, language
             )
             if not summary_obj and language != "English":
-                summary_obj = summary_repo.get_by_paper_and_language(
+                summary_obj = await summary_repo.get_by_paper_and_language(
                     paper.paper_id, "English"
                 )
 
@@ -381,11 +378,11 @@ class PaperService:
             return None
 
     async def get_summary(
-        self, paper_id: int, summary_id: int, db_manager: SQLiteManager
+        self, paper_id: int, summary_id: int, db_manager: DatabaseManager
     ) -> SummaryEntity:
         """Get a specific summary by ID."""
         summary_repo = SummaryRepository(db_manager)
-        summary = summary_repo.get_by_id(summary_id)
+        summary = await summary_repo.get_by_id(summary_id)
         if not summary:
             raise ValueError(f"Summary {summary_id} not found")
 
@@ -400,8 +397,7 @@ class PaperService:
     async def stream_paper_creation(
         self,
         paper_data: PaperCreate,
-        db_manager: SQLiteManager,
-        llm_db_manager: LLMSQLiteManager,
+        db_manager: DatabaseManager,
         arxiv_client: ArxivClient,
         summary_client: SummaryClient,
     ) -> AsyncGenerator[str, None]:
@@ -409,11 +405,9 @@ class PaperService:
         orchestration_service = PaperOrchestrationService()
 
         async for event in orchestration_service.stream_paper_creation(
-            paper_data, db_manager, llm_db_manager, arxiv_client, summary_client
+            paper_data,
+            db_manager,
+            arxiv_client,
+            summary_client,
         ):
             yield event
-
-    async def close(self) -> None:
-        """Close the service and cleanup resources."""
-        # Cleanup resources if needed
-        pass

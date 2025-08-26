@@ -1,10 +1,9 @@
 """Repository for summary operations."""
 
-from typing import Any
-
 from core import get_logger
-from core.database.base import DatabaseManager
+from core.database.interfaces import DatabaseManager
 from core.models.database.entities import SummaryEntity
+from core.types import RepositoryRowType
 
 logger = get_logger(__name__)
 
@@ -21,33 +20,21 @@ class SummaryRepository:
         if hasattr(db_manager, "connection"):
             logger.debug(f"Database connection state: {db_manager.connection}")
 
-    def _row_to_summary(self, row: tuple[Any, ...]) -> SummaryEntity:
+    def _row_to_summary(self, row: RepositoryRowType) -> SummaryEntity:
         """Convert database row to Summary model.
 
         Args:
-            row: Database row tuple
+            row: Database row as dict or tuple
 
         Returns:
             Summary model instance
         """
-        return SummaryEntity(
-            summary_id=row[0],
-            paper_id=row[1],
-            version=row[2],
-            overview=row[3],
-            motivation=row[4],
-            method=row[5],
-            result=row[6],
-            conclusion=row[7],
-            language=row[8],
-            interests=row[9],
-            relevance=row[10],
-            model=row[11],
-            is_read=bool(row[12]),
-            created_at=row[13],
-        )
+        if isinstance(row, dict):
+            return SummaryEntity.model_validate(row)
 
-    def create(self, summary: SummaryEntity) -> int:
+        return SummaryEntity.from_tuple(row)
+
+    async def create(self, summary: SummaryEntity) -> int:
         """Create a new summary record.
 
         Args:
@@ -77,10 +64,10 @@ class SummaryRepository:
             summary.is_read,
         )
 
-        cursor = self.db.execute(query, params)
+        cursor = await self.db.execute(query, params)
         return cursor.lastrowid  # type: ignore
 
-    def get_by_paper_and_language(
+    async def get_by_paper_and_language(
         self, paper_id: int, language: str
     ) -> SummaryEntity | None:
         """Get summary by paper ID and language.
@@ -99,13 +86,13 @@ class SummaryRepository:
         LIMIT 1
         """
 
-        row = self.db.fetch_one(query, (paper_id, language))
+        row = await self.db.fetch_one(query, (paper_id, language))
 
         if row:
             return self._row_to_summary(row)
         return None
 
-    def get_by_paper_id(self, paper_id: int) -> list[SummaryEntity]:
+    async def get_by_paper_id(self, paper_id: int) -> list[SummaryEntity]:
         """Get all summaries for a paper.
 
         Args:
@@ -115,7 +102,7 @@ class SummaryRepository:
             List of summaries for the paper
         """
         query = "SELECT * FROM summary WHERE paper_id = ? ORDER BY version DESC"
-        rows = self.db.fetch_all(query, (paper_id,))
+        rows = await self.db.fetch_all(query, (paper_id,))
         summaries = []
 
         for row in rows:
@@ -123,7 +110,7 @@ class SummaryRepository:
 
         return summaries
 
-    def get_by_id(self, summary_id: int) -> SummaryEntity | None:
+    async def get_by_id(self, summary_id: int) -> SummaryEntity | None:
         """Get summary by ID.
 
         Args:
@@ -133,13 +120,13 @@ class SummaryRepository:
             Summary model or None if not found
         """
         query = "SELECT * FROM summary WHERE summary_id = ?"
-        row = self.db.fetch_one(query, (summary_id,))
+        row = await self.db.fetch_one(query, (summary_id,))
 
         if row:
             return self._row_to_summary(row)
         return None
 
-    def update(self, summary: SummaryEntity) -> bool:
+    async def update(self, summary: SummaryEntity) -> bool:
         """Update a summary.
 
         Args:
@@ -172,10 +159,10 @@ class SummaryRepository:
             summary.summary_id,
         )
 
-        cursor = self.db.execute(query, params)
+        cursor = await self.db.execute(query, params)
         return bool(cursor.rowcount > 0)
 
-    def delete(self, summary_id: int) -> bool:
+    async def delete(self, summary_id: int) -> bool:
         """Delete a summary by ID.
 
         Args:
@@ -185,5 +172,5 @@ class SummaryRepository:
             True if deleted, False if not found
         """
         query = "DELETE FROM summary WHERE summary_id = ?"
-        cursor = self.db.execute(query, (summary_id,))
+        cursor = await self.db.execute(query, (summary_id,))
         return bool(cursor.rowcount > 0)

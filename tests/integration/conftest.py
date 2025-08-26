@@ -6,18 +6,18 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
+import pytest_asyncio
 from pytest_httpserver import HTTPServer
 from fastapi.testclient import TestClient
 
 from api.app import create_app
-from core.database.llm_sqlite_manager import LLMSQLiteManager
-from core.database.sqlite_manager import SQLiteManager
+from core.database.implementations.sqlite.sqlite_manager import SQLiteManager
 from core.database.repository import UserRepository
 from core.models.domain.user import DEFAULT_USER_ID
 
 
-@pytest.fixture
-def integration_client(
+@pytest_asyncio.fixture
+async def integration_client(
     tmp_path: Path,
     mock_arxiv_server: HTTPServer,
     mock_openai_server: HTTPServer,
@@ -54,13 +54,9 @@ def integration_client(
         # Use tmp_path for testing databases
         db_path = tmp_path / "test.db"
         db_manager = SQLiteManager(db_path)
-        db_manager.connect()
-        db_manager.create_tables()
 
-        llm_db_path = tmp_path / "test_llm.db"
-        llm_db_manager = LLMSQLiteManager(llm_db_path)
-        llm_db_manager.connect()
-        llm_db_manager.create_tables()
+        await db_manager.connect()
+        await db_manager.create_tables()
 
         arxiv_client = ArxivClient(base_url=arxiv_url)
         summary_client = OpenAISummarizer(
@@ -69,14 +65,14 @@ def integration_client(
         )
 
         app.state.db_manager = db_manager
-        app.state.llm_db_manager = llm_db_manager
         app.state.paper_service = PaperService()
         app.state.arxiv_client = arxiv_client
         app.state.summary_client = summary_client
 
         # Create default user for star functionality
         user_repository = UserRepository(db_manager)
-        user = user_repository.get_user_by_id(DEFAULT_USER_ID)
+        user = await user_repository.get_user_by_id(DEFAULT_USER_ID)
+
         if user is None:
             from core.models import UserEntity
 
@@ -85,7 +81,7 @@ def integration_client(
                 email="test@example.com",
                 display_name="test_user",
             )
-            user_repository.create_user(user_entity)
+            await user_repository.create_user(user_entity)
 
         return TestClient(app)
 

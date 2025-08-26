@@ -104,30 +104,6 @@ def get_database_dir(environment: Environment = Environment.DEVELOPMENT) -> Path
     return config.database_dir
 
 
-def get_llm_database_path(environment: Environment = Environment.DEVELOPMENT) -> Path:
-    """Get LLM database path for the specified environment.
-
-    Args:
-        environment: Environment type
-
-    Returns:
-        LLM database file path
-    """
-    config = DatabaseConfig(environment)
-    db_dir = config.database_dir
-    db_dir.mkdir(parents=True, exist_ok=True)
-
-    if environment == Environment.TESTING:
-        # For testing, use llm_requests.test.db
-        return db_dir / "llm_requests.test.db"
-    elif environment == Environment.DEVELOPMENT:
-        # For development, use llm_requests.dev.db
-        return db_dir / "llm_requests.dev.db"
-    else:
-        # For production, use llm_requests.db
-        return db_dir / "llm_requests.db"
-
-
 def setup_database_environment(
     environment: Environment = Environment.DEVELOPMENT,
 ) -> DatabaseConfig:
@@ -149,6 +125,5 @@ __all__ = [
     "DatabaseConfig",
     "get_database_path",
     "get_database_dir",
-    "get_llm_database_path",
     "setup_database_environment",
 ]

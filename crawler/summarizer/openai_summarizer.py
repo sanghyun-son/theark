@@ -4,7 +4,7 @@ from typing import Any
 
 import httpx
 
-from core.database.llm_sqlite_manager import LLMSQLiteManager
+from core.database.interfaces import DatabaseManager
 from core.log import get_logger
 from core.models.external.openai import (
     ChatCompletionRequest,
@@ -60,11 +60,12 @@ class OpenAISummarizer(SummaryClient):
         return self._use_tools
 
     async def summarize(
-        self, request: SummaryRequest, db_manager: LLMSQLiteManager
+        self, request: SummaryRequest, db_manager: DatabaseManager
     ) -> SummaryResponse:
         """Summarize the given abstract using OpenAI API."""
         llm_context = LLMRequestContext(
             model=request.model,
+            db_manager=db_manager,
             custom_id=request.custom_id,
             provider="openai",
             endpoint="/v1/chat/completions",
@@ -72,9 +73,8 @@ class OpenAISummarizer(SummaryClient):
             request_type="chat",
             metadata=self._create_request_metadata(request),
         )
-        llm_context.db_manager = db_manager
 
-        with llm_context as context:
+        async with llm_context as context:
             # Build and send request
             payload = self._build_request_payload(request)
             logger.debug(
@@ -84,7 +84,7 @@ class OpenAISummarizer(SummaryClient):
             response = await self._make_api_request(payload)
 
             # Update tracking with response data
-            context.update_http_status(response.status_code, db_manager)
+            await context.update_http_status(response.status_code, db_manager)
 
             if response.status_code != 200:
                 raise Exception(
@@ -94,7 +94,7 @@ class OpenAISummarizer(SummaryClient):
             # Parse response
             chat_response = ChatCompletionResponse(**response.json())
             logger.debug(f"OpenAI Response:\n{chat_response.model_dump_json(indent=2)}")
-            self._update_token_tracking(context, chat_response, db_manager)
+            await self._update_token_tracking(context, chat_response, db_manager)
 
             return self._parse_response(request, chat_response)
 
@@ -166,15 +166,15 @@ class OpenAISummarizer(SummaryClient):
             json=payload.model_dump(),
         )
 
-    def _update_token_tracking(
+    async def _update_token_tracking(
         self,
         llm_context: LLMRequestContext,
         chat_response: ChatCompletionResponse,
-        db_manager: LLMSQLiteManager,
+        db_manager: DatabaseManager,
     ) -> None:
         """Update token usage tracking."""
         if chat_response.usage:
-            llm_context.update_tokens(
+            await llm_context.update_tokens(
                 {
                     "prompt_tokens": chat_response.usage.prompt_tokens,
                     "completion_tokens": chat_response.usage.completion_tokens,

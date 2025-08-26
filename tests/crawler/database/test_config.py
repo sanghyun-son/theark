@@ -4,13 +4,13 @@ from pathlib import Path
 
 import pytest
 
-from crawler.database.config import (
+from core.database.config import (
     DatabaseConfig,
-    Environment,
     get_database_dir,
     get_database_path,
     setup_database_environment,
 )
+from core.types import Environment
 
 
 @pytest.fixture

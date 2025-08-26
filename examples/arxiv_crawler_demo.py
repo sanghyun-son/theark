@@ -5,9 +5,9 @@ import os
 from pathlib import Path
 
 from core import setup_logging
+from core.database import SQLiteManager, setup_database_environment
 from crawler.arxiv import ArxivCrawler, CrawlConfig, OnDemandCrawlConfig
 from crawler.arxiv.core import SummarizationConfig
-from crawler.database import SQLiteManager, setup_database_environment
 
 
 async def demo_crawler():
@@ -69,7 +69,7 @@ async def demo_crawler():
             print(f"   📄 Abstract length: {len(paper.abstract)} characters")
 
             # Get the paper from database to ensure we have the paper_id
-            from crawler.database import PaperRepository
+            from core.database.repository import PaperRepository
 
             paper_repo = PaperRepository(db_manager)
             with db_manager:
@@ -94,7 +94,7 @@ async def demo_crawler():
             await asyncio.sleep(3)
 
             # Check for summary in database
-            from crawler.database import SummaryRepository
+            from core.database.repository import SummaryRepository
 
             summary_repo = SummaryRepository(db_manager)
             with db_manager:

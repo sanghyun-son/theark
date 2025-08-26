@@ -6,7 +6,13 @@ from datetime import datetime
 from typing import Any, Awaitable, Callable
 
 from core import AsyncRateLimiter, get_logger
-from core.models.database.entities import PaperEntity
+from core.database.interfaces import DatabaseManager
+from core.database.repository import (
+    CrawlEventRepository,
+    PaperRepository,
+    SummaryRepository,
+)
+from core.models.database.entities import CrawlEvent, PaperEntity
 from crawler.arxiv.client import ArxivClient
 from crawler.arxiv.constants import (
     DEFAULT_MAX_RETRIES,
@@ -15,13 +21,6 @@ from crawler.arxiv.constants import (
 )
 from crawler.arxiv.exceptions import ArxivNotFoundError
 from crawler.arxiv.parser import ArxivParser
-from crawler.database import (
-    CrawlEvent,
-    CrawlEventRepository,
-    DatabaseManager,
-    PaperRepository,
-    SummaryRepository,
-)
 from crawler.summarizer.service import SummarizationService
 
 logger = get_logger(__name__)
@@ -329,17 +328,17 @@ class ArxivCrawlerCore:
                 return None
 
             # Check if paper already exists
-            existing_paper = paper_repo.get_by_arxiv_id(paper.arxiv_id)
+            existing_paper = await paper_repo.get_by_arxiv_id(paper.arxiv_id)
             if existing_paper:
                 logger.info(f"Paper {paper.arxiv_id} already exists in database")
                 return existing_paper
 
             # Store in database
-            paper_id = paper_repo.create(paper)
+            paper_id = await paper_repo.create(paper)
             logger.info(f"Stored paper {paper.arxiv_id} in database with ID {paper_id}")
 
             # Retrieve the stored paper to get the database ID
-            stored_paper = paper_repo.get_by_arxiv_id(paper.arxiv_id)
+            stored_paper = await paper_repo.get_by_arxiv_id(paper.arxiv_id)
 
             return stored_paper
 
@@ -367,7 +366,7 @@ class ArxivCrawlerCore:
                 detail=f"Identifier: {identifier}",
             )
 
-            event_repo.log_event(event)
+            await event_repo.log_event(event)
 
         except Exception as e:
             logger.error(f"Failed to record crawl event: {e}")

@@ -4,13 +4,13 @@ from dataclasses import dataclass
 from typing import Any, Awaitable, Callable
 
 from core import PeriodicTask, PeriodicTaskManager, get_logger
+from core.database.interfaces import DatabaseManager
 from core.models.database.entities import PaperEntity
 from crawler.arxiv.constants import (
     DEFAULT_BACKGROUND_INTERVAL,
     DEFAULT_RECENT_PAPERS_LIMIT,
 )
 from crawler.arxiv.core import ArxivCrawlerCore, CrawlConfig, CrawlerStatus
-from crawler.database import DatabaseManager
 
 logger = get_logger(__name__)
 

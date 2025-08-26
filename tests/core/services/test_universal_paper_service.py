@@ -1,13 +1,13 @@
 """Tests for universal paper service."""
 
 import pytest
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, AsyncMock, patch
 
 from core.services.universal_paper_service import UniversalPaperService
 from core.models.domain.paper_source import PaperSource
 from core.models.domain.paper_extraction import PaperMetadata
 from core.models.database.entities import PaperEntity
-from core.database.sqlite_manager import SQLiteManager
+from core.database.interfaces.manager import DatabaseManager
 
 
 @pytest.fixture
@@ -26,6 +26,8 @@ def mock_repository():
     """Mock PaperRepository."""
     with patch("core.services.universal_paper_service.PaperRepository") as mock_class:
         mock_repo = Mock()
+        mock_repo.create = AsyncMock(return_value=1)
+        mock_repo.get_by_arxiv_id = AsyncMock()
         mock_class.return_value = mock_repo
         yield mock_repo
 
@@ -77,7 +79,8 @@ def test_determine_source_custom() -> None:
     )
 
 
-def test_create_paper_from_url_success(mock_extractor, mock_repository) -> None:
+@pytest.mark.asyncio
+async def test_create_paper_from_url_success(mock_extractor, mock_repository) -> None:
     """Test successful paper creation from URL."""
     # Mock metadata
     metadata = PaperMetadata(
@@ -95,8 +98,9 @@ def test_create_paper_from_url_success(mock_extractor, mock_repository) -> None:
 
     # Test
     service = UniversalPaperService()
-    paper = service.create_paper_from_url(
-        "https://arxiv.org/abs/1234.5678", Mock(spec=SQLiteManager)
+    paper = await service.create_paper_from_url(
+        "https://arxiv.org/abs/1234.5678",
+        Mock(spec=DatabaseManager),
     )
 
     # Verify
@@ -109,7 +113,8 @@ def test_create_paper_from_url_success(mock_extractor, mock_repository) -> None:
     assert paper.paper_id == 1
 
 
-def test_create_paper_from_url_with_default_category(
+@pytest.mark.asyncio
+async def test_create_paper_from_url_with_default_category(
     mock_extractor, mock_repository
 ) -> None:
     """Test paper creation with default category when no categories provided."""
@@ -129,8 +134,8 @@ def test_create_paper_from_url_with_default_category(
 
     # Test
     service = UniversalPaperService()
-    paper = service.create_paper_from_url(
-        "https://arxiv.org/abs/1234.5678", Mock(spec=SQLiteManager)
+    paper = await service.create_paper_from_url(
+        "https://arxiv.org/abs/1234.5678", Mock(spec=DatabaseManager)
     )
 
     # Verify default category is used
@@ -138,7 +143,8 @@ def test_create_paper_from_url_with_default_category(
     assert paper.categories == "cs.OTHER"
 
 
-def test_create_paper_from_url_extraction_failure(mock_extractor) -> None:
+@pytest.mark.asyncio
+async def test_create_paper_from_url_extraction_failure(mock_extractor) -> None:
     """Test paper creation when extraction fails."""
     mock_extractor.extract_paper.side_effect = ValueError("Extraction failed")
 
@@ -146,34 +152,22 @@ def test_create_paper_from_url_extraction_failure(mock_extractor) -> None:
     service = UniversalPaperService()
 
     with pytest.raises(ValueError, match="Extraction failed"):
-        service.create_paper_from_url(
-            "https://arxiv.org/abs/1234.5678", Mock(spec=SQLiteManager)
+        await service.create_paper_from_url(
+            "https://arxiv.org/abs/1234.5678", Mock(spec=DatabaseManager)
         )
 
 
-def test_get_paper_by_identifier_arxiv(mock_repository) -> None:
+@pytest.mark.asyncio
+async def test_get_paper_by_identifier_arxiv(mock_repository) -> None:
     """Test getting paper by arXiv identifier."""
     mock_paper = Mock(spec=PaperEntity)
     mock_repository.get_by_arxiv_id.return_value = mock_paper
 
     # Test
     service = UniversalPaperService()
-    result = service.get_paper_by_identifier("1234.5678", Mock(spec=SQLiteManager))
-
-    # Verify
-    assert result == mock_paper
-    mock_repository.get_by_arxiv_id.assert_called_once_with("1234.5678")
-
-
-def test_get_paper_by_identifier_source_format(mock_repository) -> None:
-    """Test getting paper by source:identifier format."""
-    mock_paper = Mock(spec=PaperEntity)
-    mock_repository.get_by_arxiv_id.return_value = mock_paper
-
-    # Test
-    service = UniversalPaperService()
-    result = service.get_paper_by_identifier(
-        "arxiv:1234.5678", Mock(spec=SQLiteManager)
+    result = await service.get_paper_by_identifier(
+        "1234.5678",
+        Mock(spec=DatabaseManager),
     )
 
     # Verify
@@ -181,13 +175,35 @@ def test_get_paper_by_identifier_source_format(mock_repository) -> None:
     mock_repository.get_by_arxiv_id.assert_called_once_with("1234.5678")
 
 
-def test_get_paper_by_identifier_not_found(mock_repository) -> None:
+@pytest.mark.asyncio
+async def test_get_paper_by_identifier_source_format(mock_repository) -> None:
+    """Test getting paper by source:identifier format."""
+    mock_paper = Mock(spec=PaperEntity)
+    mock_repository.get_by_arxiv_id.return_value = mock_paper
+
+    # Test
+    service = UniversalPaperService()
+    result = await service.get_paper_by_identifier(
+        "arxiv:1234.5678",
+        Mock(spec=DatabaseManager),
+    )
+
+    # Verify
+    assert result == mock_paper
+    mock_repository.get_by_arxiv_id.assert_called_once_with("1234.5678")
+
+
+@pytest.mark.asyncio
+async def test_get_paper_by_identifier_not_found(mock_repository) -> None:
     """Test getting paper when not found."""
     mock_repository.get_by_arxiv_id.return_value = None
 
     # Test
     service = UniversalPaperService()
-    result = service.get_paper_by_identifier("1234.5678", Mock(spec=SQLiteManager))
+    result = await service.get_paper_by_identifier(
+        "1234.5678",
+        Mock(spec=DatabaseManager),
+    )
 
     # Verify
     assert result is None

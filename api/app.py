@@ -29,23 +29,16 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     logger.info(f"Authentication required: {current_settings.auth_required}")
 
     from api.services.paper_service import PaperService
-    from core.database.llm_sqlite_manager import LLMSQLiteManager
-    from core.database.sqlite_manager import SQLiteManager
+    from core.database.config import get_database_path
+    from core.database.implementations.sqlite import SQLiteManager
     from crawler.arxiv.client import ArxivClient
-    from crawler.database.config import get_database_path, get_llm_database_path
     from crawler.summarizer.openai_summarizer import OpenAISummarizer
 
-    # Use current environment for database paths
-    current_environment = current_settings.environment
-    db_path = get_database_path(current_environment)
+    # Create tables on startup (without persistent connections)
+    db_path = get_database_path(current_settings.environment)
     db_manager = SQLiteManager(db_path)
-    db_manager.connect()
-    db_manager.create_tables()
-
-    llm_db_path = get_llm_database_path(current_environment)
-    llm_db_manager = LLMSQLiteManager(llm_db_path)
-    llm_db_manager.connect()
-    llm_db_manager.create_tables()
+    await db_manager.connect()
+    await db_manager.create_tables()
 
     arxiv_client = ArxivClient(base_url=current_settings.arxiv_url)
 
@@ -59,18 +52,15 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         base_url=current_settings.llm_api_base_url,
     )
 
-    app.state.db_manager = db_manager
-    app.state.llm_db_manager = llm_db_manager
     app.state.paper_service = PaperService()
+    app.state.db_manager = db_manager
     app.state.arxiv_client = arxiv_client
     app.state.summary_client = summary_client
-    logger.info("Database and LLM database initialized successfully")
+    logger.info("Application initialized successfully")
 
     yield
 
-    await app.state.paper_service.close()
-    app.state.db_manager.disconnect()
-    app.state.llm_db_manager.disconnect()
+    await db_manager.disconnect()
     logger.info("TheArk API server shutting down")
 
 

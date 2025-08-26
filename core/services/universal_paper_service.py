@@ -2,8 +2,8 @@
 
 from urllib.parse import urlparse
 
+from core.database.interfaces import DatabaseManager
 from core.database.repository import PaperRepository
-from core.database.sqlite_manager import SQLiteManager
 from core.extractors.universal_extractor import UniversalPaperExtractor
 from core.models.database.entities import PaperEntity
 from core.models.domain.paper_source import PaperSource
@@ -16,7 +16,9 @@ class UniversalPaperService:
         """Initialize universal paper service."""
         self.extractor = UniversalPaperExtractor()
 
-    def create_paper_from_url(self, url: str, db_manager: SQLiteManager) -> PaperEntity:
+    async def create_paper_from_url(
+        self, url: str, db_manager: DatabaseManager
+    ) -> PaperEntity:
         """Create paper from any supported URL.
 
         Args:
@@ -59,13 +61,15 @@ class UniversalPaperService:
 
         # Save to database
         paper_repo = PaperRepository(db_manager)
-        paper_id = paper_repo.create(paper)
+        paper_id = await paper_repo.create(paper)
         paper.paper_id = paper_id
 
         return paper
 
-    def get_paper_by_identifier(
-        self, identifier: str, db_manager: SQLiteManager
+    async def get_paper_by_identifier(
+        self,
+        identifier: str,
+        db_manager: DatabaseManager,
     ) -> PaperEntity | None:
         """Get paper by universal identifier.
 
@@ -81,21 +85,26 @@ class UniversalPaperService:
             source_str, source_id = identifier.split(":", 1)
             try:
                 source = PaperSource(source_str)
-                return self._get_by_source_identifier(source, source_id, db_manager)
+                return await self._get_by_source_identifier(
+                    source, source_id, db_manager
+                )
             except ValueError:
                 # Invalid source, try as regular identifier
                 pass
 
         # Try all sources for backward compatibility
         for source in PaperSource:
-            paper = self._get_by_source_identifier(source, identifier, db_manager)
+            paper = await self._get_by_source_identifier(source, identifier, db_manager)
             if paper:
                 return paper
 
         return None
 
-    def _get_by_source_identifier(
-        self, source: PaperSource, identifier: str, db_manager: SQLiteManager
+    async def _get_by_source_identifier(
+        self,
+        source: PaperSource,
+        identifier: str,
+        db_manager: DatabaseManager,
     ) -> PaperEntity | None:
         """Get paper by source-specific identifier.
 
@@ -112,7 +121,7 @@ class UniversalPaperService:
         # For now, we'll use the existing arxiv_id field for backward compatibility
         # In the future, we might want to add source and source_identifier fields
         if source == PaperSource.ARXIV:
-            return paper_repo.get_by_arxiv_id(identifier)
+            return await paper_repo.get_by_arxiv_id(identifier)
 
         # For other sources, we'll need to implement source-specific lookup
         # For now, return None

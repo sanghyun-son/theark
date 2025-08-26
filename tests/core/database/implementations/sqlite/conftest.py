@@ -1,11 +1,12 @@
-"""Shared test fixtures for database tests."""
+"""Shared test fixtures for SQLite database tests."""
 
 from pathlib import Path
 
 import pytest
+import pytest_asyncio
 
 from core.models.database.entities import PaperEntity
-from crawler.database import SQLiteManager
+from core.database.implementations.sqlite.sqlite_manager import SQLiteManager
 from core.database.repository import (
     CrawlEventRepository,
     FeedRepository,
@@ -21,12 +22,12 @@ def temp_db_path(tmp_path: Path) -> Path:
     return tmp_path / "test.db"
 
 
-@pytest.fixture
-def db_manager(temp_db_path: Path) -> SQLiteManager:
+@pytest_asyncio.fixture
+async def db_manager(temp_db_path: Path) -> SQLiteManager:
     """Create a database manager with temporary database."""
     manager = SQLiteManager(temp_db_path)
-    with manager:
-        manager.create_tables()
+    async with manager:
+        await manager.create_tables()
         yield manager
 
 
@@ -100,7 +101,18 @@ def sample_papers() -> list[PaperEntity]:
             categories="cs.AI",
             authors="Author 2",
             url_abs="https://arxiv.org/abs/2101.00002",
-            published_at="2021-01-02T00:00:00Z",
-            updated_at="2021-01-02T00:00:00Z",
+            published_at="2021-01-01T00:00:00Z",
+            updated_at="2021-01-01T00:00:00Z",
+        ),
+        PaperEntity(
+            arxiv_id="2101.00003",
+            title="Natural Language Processing",
+            abstract="NLP techniques for text analysis",
+            primary_category="cs.CL",
+            categories="cs.CL",
+            authors="Author 3",
+            url_abs="https://arxiv.org/abs/2101.00003",
+            published_at="2021-01-01T00:00:00Z",
+            updated_at="2021-01-01T00:00:00Z",
         ),
     ]

@@ -48,7 +48,7 @@ def test_crawl_config_custom():
 
 
 @pytest.fixture
-def arxiv_crawler(mock_sqlite_db):
+def arxiv_crawler(mock_db_manager):
     """Create an ArxivCrawler instance for testing."""
     from crawler.arxiv.on_demand_crawler import OnDemandCrawlConfig
     from crawler.arxiv.periodic_crawler import PeriodicCrawlConfig
@@ -59,7 +59,7 @@ def arxiv_crawler(mock_sqlite_db):
         ),  # Short interval for testing
         on_demand=OnDemandCrawlConfig(),
     )
-    return ArxivCrawler(mock_sqlite_db, config=config)
+    return ArxivCrawler(mock_db_manager, config=config)
 
 
 def test_arxiv_crawler_initialization(arxiv_crawler):
@@ -71,7 +71,7 @@ def test_arxiv_crawler_initialization(arxiv_crawler):
     assert arxiv_crawler.periodic_crawler is not None
 
 
-def test_arxiv_crawler_initialization_with_callbacks(mock_sqlite_db):
+def test_arxiv_crawler_initialization_with_callbacks(mock_db_manager):
     """Test crawler initialization with callbacks."""
     callback_called = False
     error_called = False
@@ -85,7 +85,7 @@ def test_arxiv_crawler_initialization_with_callbacks(mock_sqlite_db):
         error_called = True
 
     crawler = ArxivCrawler(
-        mock_sqlite_db,
+        mock_db_manager,
         on_paper_crawled=on_paper_crawled,
         on_error=on_error,
     )
@@ -306,7 +306,7 @@ async def test_arxiv_crawler_get_status_with_background_loop(arxiv_crawler):
 
 @pytest.mark.asyncio
 async def test_arxiv_crawler_callback_on_paper_crawled(
-    mock_sqlite_db, mock_arxiv_client
+    mock_db_manager, mock_arxiv_client
 ):
     """Test callback when paper is crawled."""
     # Use a simple callback tracker
@@ -316,7 +316,7 @@ async def test_arxiv_crawler_callback_on_paper_crawled(
         callback_tracker["called"] = True
         callback_tracker["paper"] = paper
 
-    crawler = ArxivCrawler(mock_sqlite_db, on_paper_crawled=on_paper_crawled)
+    crawler = ArxivCrawler(mock_db_manager, on_paper_crawled=on_paper_crawled)
 
     # Setup mock paper
     mock_paper = Paper(
@@ -344,7 +344,7 @@ async def test_arxiv_crawler_callback_on_paper_crawled(
     crawler.on_demand_crawler.crawl_single_paper = mock_crawl_single_paper_with_callback
 
     await crawler.start()
-    await crawler.crawl_single_paper("1706.03762", mock_sqlite_db, mock_arxiv_client)
+    await crawler.crawl_single_paper("1706.03762", mock_db_manager, mock_arxiv_client)
 
     # Verify callback was called
     assert callback_tracker["called"] is True
@@ -354,7 +354,7 @@ async def test_arxiv_crawler_callback_on_paper_crawled(
 
 
 @pytest.mark.asyncio
-async def test_arxiv_crawler_callback_on_error(mock_sqlite_db, mock_arxiv_client):
+async def test_arxiv_crawler_callback_on_error(mock_db_manager, mock_arxiv_client):
     """Test callback when error occurs."""
     # Use a simple callback tracker
     error_tracker = {"called": False, "exception": None}
@@ -363,7 +363,7 @@ async def test_arxiv_crawler_callback_on_error(mock_sqlite_db, mock_arxiv_client
         error_tracker["called"] = True
         error_tracker["exception"] = exception
 
-    crawler = ArxivCrawler(mock_sqlite_db, on_error=on_error)
+    crawler = ArxivCrawler(mock_db_manager, on_error=on_error)
 
     # Mock the on_demand_crawler's crawl_single_paper method to trigger error callback
     async def mock_crawl_single_paper_with_error(identifier, db_manager, arxiv_client):
@@ -376,7 +376,7 @@ async def test_arxiv_crawler_callback_on_error(mock_sqlite_db, mock_arxiv_client
     crawler.on_demand_crawler.crawl_single_paper = mock_crawl_single_paper_with_error
 
     await crawler.start()
-    await crawler.crawl_single_paper("1706.03762", mock_sqlite_db, mock_arxiv_client)
+    await crawler.crawl_single_paper("1706.03762", mock_db_manager, mock_arxiv_client)
 
     # Verify error callback was called
     assert error_tracker["called"] is True

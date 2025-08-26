@@ -5,6 +5,7 @@ from enum import Enum
 from typing import Any, Awaitable, Callable
 
 from core import get_logger
+from core.database.interfaces import DatabaseManager
 from core.models.database.entities import PaperEntity
 from crawler.arxiv.client import ArxivClient
 from crawler.arxiv.core import SummarizationConfig
@@ -18,7 +19,6 @@ from crawler.arxiv.periodic_crawler import (
     PeriodicCrawler,
     PeriodicCrawlerStatus,
 )
-from crawler.database import DatabaseManager
 
 logger = get_logger(__name__)
 

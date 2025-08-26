@@ -8,7 +8,6 @@ from fastapi.responses import StreamingResponse
 from api.dependencies import (
     ArxivClientDep,
     DBManager,
-    LLMDBManager,
     PaperServiceDep,
     SummaryClientDep,
 )
@@ -25,7 +24,6 @@ async def stream_paper_summary(
     paper_service: PaperServiceDep,
     paper_data: PaperCreate,
     db_manager: DBManager,
-    llm_db_manager: LLMDBManager,
     arxiv_client: ArxivClientDep,
     summary_client: SummaryClientDep,
 ) -> StreamingResponse:
@@ -44,7 +42,10 @@ async def stream_paper_summary(
     async def generate_stream() -> AsyncGenerator[str, None]:
         try:
             async for event in paper_service.create_paper_streaming(
-                paper_data, db_manager, llm_db_manager, arxiv_client, summary_client
+                paper_data,
+                db_manager,
+                arxiv_client,
+                summary_client,
             ):
                 yield f"{event}\n\n"
         except Exception as e:
