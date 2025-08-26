@@ -1,30 +1,11 @@
 """Tests for ArXiv extractor."""
 
 import pytest
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import patch
 
-from core.extractors.arxiv_extractor import ArxivExtractor
+from core.extractors.concrete.arxiv_extractor import ArxivExtractor
+from core.extractors.exceptions import InvalidIdentifierError, ExtractionError
 from core.models.domain.paper_extraction import PaperMetadata
-from core.models.database.entities import PaperEntity
-
-
-@pytest.fixture
-def mock_arxiv_client():
-    """Mock ArxivClient."""
-    with patch("core.extractors.arxiv_extractor.ArxivClient") as mock_class:
-        mock_client = Mock()
-        mock_client.base_url = "http://export.arxiv.org/api/query"
-        mock_class.return_value = mock_client
-        yield mock_client
-
-
-@pytest.fixture
-def mock_arxiv_parser():
-    """Mock ArxivParser."""
-    with patch("core.extractors.arxiv_extractor.ArxivParser") as mock_class:
-        mock_parser = Mock()
-        mock_class.return_value = mock_parser
-        yield mock_parser
 
 
 def test_can_extract_arxiv_url() -> None:
@@ -52,55 +33,82 @@ def test_extract_identifier_from_pdf_url() -> None:
     assert identifier == "1234.5678"
 
 
+def test_extract_identifier_from_direct_id() -> None:
+    """Test extract_identifier from direct arXiv ID."""
+    extractor = ArxivExtractor()
+
+    identifier = extractor.extract_identifier("1234.5678")
+    assert identifier == "1234.5678"
+
+
+def test_extract_identifier_from_versioned_url() -> None:
+    """Test extract_identifier from versioned URL."""
+    extractor = ArxivExtractor()
+
+    identifier = extractor.extract_identifier("https://arxiv.org/abs/1234.5678v2")
+    assert identifier == "1234.5678"
+
+
 def test_extract_identifier_invalid_url() -> None:
     """Test extract_identifier with invalid URL."""
     extractor = ArxivExtractor()
 
-    with pytest.raises(ValueError, match="Invalid arXiv URL format"):
+    with pytest.raises(InvalidIdentifierError, match="Could not extract arXiv ID"):
         extractor.extract_identifier("https://invalid-url.com/1234.5678")
 
 
-def test_extract_metadata_success(mock_arxiv_client, mock_arxiv_parser) -> None:
+@pytest.mark.asyncio
+async def test_extract_metadata_success(mock_arxiv_extractor) -> None:
     """Test successful metadata extraction."""
-    # Mock paper entity
-    paper_entity = PaperEntity(
-        arxiv_id="1234.5678",
-        title="Test Paper",
-        abstract="This is a test abstract",
-        authors="Author 1;Author 2",
-        primary_category="cs.AI",
-        categories="cs.AI,cs.LG",
-        url_abs="https://arxiv.org/abs/1234.5678",
-        url_pdf="https://arxiv.org/pdf/1234.5678",
-        published_at="2023-01-01T00:00:00Z",
-        updated_at="2023-01-02T00:00:00Z",
+    # Test with a known paper ID
+    metadata = await mock_arxiv_extractor.extract_metadata_async(
+        "https://arxiv.org/abs/1706.03762"
     )
 
-    mock_arxiv_parser.parse_paper.return_value = paper_entity
-    mock_arxiv_client.get_paper = AsyncMock(return_value="<xml>test</xml>")
-
-    # Test
-    extractor = ArxivExtractor()
-    metadata = extractor.extract_metadata("https://arxiv.org/abs/1234.5678")
-
-    # Verify
+    # Verify basic structure
     assert isinstance(metadata, PaperMetadata)
-    assert metadata.title == "Test Paper"
-    assert metadata.abstract == "This is a test abstract"
-    assert metadata.authors == ["Author 1", "Author 2"]
-    assert metadata.categories == ["cs.AI", "cs.LG"]
-    assert metadata.url_abs == "https://arxiv.org/abs/1234.5678"
-    assert metadata.url_pdf == "https://arxiv.org/pdf/1234.5678"
-    assert metadata.raw_metadata == {"arxiv_id": "1234.5678"}
+    assert metadata.title
+    assert metadata.abstract
+    assert metadata.authors
+    assert metadata.url_abs == "https://arxiv.org/abs/1706.03762"
+    assert metadata.url_pdf == "https://arxiv.org/pdf/1706.03762"
+    assert metadata.raw_metadata["arxiv_id"] == "1706.03762"
 
 
-def test_extract_metadata_parse_failure(mock_arxiv_client, mock_arxiv_parser) -> None:
-    """Test metadata extraction when parsing fails."""
-    mock_arxiv_parser.parse_paper.return_value = None
-    mock_arxiv_client.get_paper = AsyncMock(return_value="<xml>test</xml>")
+@pytest.mark.asyncio
+async def test_extract_metadata_network_error() -> None:
+    """Test metadata extraction with network error."""
+    # Create extractor with invalid URL
+    extractor = ArxivExtractor(api_base_url="http://invalid-server.com/api/query")
 
-    # Test
+    with pytest.raises(ExtractionError, match="Network error"):
+        await extractor.extract_metadata_async("https://arxiv.org/abs/1706.03762")
+
+
+@pytest.mark.asyncio
+async def test_extract_metadata_server_error(mock_arxiv_extractor) -> None:
+    """Test metadata extraction with server error."""
+    # Test with a paper ID that returns server error
+    with pytest.raises(ExtractionError, match="HTTP error"):
+        await mock_arxiv_extractor.extract_metadata_async(
+            "https://arxiv.org/abs/1706.99999"
+        )
+
+
+def test_get_source_name() -> None:
+    """Test get_source_name method."""
     extractor = ArxivExtractor()
+    assert extractor.get_source_name() == "Arxiv"
 
-    with pytest.raises(ValueError, match="Failed to parse arXiv paper"):
-        extractor.extract_metadata("https://arxiv.org/abs/1234.5678")
+
+def test_custom_base_urls() -> None:
+    """Test extractor with custom base URLs."""
+    extractor = ArxivExtractor(
+        api_base_url="https://custom-api.example.com/query",
+        abs_base_url="https://custom-abs.example.com",
+        pdf_base_url="https://custom-pdf.example.com",
+    )
+
+    assert extractor.base_url == "https://custom-api.example.com/query"
+    assert extractor.abs_base_url == "https://custom-abs.example.com"
+    assert extractor.pdf_base_url == "https://custom-pdf.example.com"

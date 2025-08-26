@@ -21,7 +21,6 @@ from core.models import (
 from core.models.api.responses import StarredPapersResponse, StarResponse
 from core.models.database.entities import PaperEntity, UserStarEntity
 from core.models.domain.user import User
-from crawler.arxiv.client import ArxivClient
 from crawler.summarizer.client import SummaryClient
 from crawler.summarizer.service import SummarizationService
 
@@ -56,7 +55,6 @@ class PaperService:
         self,
         paper_data: PaperCreate,
         db_manager: DatabaseManager,
-        arxiv_client: ArxivClient,
         summary_client: SummaryClient,
         skip_auto_summarization: bool = False,
     ) -> PaperResponse:
@@ -65,13 +63,11 @@ class PaperService:
             return await self.orchestration_service.create_paper_streaming(
                 paper_data,
                 db_manager,
-                arxiv_client,
             )
 
         return await self.orchestration_service.create_paper_normal(
             paper_data,
             db_manager,
-            arxiv_client,
             summary_client,
         )
 
@@ -87,12 +83,11 @@ class PaperService:
         self,
         paper_data: PaperCreate,
         db_manager: DatabaseManager,
-        arxiv_client: ArxivClient,
         summary_client: SummaryClient,
     ) -> AsyncGenerator[str, None]:
         """Create a paper with streaming response."""
         async for event in self.orchestration_service.stream_paper_creation(
-            paper_data, db_manager, arxiv_client, summary_client
+            paper_data, db_manager, summary_client
         ):
             yield event
 
@@ -398,7 +393,6 @@ class PaperService:
         self,
         paper_data: PaperCreate,
         db_manager: DatabaseManager,
-        arxiv_client: ArxivClient,
         summary_client: SummaryClient,
     ) -> AsyncGenerator[str, None]:
         """Stream paper creation and summarization process."""
@@ -407,7 +401,6 @@ class PaperService:
         async for event in orchestration_service.stream_paper_creation(
             paper_data,
             db_manager,
-            arxiv_client,
             summary_client,
         ):
             yield event

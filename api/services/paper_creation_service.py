@@ -3,10 +3,10 @@
 from core import get_logger
 from core.database.interfaces import DatabaseManager
 from core.database.repository import PaperRepository
+from core.extractors import extractor_factory
+from core.extractors.exceptions import ExtractionError
 from core.models import PaperCreateRequest as PaperCreate
 from core.models.database.entities import PaperEntity
-from crawler.arxiv.client import ArxivClient
-from crawler.arxiv.on_demand_crawler import OnDemandCrawlConfig, OnDemandCrawler
 
 logger = get_logger(__name__)
 
@@ -23,14 +23,11 @@ class PaperCreationService:
         if not paper_data.url:
             raise ValueError("No URL provided")
 
-        # Extract arXiv ID from URL
-        import re
-
-        match = re.search(r"arxiv\.org/(?:abs|pdf)/(\d{4}\.\d{4,5})", paper_data.url)
-        if not match:
-            raise ValueError("Invalid arXiv URL format")
-
-        return match.group(1)
+        try:
+            extractor = extractor_factory.find_extractor_for_url(paper_data.url)
+            return extractor.extract_identifier(paper_data.url)
+        except Exception as e:
+            raise ValueError(f"Invalid URL format: {e}")
 
     async def _get_paper_by_arxiv_id(
         self, arxiv_id: str, paper_repo: PaperRepository
@@ -42,14 +39,13 @@ class PaperCreationService:
         self,
         paper_data: PaperCreate,
         db_manager: DatabaseManager,
-        arxiv_client: ArxivClient,
     ) -> PaperEntity:
-        """Create a paper with injected ArxivClient."""
+        """Create a paper using the new extractor system."""
         try:
             arxiv_id = self._extract_arxiv_id(paper_data)
         except ValueError as e:
-            logger.error(f"Invalid arXiv URL: {e}")
-            raise ValueError(f"Invalid arXiv URL format: {e}")
+            logger.error(f"Invalid URL: {e}")
+            raise ValueError(f"Invalid URL format: {e}")
 
         paper_repo = PaperRepository(db_manager)
 
@@ -59,27 +55,49 @@ class PaperCreationService:
             logger.info(f"Paper {arxiv_id} already exists, returning existing paper")
             return existing_paper
 
-        # Crawl the paper with injected client
-        crawled_paper = await self._crawl_paper(arxiv_id, db_manager, arxiv_client)
-        return crawled_paper
+        # Extract paper metadata using the new extractor system
+        extracted_paper = await self._extract_paper(
+            paper_data.url, arxiv_id, paper_repo
+        )
+        return extracted_paper
 
-    async def _crawl_paper(
+    async def _extract_paper(
         self,
+        url: str,
         arxiv_id: str,
-        db_manager: DatabaseManager,
-        arxiv_client: ArxivClient,
+        paper_repo: PaperRepository,
     ) -> PaperEntity:
-        """Crawl a single paper from arXiv."""
-        crawler_config = OnDemandCrawlConfig()
-        async with OnDemandCrawler(config=crawler_config) as crawler:
-            crawled_paper = await crawler.crawl_single_paper(
-                arxiv_id, db_manager, arxiv_client
-            )
-            if not crawled_paper:
-                raise ValueError(f"Failed to crawl paper {arxiv_id}")
+        """Extract paper metadata using the new extractor system."""
+        try:
+            extractor = extractor_factory.find_extractor_for_url(url)
+            metadata = await extractor.extract_metadata_async(url)
 
-            logger.info(f"Successfully crawled paper {arxiv_id}")
-            return crawled_paper
+            # Convert PaperMetadata to PaperEntity
+            paper_entity = PaperEntity(
+                arxiv_id=arxiv_id,
+                title=metadata.title,
+                abstract=metadata.abstract,
+                authors=";".join(metadata.authors),
+                primary_category=(
+                    metadata.categories[0] if metadata.categories else "cs.AI"
+                ),
+                categories=",".join(metadata.categories),
+                url_abs=metadata.url_abs,
+                url_pdf=metadata.url_pdf,
+                published_at=metadata.published_date,
+                updated_at=metadata.updated_date,
+            )
+
+            # Save to database
+            paper_id = await paper_repo.create(paper_entity)
+            paper_entity.paper_id = paper_id
+
+            logger.info(f"Successfully extracted paper {arxiv_id}")
+            return paper_entity
+
+        except ExtractionError as e:
+            logger.error(f"Failed to extract paper {arxiv_id}: {e}")
+            raise ValueError(f"Failed to extract paper {arxiv_id}: {e}")
 
     async def get_paper_by_identifier(
         self, paper_identifier: str, db_manager: DatabaseManager

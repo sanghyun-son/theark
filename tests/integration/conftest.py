@@ -2,88 +2,52 @@
 
 import json
 import os
+from typing import AsyncGenerator
 from pathlib import Path
 from unittest.mock import patch
 
-import pytest
 import pytest_asyncio
-from pytest_httpserver import HTTPServer
 from fastapi.testclient import TestClient
 
 from api.app import create_app
 from core.database.implementations.sqlite.sqlite_manager import SQLiteManager
-from core.database.repository import UserRepository
-from core.models.domain.user import DEFAULT_USER_ID
 
 
 @pytest_asyncio.fixture
 async def integration_client(
     tmp_path: Path,
-    mock_arxiv_server: HTTPServer,
-    mock_openai_server: HTTPServer,
-) -> TestClient:
+    mock_arxiv_extractor,
+    mock_summary_client,
+) -> AsyncGenerator[TestClient, None]:
     """Create a test client with real database managers using mock servers."""
     # Set up URLs first
-    arxiv_url = f"http://{mock_arxiv_server.host}:{mock_arxiv_server.port}/api/query"
-    openai_url = f"http://{mock_openai_server.host}:{mock_openai_server.port}/v1"
 
     # Set environment variables for testing
-    test_env = {
-        "THEARK_ENV": "testing",
-        "THEARK_ARXIV_API_BASE_URL": arxiv_url,
-        "THEARK_LLM_API_BASE_URL": openai_url,
-        "OPENAI_API_KEY": "test-api-key",
-        "THEARK_LOG_LEVEL": "DEBUG",
-    }
+    test_env = {"THEARK_ENV": "testing", "THEARK_LOG_LEVEL": "DEBUG"}
 
     with patch.dict(os.environ, test_env, clear=True):
         # Force reload settings with new environment variables
-        from core.config import load_settings
-        import core.config
+        from core import config
+        from core.extractors import extractor_factory
 
-        core.config.settings = load_settings()
+        config.settings = config.load_settings()
 
         # Create app - it will automatically detect testing environment and use temp DB paths
         app = create_app()
 
-        # Manually initialize app state since lifespan might not run in tests
-        from api.services.paper_service import PaperService
-        from crawler.arxiv.client import ArxivClient
-        from crawler.summarizer.openai_summarizer import OpenAISummarizer
+        app.state.db_manager = SQLiteManager(tmp_path / "test.db")
+        await app.state.db_manager.connect()
+        await app.state.db_manager.create_tables()
 
-        # Use tmp_path for testing databases
-        db_path = tmp_path / "test.db"
-        db_manager = SQLiteManager(db_path)
-
-        await db_manager.connect()
-        await db_manager.create_tables()
-
-        arxiv_client = ArxivClient(base_url=arxiv_url)
-        summary_client = OpenAISummarizer(
-            api_key="test-api-key",
-            base_url=openai_url,
+        extractor_factory.register_extractor(
+            "arxiv",
+            mock_arxiv_extractor,
         )
+        app.state.summary_client = mock_summary_client
 
-        app.state.db_manager = db_manager
-        app.state.paper_service = PaperService()
-        app.state.arxiv_client = arxiv_client
-        app.state.summary_client = summary_client
+        yield TestClient(app)
 
-        # Create default user for star functionality
-        user_repository = UserRepository(db_manager)
-        user = await user_repository.get_user_by_id(DEFAULT_USER_ID)
-
-        if user is None:
-            from core.models import UserEntity
-
-            user_entity = UserEntity(
-                user_id=DEFAULT_USER_ID,
-                email="test@example.com",
-                display_name="test_user",
-            )
-            await user_repository.create_user(user_entity)
-
-        return TestClient(app)
+        await app.state.db_manager.disconnect()
 
 
 def parse_sse_events(content: str) -> list[dict]:

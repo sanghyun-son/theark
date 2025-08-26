@@ -16,7 +16,6 @@ from core.models.api.streaming import (
     StreamingStatusEvent,
 )
 from core.models.database.entities import PaperEntity
-from crawler.arxiv.client import ArxivClient
 from crawler.summarizer.client import SummaryClient
 
 logger = get_logger(__name__)
@@ -34,13 +33,10 @@ class PaperOrchestrationService:
         self,
         paper_data: PaperCreate,
         db_manager: DatabaseManager,
-        arxiv_client: ArxivClient,
         summary_client: SummaryClient,
     ) -> PaperResponse:
         """Create paper with background summarization."""
-        paper = await self.creation_service.create_paper(
-            paper_data, db_manager, arxiv_client
-        )
+        paper = await self.creation_service.create_paper(paper_data, db_manager)
 
         # Only start background summarization if not skipped
         if not getattr(paper_data, "skip_auto_summarization", False):
@@ -57,12 +53,9 @@ class PaperOrchestrationService:
         self,
         paper_data: PaperCreate,
         db_manager: DatabaseManager,
-        arxiv_client: ArxivClient,
     ) -> PaperResponse:
         """Create paper without background summarization (for streaming)."""
-        paper = await self.creation_service.create_paper(
-            paper_data, db_manager, arxiv_client
-        )
+        paper = await self.creation_service.create_paper(paper_data, db_manager)
         return PaperResponse.from_crawler_paper(paper, None)
 
     async def get_paper(
@@ -104,7 +97,6 @@ class PaperOrchestrationService:
         self,
         paper_data: PaperCreate,
         db_manager: DatabaseManager,
-        arxiv_client: ArxivClient,
         summary_client: SummaryClient,
     ) -> AsyncGenerator[str, None]:
         """Stream paper creation and immediate summarization process.
@@ -115,9 +107,7 @@ class PaperOrchestrationService:
             yield self._create_event(StreamingStatusEvent(message="Creating paper..."))
             logger.info(f"Creating paper: {paper_data.url}")
 
-            paper_response = await self.create_paper_streaming(
-                paper_data, db_manager, arxiv_client
-            )
+            paper_response = await self.create_paper_streaming(paper_data, db_manager)
             yield self._create_event(StreamingCompleteEvent(paper=paper_response))
             logger.info(f"Paper created successfully: {paper_response.arxiv_id}")
 

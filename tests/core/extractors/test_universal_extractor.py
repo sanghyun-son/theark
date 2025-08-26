@@ -35,17 +35,6 @@ def mock_arxiv_extractor():
     return mock
 
 
-def test_register_extractor(mock_extractor) -> None:
-    """Test registering a new extractor."""
-    extractor = UniversalPaperExtractor()
-
-    # Register the extractor
-    extractor.register_extractor(mock_extractor)
-
-    # Verify it's registered
-    assert len(extractor.extractors) == 2  # ArxivExtractor + mock_extractor
-
-
 def test_extract_paper_success(mock_arxiv_extractor) -> None:
     """Test successful paper extraction."""
     extractor = UniversalPaperExtractor()

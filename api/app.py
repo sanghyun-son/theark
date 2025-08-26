@@ -28,39 +28,36 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     logger.info(f"TheArk: {current_settings.environment}")
     logger.info(f"Authentication required: {current_settings.auth_required}")
 
-    from api.services.paper_service import PaperService
     from core.database.config import get_database_path
     from core.database.implementations.sqlite import SQLiteManager
-    from crawler.arxiv.client import ArxivClient
+    from core.extractors import extractor_factory
+    from core.extractors.concrete import ArxivExtractor
     from crawler.summarizer.openai_summarizer import OpenAISummarizer
 
     # Create tables on startup (without persistent connections)
     db_path = get_database_path(current_settings.environment)
-    db_manager = SQLiteManager(db_path)
-    await db_manager.connect()
-    await db_manager.create_tables()
+    app.state.db_manager = SQLiteManager(db_path)
+    await app.state.db_manager.connect()
+    await app.state.db_manager.create_tables()
 
-    arxiv_client = ArxivClient(base_url=current_settings.arxiv_url)
+    # Setup extractors
+    extractor_factory.register_extractor("arxiv", ArxivExtractor())
 
     fake_key = "*"
     openai_api_key = os.getenv("OPENAI_API_KEY", fake_key)
     if openai_api_key == fake_key:
         logger.warning("OPENAI_API_KEY is not set.")
 
-    summary_client = OpenAISummarizer(
+    app.state.summary_client = OpenAISummarizer(
         api_key=openai_api_key,
         base_url=current_settings.llm_api_base_url,
     )
 
-    app.state.paper_service = PaperService()
-    app.state.db_manager = db_manager
-    app.state.arxiv_client = arxiv_client
-    app.state.summary_client = summary_client
-    logger.info("Application initialized successfully")
+    logger.info("TheArk API server initialized successfully")
 
     yield
 
-    await db_manager.disconnect()
+    await app.state.db_manager.disconnect()
     logger.info("TheArk API server shutting down")
 
 

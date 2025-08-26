@@ -35,7 +35,6 @@ class SQLiteConnection(DatabaseConnection):
             )
             self._connection.row_factory = sqlite3.Row
             self._configure_connection()
-            logger.info(f"Connected to SQLite: {self.db_path}")
         except sqlite3.Error as e:
             logger.error(f"Failed to connect to SQLite database: {e}")
             raise
@@ -45,7 +44,6 @@ class SQLiteConnection(DatabaseConnection):
         if self._connection:
             self._connection.close()
             self._connection = None
-            logger.info("Disconnected from SQLite")
 
     async def execute(self, query: str, params: DatabaseParamType = None) -> Any:
         """Execute a query.
