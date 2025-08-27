@@ -26,7 +26,7 @@ class PaperResponse(BaseModel):
         summary: SummaryEntity | None = None,
         is_starred: bool = False,
     ) -> "PaperResponse":
-        """Create PaperResponse from crawler Paper model (legacy compatibility)."""
+        """Create PaperResponse from PaperEntity (legacy compatibility)."""
         return cls(
             paper_id=paper.paper_id or 0,
             arxiv_id=paper.arxiv_id,

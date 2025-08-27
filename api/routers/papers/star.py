@@ -3,10 +3,10 @@
 from fastapi import APIRouter, Query
 
 from api.dependencies import CurrentUser, DBManager
-from api.services.paper_service import PaperService
 from api.utils.error_handler import handle_async_api_operation
 from core.models.api.requests import StarRequest
 from core.models.api.responses import StarredPapersResponse, StarResponse
+from core.services.paper_service import PaperService
 
 router = APIRouter()
 

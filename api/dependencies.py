@@ -2,15 +2,16 @@
 
 from typing import Annotated
 
-from fastapi import Depends, Request
+from fastapi import Depends, HTTPException, Request
 
 from core import get_logger
+from core.batch.background_manager import BackgroundBatchManager
 from core.config import load_settings
 from core.database.interfaces import DatabaseManager
 from core.database.repository import UserRepository
+from core.llm.openai_client import UnifiedOpenAIClient
 from core.models.database.entities import UserEntity
 from core.models.domain.user import DEFAULT_USER_ID, User
-from crawler.summarizer.openai_summarizer import OpenAISummarizer
 
 logger = get_logger(__name__)
 settings = load_settings()
@@ -45,16 +46,31 @@ async def get_current_user(request: Request) -> User:
     )
 
 
-def get_summary_client(request: Request) -> OpenAISummarizer:
-    """Get SummaryClient instance from app state."""
-    return request.app.state.summary_client  # type: ignore
-
-
 def get_db_manager(request: Request) -> DatabaseManager:
     """Get database manager from app state."""
     return request.app.state.db_manager  # type: ignore
 
 
+def get_batch_manager(request: Request) -> BackgroundBatchManager:
+    """Get background batch manager from app state."""
+    if not hasattr(request.app.state, "background_batch_manager"):
+        raise HTTPException(
+            status_code=503, detail="Background batch manager not available"
+        )
+    return request.app.state.background_batch_manager  # type: ignore
+
+
+def get_summary_client(request: Request) -> UnifiedOpenAIClient:
+    """Get OpenAI summary client from app state."""
+    if not hasattr(request.app.state, "summary_client"):
+        raise HTTPException(
+            status_code=503, detail="OpenAI summary client not available"
+        )
+    return request.app.state.summary_client  # type: ignore
+
+
 CurrentUser = Annotated[User, Depends(get_current_user)]
-SummaryClientDep = Annotated[OpenAISummarizer, Depends(get_summary_client)]
+SummaryClientDep = Annotated[UnifiedOpenAIClient, Depends(get_summary_client)]
 DBManager = Annotated[DatabaseManager, Depends(get_db_manager)]
+BatchManager = Annotated[BackgroundBatchManager, Depends(get_batch_manager)]
+OpenAIBatchClientDep = Annotated[UnifiedOpenAIClient, Depends(get_summary_client)]

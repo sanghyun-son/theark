@@ -237,6 +237,39 @@ class SQLiteManager(DatabaseManager):
                 estimated_cost_usd REAL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )""",
+            # 10) LLM 배치 요청 테이블
+            """CREATE TABLE IF NOT EXISTS llm_batch_requests (
+                batch_id TEXT PRIMARY KEY,
+                status TEXT NOT NULL DEFAULT 'validating',
+                input_file_id TEXT NOT NULL,
+                output_file_id TEXT,
+                error_file_id TEXT,
+                completion_window TEXT NOT NULL DEFAULT '24h',
+                endpoint TEXT NOT NULL DEFAULT '/v1/chat/completions',
+                metadata TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                in_progress_at TIMESTAMP,
+                expires_at TIMESTAMP,
+                finalizing_at TIMESTAMP,
+                completed_at TIMESTAMP,
+                request_counts TEXT,
+                retry_count INTEGER DEFAULT 0
+            )""",
+            # 11) LLM 배치 아이템 테이블
+            """CREATE TABLE IF NOT EXISTS llm_batch_items (
+                item_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                batch_id TEXT NOT NULL REFERENCES llm_batch_requests(batch_id)
+                         ON DELETE CASCADE,
+                paper_id INTEGER NOT NULL REFERENCES paper(paper_id)
+                         ON DELETE CASCADE,
+                status TEXT NOT NULL DEFAULT 'pending',
+                input_data TEXT NOT NULL,
+                output_data TEXT,
+                error_message TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                processed_at TIMESTAMP,
+                UNIQUE (batch_id, paper_id)
+            )""",
             # 9) 인덱스들
             """CREATE INDEX IF NOT EXISTS idx_paper_published_at
                 ON paper(published_at DESC)""",
@@ -259,11 +292,44 @@ class SQLiteManager(DatabaseManager):
         ]
 
         try:
+            # Create tables
             for statement in statements:
-                await self._connection.execute(statement)
+                await self.execute(statement)
+
+            # Run migrations
+            await self._run_migrations()
+
             logger.info("Database tables created successfully")
         except Exception as e:
             logger.error(f"Failed to create tables: {e}")
+            raise
+
+    async def _run_migrations(self) -> None:
+        """Run database migrations."""
+        try:
+            # Migration 1: Add summary_status column to paper table
+            await self._migrate_add_summary_status()
+        except Exception as e:
+            logger.error(f"Migration failed: {e}")
+            raise
+
+    async def _migrate_add_summary_status(self) -> None:
+        """Migration to add summary_status column to paper table."""
+        try:
+            # Check if summary_status column exists
+            result = await self.fetch_all("PRAGMA table_info(paper)")
+            columns = [row["name"] for row in result] if result else []
+
+            if "summary_status" not in columns:
+                logger.info("Adding summary_status column to paper table")
+                await self.execute(
+                    "ALTER TABLE paper ADD COLUMN summary_status TEXT NOT NULL DEFAULT 'done'"
+                )
+                logger.info("Migration completed: summary_status column added")
+            else:
+                logger.debug("summary_status column already exists")
+        except Exception as e:
+            logger.error(f"Failed to migrate summary_status column: {e}")
             raise
 
     async def drop_tables(self) -> None:

@@ -94,3 +94,70 @@ class TestSettings:
             assert settings.auth_required is True
             assert settings.auth_header_name == "X-API-Key"
             assert settings.log_level == "DEBUG"
+
+    def test_batch_settings_integration(self) -> None:
+        """Test batch settings integration with other settings."""
+        env_vars = {
+            "THEARK_ENV": "production",
+            "THEARK_BATCH_ENABLED": "false",
+            "THEARK_BATCH_MAX_ITEMS": "500",
+        }
+
+        with patch.dict(os.environ, env_vars, clear=True):
+            from core.config import load_settings
+
+            settings = load_settings()
+
+            # Test that batch settings work with other settings
+            assert settings.environment == Environment.PRODUCTION
+            assert settings.auth_required is True  # Production mode
+            assert settings.batch_enabled is False
+            assert settings.batch_max_items == 500
+            # Other batch settings should have defaults
+            assert settings.batch_summary_interval == 3600
+            assert settings.batch_fetch_interval == 600
+
+    def test_batch_settings_custom(self) -> None:
+        """Test custom batch settings via environment variables."""
+        env_vars = {
+            "THEARK_BATCH_SUMMARY_INTERVAL": "1800",
+            "THEARK_BATCH_FETCH_INTERVAL": "300",
+            "THEARK_BATCH_MAX_ITEMS": "500",
+            "THEARK_BATCH_DAILY_LIMIT": "5000",
+            "THEARK_BATCH_ENABLED": "false",
+            "THEARK_BATCH_MAX_RETRIES": "5",
+        }
+
+        with patch.dict(os.environ, env_vars, clear=True):
+            from core.config import load_settings
+
+            settings = load_settings()
+
+            assert settings.batch_summary_interval == 1800
+            assert settings.batch_fetch_interval == 300
+            assert settings.batch_max_items == 500
+            assert settings.batch_daily_limit == 5000
+            assert settings.batch_enabled is False
+            assert settings.batch_max_retries == 5
+
+    def test_batch_settings_boolean_parsing(self) -> None:
+        """Test batch enabled boolean parsing."""
+        # Test true values
+        for true_value in ["true", "True", "TRUE", "1", "yes", "on"]:
+            with patch.dict(
+                os.environ, {"THEARK_BATCH_ENABLED": true_value}, clear=True
+            ):
+                from core.config import load_settings
+
+                settings = load_settings()
+                assert settings.batch_enabled is True
+
+        # Test false values
+        for false_value in ["false", "False", "FALSE", "0", "no", "off", ""]:
+            with patch.dict(
+                os.environ, {"THEARK_BATCH_ENABLED": false_value}, clear=True
+            ):
+                from core.config import load_settings
+
+                settings = load_settings()
+                assert settings.batch_enabled is False

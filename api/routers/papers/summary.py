@@ -10,10 +10,10 @@ from api.dependencies import (
     SummaryClientDep,
 )
 from api.literals import CONTENT_TYPE_EVENT_STREAM, EventType
-from api.services.paper_service import PaperService
 from api.utils.error_handler import handle_async_api_operation
 from core.models import PaperCreateRequest as PaperCreate
 from core.models import SummaryEntity, SummaryReadResponse
+from core.services.paper_service import PaperService
 
 router = APIRouter()
 

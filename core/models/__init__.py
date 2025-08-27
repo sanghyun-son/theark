@@ -50,6 +50,9 @@ from core.models.external.openai import (
     PaperAnalysis,
 )
 
+# Summarization models
+from core.models.summarization import SummaryRequest, SummaryResponse
+
 __all__ = [
     # Domain models
     "User",
@@ -87,4 +90,7 @@ __all__ = [
     "ChatCompletionRequest",
     "ChatCompletionResponse",
     "PaperAnalysis",
+    # Summarization models
+    "SummaryRequest",
+    "SummaryResponse",
 ]

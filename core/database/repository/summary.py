@@ -15,11 +15,6 @@ class SummaryRepository:
         """Initialize repository with database manager."""
         self.db = db_manager
 
-        # Log the database manager state for debugging
-        logger.debug(f"SummaryRepository initialized with db_manager: {db_manager}")
-        if hasattr(db_manager, "connection"):
-            logger.debug(f"Database connection state: {db_manager.connection}")
-
     def _row_to_summary(self, row: RepositoryRowType) -> SummaryEntity:
         """Convert database row to Summary model.
 

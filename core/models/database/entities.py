@@ -21,6 +21,10 @@ class PaperEntity(BaseModel):
     url_pdf: str | None = None
     published_at: str = Field(..., description="ISO8601 datetime")
     updated_at: str = Field(..., description="ISO8601 datetime")
+    summary_status: str = Field(
+        default="batched",
+        description="Summary status: batched, processing, done",
+    )
 
     @field_validator("arxiv_id")
     @classmethod

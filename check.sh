@@ -3,7 +3,7 @@
 # TheArk Code Quality Check Script
 # Performs type checking, linting, and formatting checks
 
-# Don't exit on error, handle them manually
+set -euo pipefail  # Exit on error, undefined vars, pipe failures
 
 # Colors for output
 RED='\033[0;31m'
@@ -30,11 +30,37 @@ print_error() {
 }
 
 # Source directories to check
-SOURCE_DIRS="core/ crawler/ api/"
+SOURCE_DIRS="core/ api/"
 
 # Function to check if command exists
 command_exists() {
     command -v "$1" >/dev/null 2>&1
+}
+
+# Function to run a command with proper output handling
+run_command() {
+    local tool_name="$1"
+    local command="$2"
+    local action="$3"
+    
+    echo "[$tool_name]"
+    print_status "$action..."
+    
+    if $VERBOSE; then
+        if eval "$command"; then
+            print_success "$action completed successfully"
+        else
+            print_error "$action failed"
+            return 1
+        fi
+    else
+        if eval "$command" >/dev/null 2>&1; then
+            print_success "$action completed successfully"
+        else
+            print_error "$action failed"
+            return 1
+        fi
+    fi
 }
 
 # Check if uv is available
@@ -96,45 +122,34 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+# Function to run formatting checks (black and isort)
+run_formatting() {
+    # Black - can be auto-fixed
+    if $FIX_MODE; then
+        run_command "black" "uv run black $SOURCE_DIRS" "Fixing code formatting"
+    else
+        run_command "black" "uv run black --check $SOURCE_DIRS" "Checking code formatting"
+    fi
+    
+    # isort - can be auto-fixed
+    if $FIX_MODE; then
+        run_command "isort" "uv run isort $SOURCE_DIRS" "Fixing import sorting"
+    else
+        run_command "isort" "uv run isort --check-only $SOURCE_DIRS" "Checking import sorting"
+    fi
+}
+
 # Function to run type checking
 run_typecheck() {
-    echo "[mypy]"
-    print_status "Running type checking..."
-    if $VERBOSE; then
-        if uv run mypy $SOURCE_DIRS --ignore-missing-imports --strict; then
-            print_success "Type checking passed"
-        else
-            print_error "Type checking failed"
-            return 1
-        fi
-    else
-        if uv run mypy $SOURCE_DIRS --ignore-missing-imports --strict >/dev/null 2>&1; then
-            print_success "Type checking passed"
-        else
-            print_error "Type checking failed"
-            return 1
-        fi
-    fi
+    run_command "mypy" "uv run mypy $SOURCE_DIRS --ignore-missing-imports --strict" "Running type checking"
 }
 
 # Function to run linting
 run_linting() {
-    echo "[flake8]"
-    print_status "Running linting..."
-    if $VERBOSE; then
-        if uv run flake8 $SOURCE_DIRS; then
-            print_success "Linting passed"
-        else
-            print_warning "Linting found issues (some line length warnings)"
-        fi
-    else
-        if uv run flake8 $SOURCE_DIRS >/dev/null 2>&1; then
-            print_success "Linting passed"
-        else
-            print_warning "Linting found issues (some line length warnings)"
-        fi
-    fi
+    # flake8 - cannot be auto-fixed
+    run_command "flake8" "uv run flake8 $SOURCE_DIRS" "Running linting"
     
+    # bandit - security checks, always run
     echo "[bandit]"
     print_status "Running security checks..."
     if $VERBOSE; then
@@ -143,83 +158,6 @@ run_linting() {
         uv run bandit -r $SOURCE_DIRS -f json -o bandit-report.json >/dev/null 2>&1 || true
     fi
     print_success "Security checks completed"
-}
-
-# Function to run formatting checks
-run_formatting() {
-    echo "[black]"  
-    if $FIX_MODE; then
-        print_status "Fixing code formatting..."
-        if $VERBOSE; then
-            if uv run black $SOURCE_DIRS examples/; then
-                print_success "Code formatting fixed"
-            else
-                print_error "Code formatting fix failed"
-                return 1
-            fi
-        else
-            if uv run black $SOURCE_DIRS examples/ >/dev/null 2>&1; then
-                print_success "Code formatting fixed"
-            else
-                print_error "Code formatting fix failed"
-                return 1
-            fi
-        fi
-    else
-        print_status "Checking code formatting..."
-        if $VERBOSE; then
-            if uv run black --check $SOURCE_DIRS examples/; then
-                print_success "Code formatting check passed"
-            else
-                print_error "Code formatting check failed"
-                return 1
-            fi
-        else
-            if uv run black --check $SOURCE_DIRS examples/ >/dev/null 2>&1; then
-                print_success "Code formatting check passed"
-            else
-                print_error "Code formatting check failed"
-                return 1
-            fi
-        fi
-    fi
-    
-    echo "[isort]"
-    if $FIX_MODE; then
-        print_status "Fixing import sorting..."
-        if $VERBOSE; then
-            if uv run isort $SOURCE_DIRS examples/; then
-                print_success "Import sorting fixed"
-            else
-                print_error "Import sorting fix failed"
-                return 1
-            fi
-        else
-            if uv run isort $SOURCE_DIRS examples/ >/dev/null 2>&1; then
-                print_success "Import sorting fixed"
-            else
-                print_error "Import sorting fix failed"
-                return 1
-            fi
-        fi
-    else
-        print_status "Checking import sorting..."
-        if $VERBOSE; then
-            if uv run isort --check-only $SOURCE_DIRS examples/; then
-                print_success "Import sorting check passed"
-            else
-                print_error "Import sorting check failed"
-                return 1
-            fi
-        else
-            if uv run isort --check-only $SOURCE_DIRS examples/ >/dev/null 2>&1; then
-                print_success "Import sorting check passed"
-            else
-                print_error "Import sorting check failed"
-                return 1
-            fi
-        fi
-    fi
 }
 
 # Main execution
@@ -237,29 +175,28 @@ case $CHECK_TYPE in
         print_status "Running all code quality checks..."
         echo ""
         
-        FAILED=0
-        
-        if ! run_typecheck; then
-            FAILED=1
-        fi
-        echo ""
-        
-        if ! run_linting; then
-            FAILED=1
-        fi
-        echo ""
-        
+        # Run formatting first (can be auto-fixed)
         if ! run_formatting; then
-            FAILED=1
-        fi
-        echo ""
-        
-        if [ $FAILED -eq 0 ]; then
-            print_success "All code quality checks passed! 🎉"
-        else
-            print_error "Some code quality checks failed!"
+            print_error "Formatting checks failed!"
             exit 1
         fi
+        echo ""
+        
+        # Run type checking
+        if ! run_typecheck; then
+            print_error "Type checking failed!"
+            exit 1
+        fi
+        echo ""
+        
+        # Run linting last (cannot be auto-fixed)
+        if ! run_linting; then
+            print_error "Linting failed!"
+            exit 1
+        fi
+        echo ""
+        
+        print_success "All code quality checks passed! 🎉"
         ;;
     *)
         print_error "Unknown check type: $CHECK_TYPE"

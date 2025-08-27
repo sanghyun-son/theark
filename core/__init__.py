@@ -8,12 +8,14 @@ from .log import (
     setup_test_logging,
 )
 from .models.domain.task import TaskManagerStatus, TaskStats
-from .periodic_task import (
-    PeriodicTask,
-    PeriodicTaskManager,
-    TaskStatus,
-)
 from .rate_limiter import AsyncRateLimiter
+from .services import (
+    PaperCreationService,
+    PaperOrchestrationService,
+    PaperService,
+    PaperSummarizationService,
+    UniversalPaperService,
+)
 from .types import Environment
 
 __all__ = [
@@ -25,9 +27,11 @@ __all__ = [
     "setup_production_logging",
     "setup_test_logging",
     "AsyncRateLimiter",
-    "PeriodicTask",
-    "PeriodicTaskManager",
-    "TaskStatus",
     "TaskStats",
     "TaskManagerStatus",
+    "PaperCreationService",
+    "PaperOrchestrationService",
+    "PaperService",
+    "PaperSummarizationService",
+    "UniversalPaperService",
 ]

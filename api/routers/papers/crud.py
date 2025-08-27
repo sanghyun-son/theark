@@ -7,7 +7,6 @@ from api.dependencies import (
     DBManager,
     SummaryClientDep,
 )
-from api.services.paper_service import PaperService
 from api.utils.error_handler import handle_async_api_operation
 from core.models import PaperCreateRequest as PaperCreate
 from core.models import (
@@ -15,6 +14,7 @@ from core.models import (
     PaperListResponse,
     PaperResponse,
 )
+from core.services.paper_service import PaperService
 
 router = APIRouter()
 

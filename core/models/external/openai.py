@@ -1,6 +1,6 @@
 """OpenAI API models for external service integration."""
 
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -170,3 +170,61 @@ class PaperAnalysis(BaseModel):
             "conclusion",
             "relevance",
         ]
+
+
+class BatchRequest(BaseModel):
+    """OpenAI Batch API request model."""
+
+    id: str | None = Field(default=None, description="Unique batch request ID")
+    input_file_id: str = Field(..., description="ID of the uploaded input file")
+    endpoint: str = Field(
+        default="/v1/chat/completions", description="API endpoint for batch processing"
+    )
+    completion_window: str = Field(
+        default="24h", description="Time window for batch completion (24h, 24h, 24h)"
+    )
+    metadata: dict[str, Any] | None = Field(
+        default=None, description="Additional metadata for the batch request"
+    )
+
+
+class BatchResponse(BaseModel):
+    """OpenAI Batch API response model."""
+
+    id: str = Field(..., description="Unique batch request ID")
+    object: str = Field(default="batch", description="Object type")
+    endpoint: str = Field(..., description="API endpoint used")
+    errors: dict[str, Any] | None = Field(
+        default=None, description="Error information if batch creation failed"
+    )
+    input_file_id: str = Field(..., description="ID of the input file")
+    completion_window: str = Field(..., description="Completion window")
+    status: str = Field(
+        ...,
+        description="Batch status: validating, failed, in_progress, completed, expired",
+    )
+    output_file_id: str | None = Field(
+        default=None, description="ID of the output file with results"
+    )
+    error_file_id: str | None = Field(
+        default=None, description="ID of the error file if any"
+    )
+    created_at: int = Field(..., description="Unix timestamp when batch was created")
+    in_progress_at: int | None = Field(
+        default=None, description="Unix timestamp when batch started processing"
+    )
+    expires_at: int | None = Field(
+        default=None, description="Unix timestamp when batch expires"
+    )
+    finalizing_at: int | None = Field(
+        default=None, description="Unix timestamp when batch started finalizing"
+    )
+    completed_at: int | None = Field(
+        default=None, description="Unix timestamp when batch completed"
+    )
+    request_counts: dict[str, int] | None = Field(
+        default=None, description="Counts of requests by status"
+    )
+    metadata: dict[str, Any] | None = Field(
+        default=None, description="Additional metadata"
+    )

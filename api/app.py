@@ -12,7 +12,13 @@ from fastapi.staticfiles import StaticFiles
 from core import get_logger, setup_logging
 from core.config import load_settings
 
-from .routers import common_router, config_router, main_router, papers_router
+from .routers import (
+    batch_router,
+    common_router,
+    config_router,
+    main_router,
+    papers_router,
+)
 
 settings = load_settings()
 log_level = getattr(logging, settings.log_level.upper(), logging.INFO)
@@ -28,11 +34,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     logger.info(f"TheArk: {current_settings.environment}")
     logger.info(f"Authentication required: {current_settings.auth_required}")
 
+    from core.batch.background_manager import BackgroundBatchManager
     from core.database.config import get_database_path
     from core.database.implementations.sqlite import SQLiteManager
     from core.extractors import extractor_factory
     from core.extractors.concrete import ArxivExtractor
-    from crawler.summarizer.openai_summarizer import OpenAISummarizer
+    from core.llm.openai_client import UnifiedOpenAIClient
 
     # Create tables on startup (without persistent connections)
     db_path = get_database_path(current_settings.environment)
@@ -48,14 +55,37 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     if openai_api_key == fake_key:
         logger.warning("OPENAI_API_KEY is not set.")
 
-    app.state.summary_client = OpenAISummarizer(
+    app.state.summary_client = UnifiedOpenAIClient(
         api_key=openai_api_key,
         base_url=current_settings.llm_api_base_url,
+        model=current_settings.llm_model,
     )
+
+    # Initialize background batch manager
+    app.state.background_batch_manager = BackgroundBatchManager(current_settings)
+
+    # Start background batch processing if enabled
+    if current_settings.batch_enabled:
+        try:
+            await app.state.background_batch_manager.start(
+                app.state.db_manager,
+                app.state.summary_client,
+            )
+        except Exception as e:
+            logger.error(f"Failed to start background batch manager: {e}")
+    else:
+        logger.info("Background batch processing is disabled")
 
     logger.info("TheArk API server initialized successfully")
 
     yield
+
+    # Stop background batch processing
+    if hasattr(app.state, "background_batch_manager"):
+        try:
+            await app.state.background_batch_manager.stop()
+        except Exception as e:
+            logger.error(f"Error stopping background batch manager: {e}")
 
     await app.state.db_manager.disconnect()
     logger.info("TheArk API server shutting down")
@@ -85,6 +115,7 @@ def create_app() -> FastAPI:
     app.include_router(common_router)
     app.include_router(config_router)
     app.include_router(papers_router)
+    app.include_router(batch_router)
     return app
 
 

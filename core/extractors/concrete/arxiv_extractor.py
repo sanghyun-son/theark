@@ -2,6 +2,7 @@
 
 import re
 from datetime import datetime
+from urllib.parse import urljoin
 from xml.etree import ElementTree
 
 import httpx
@@ -191,8 +192,8 @@ class ArxivExtractor(BaseExtractor):
         updated_date = self._extract_date(entry, "atom:updated")
 
         # Extract URLs
-        url_abs = f"{self.abs_base_url}/{identifier}"
-        url_pdf = f"{self.pdf_base_url}/{identifier}"
+        url_abs = urljoin(self.abs_base_url, f"abs/{identifier}")
+        url_pdf = urljoin(self.pdf_base_url, f"pdf/{identifier}")
 
         return PaperMetadata(
             title=title,

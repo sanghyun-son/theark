@@ -8,9 +8,7 @@ from pathlib import Path
 import colorlog
 
 # Base format string for log messages (without colors)
-BASE_LOG_FORMAT = (
-    "%(asctime)s %(levelname)8s %(message)s (%(name)s@%(filename)s:%(lineno)d)"
-)
+BASE_LOG_FORMAT = "%(asctime)s %(levelname)8s %(message)s (%(filename)s:%(lineno)d)"
 
 
 def setup_logging(
@@ -64,7 +62,7 @@ def _get_console_format(use_colors: bool) -> str:
     if use_colors:
         return (
             "%(asctime)s %(log_color)s%(levelname)8s%(reset)s %(message)s "
-            "\033[90m(%(name)s@%(filename)s:%(lineno)d)\033[0m"
+            "\033[90m(%(filename)s:%(lineno)d)\033[0m"
         )
     return BASE_LOG_FORMAT
 

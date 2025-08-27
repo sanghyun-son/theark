@@ -37,9 +37,19 @@ class PaperRepository:
         """
         query = """
         INSERT INTO paper (
-            arxiv_id, latest_version, title, abstract, primary_category,
-            categories, authors, url_abs, url_pdf, published_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            arxiv_id,
+            latest_version,
+            title,
+            abstract,
+            primary_category,
+            categories,
+            authors,
+            url_abs,
+            url_pdf,
+            published_at,
+            updated_at,
+            summary_status
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """
         params = (
             paper.arxiv_id,
@@ -53,6 +63,7 @@ class PaperRepository:
             paper.url_pdf,
             paper.published_at,
             paper.updated_at,
+            "batched",  # Default status for new papers
         )
 
         cursor = await self.db.execute(query, params)

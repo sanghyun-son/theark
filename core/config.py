@@ -70,6 +70,26 @@ class Settings(BaseModel):
         description="Whether to use function calling for structured output",
     )
 
+    # Batch Processing Settings
+    batch_summary_interval: int = Field(
+        default=3600, description="Interval in seconds for summary batch processing"
+    )
+    batch_fetch_interval: int = Field(
+        default=600, description="Interval in seconds for fetching batch results"
+    )
+    batch_max_items: int = Field(
+        default=1000, description="Maximum number of items per batch"
+    )
+    batch_daily_limit: int = Field(
+        default=10000, description="Maximum number of requests per day"
+    )
+    batch_enabled: bool = Field(
+        default=True, description="Whether batch processing is enabled"
+    )
+    batch_max_retries: int = Field(
+        default=3, description="Maximum number of retries for failed batches"
+    )
+
     def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         # Set auth_required based on environment
@@ -125,6 +145,15 @@ def load_settings() -> Settings:
     # Parse LLM use_tools from boolean string
     llm_use_tools = os.getenv("THEARK_LLM_USE_TOOLS", "true").lower() == "true"
 
+    # Parse batch settings
+    batch_summary_interval = int(os.getenv("THEARK_BATCH_SUMMARY_INTERVAL", "3600"))
+    batch_fetch_interval = int(os.getenv("THEARK_BATCH_FETCH_INTERVAL", "600"))
+    batch_max_items = int(os.getenv("THEARK_BATCH_MAX_ITEMS", "1000"))
+    batch_daily_limit = int(os.getenv("THEARK_BATCH_DAILY_LIMIT", "10000"))
+    batch_enabled_str = os.getenv("THEARK_BATCH_ENABLED", "true").lower()
+    batch_enabled = batch_enabled_str in ["true", "1", "yes", "on"]
+    batch_max_retries = int(os.getenv("THEARK_BATCH_MAX_RETRIES", "3"))
+
     return Settings(
         environment=Environment(os.getenv("THEARK_ENV", "development")),
         api_title=os.getenv("THEARK_API_TITLE", "TheArk API"),
@@ -146,6 +175,12 @@ def load_settings() -> Settings:
             "THEARK_LLM_API_BASE_URL", "https://api.openai.com/v1"
         ),
         llm_use_tools=llm_use_tools,
+        batch_summary_interval=batch_summary_interval,
+        batch_fetch_interval=batch_fetch_interval,
+        batch_max_items=batch_max_items,
+        batch_daily_limit=batch_daily_limit,
+        batch_enabled=batch_enabled,
+        batch_max_retries=batch_max_retries,
     )
 
 
