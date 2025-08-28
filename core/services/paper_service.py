@@ -110,42 +110,37 @@ class PaperService:
         summary_repo = SummaryRepository(db_manager)
         user_repo = UserRepository(db_manager)
 
-        try:
-            papers, total_count = await paper_repo.get_papers_paginated(limit, offset)
-            paper_responses = []
+        papers, total_count = await paper_repo.get_papers_paginated(limit, offset)
+        paper_responses = []
 
-            # Get user's starred papers for efficient lookup
-            user_stars = []
-            if user.user_id is not None:
-                user_stars = await user_repo.get_user_stars(user.user_id, limit=1000)
-                starred_paper_ids = {star.paper_id for star in user_stars}
+        # Get user's starred papers for efficient lookup
+        user_stars = []
+        if user.user_id is not None:
+            user_stars = await user_repo.get_user_stars(user.user_id, limit=1000)
+            starred_paper_ids = {star.paper_id for star in user_stars}
 
-            for paper in papers:
-                summary = await self._get_paper_summary(paper, summary_repo, language)
+        for paper in papers:
+            summary = await self._get_paper_summary(paper, summary_repo, language)
 
-                # Check if this paper is starred by the user
-                is_starred = False
-                if user.user_id is not None and paper.paper_id:
-                    is_starred = paper.paper_id in starred_paper_ids
+            # Check if this paper is starred by the user
+            is_starred = False
+            if user.user_id is not None and paper.paper_id:
+                is_starred = paper.paper_id in starred_paper_ids
 
-                paper_response = PaperResponse.from_crawler_paper(
-                    paper, summary, is_starred
-                )
-                paper_responses.append(paper_response)
-
-            has_more = total_count > (offset + limit)
-
-            return PaperListResponse(
-                papers=paper_responses,
-                total_count=total_count,
-                limit=limit,
-                offset=offset,
-                has_more=has_more,
+            paper_response = PaperResponse.from_crawler_paper(
+                paper, summary, is_starred
             )
+            paper_responses.append(paper_response)
 
-        except Exception as e:
-            logger.error(f"Error getting papers: {e}")
-            raise ValueError(f"Failed to get papers: {e}")
+        has_more = total_count > (offset + limit)
+
+        return PaperListResponse(
+            papers=paper_responses,
+            total_count=total_count,
+            limit=limit,
+            offset=offset,
+            has_more=has_more,
+        )
 
     async def mark_summary_as_read(
         self, paper_id: int, summary_id: int, db_manager: DatabaseManager

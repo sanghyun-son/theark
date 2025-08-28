@@ -143,3 +143,15 @@ class BatchStateManager:
         await repository.update_batch_item_status(
             batch_id, paper_id, status, output_data, error_message
         )
+
+    async def mark_papers_processing(
+        self, db_manager: DatabaseManager, paper_ids: list[int]
+    ) -> None:
+        """Mark papers as being processed.
+
+        Args:
+            db_manager: Database manager instance
+            paper_ids: List of paper IDs to mark as processing
+        """
+        repository = LLMBatchRepository(db_manager)
+        await repository.mark_papers_processing(paper_ids)

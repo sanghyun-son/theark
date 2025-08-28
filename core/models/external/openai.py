@@ -4,6 +4,15 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
+# OpenAI API literal types
+CompletionWindow = Literal["24h"]
+BatchEndpoint = Literal[
+    "/v1/responses", "/v1/chat/completions", "/v1/embeddings", "/v1/completions"
+]
+FilePurpose = Literal[
+    "assistants", "batch", "fine-tune", "vision", "user_data", "evals"
+]
+
 
 class TokenUsage(BaseModel):
     """Generic token usage model for LLM requests."""

@@ -180,7 +180,7 @@ class BackgroundBatchManager:
 
             # Mark papers as processing to prevent race conditions
             paper_ids = [paper["paper_id"] for paper in pending_papers]
-            await self._state_manager.mark_papers_processing(paper_ids)
+            await self._state_manager.mark_papers_processing(db_manager, paper_ids)
 
             # Create batch request
             await self._create_batch_request(db_manager, paper_summaries, openai_client)
@@ -200,71 +200,66 @@ class BackgroundBatchManager:
             db_manager: Database manager instance
             papers: List of papers to summarize
         """
-        try:
-            # Limit papers to batch_max_items
-            papers = papers[: self._settings.batch_max_items]
+        # Limit papers to batch_max_items
+        papers = papers[: self._settings.batch_max_items]
 
-            # Create batch request payload
-            batch_payload = self._create_batch_payload(papers, openai_client)
+        # Create batch request payload
+        batch_payload = self._create_batch_payload(papers, openai_client)
 
-            # Upload data to OpenAI
-            file_id = await openai_client.upload_data(
-                batch_payload.to_jsonl(), "batch_requests.jsonl", purpose="batch"
+        # Upload data to OpenAI
+        file_id = await openai_client.upload_data(
+            batch_payload.to_jsonl(), "batch_requests.jsonl", purpose="batch"
+        )
+
+        # Create batch request
+        batch_metadata = BatchMetadata(
+            purpose="paper_summarization",
+            paper_count=len(papers),
+            model=openai_client.model,  # Use the model from the client
+        )
+        batch_response = await openai_client.create_batch_request(
+            input_file_id=file_id,
+            completion_window="24h",
+            endpoint="/v1/chat/completions",
+            metadata=batch_metadata.model_dump(),
+        )
+
+        # Store batch record in database
+        if not batch_response.id:
+            raise RuntimeError("Batch response missing ID")
+
+        await self._state_manager.create_batch_record(
+            db_manager,
+            batch_id=batch_response.id,
+            input_file_id=file_id,
+            completion_window="24h",
+            endpoint="/v1/chat/completions",
+            metadata=batch_metadata.model_dump(),
+        )
+
+        # Add batch items to database
+        batch_items = []
+        for paper in papers:
+            batch_item = BatchItem(
+                paper_id=paper.paper_id,
+                input_data=json.dumps(
+                    {
+                        "paper_id": paper.paper_id,
+                        "title": paper.title,
+                        "abstract": paper.abstract,
+                        "arxiv_id": paper.arxiv_id,
+                    }
+                ),
             )
+            batch_items.append(batch_item.model_dump())
 
-            # Create batch request
-            batch_metadata = BatchMetadata(
-                purpose="paper_summarization",
-                paper_count=len(papers),
-                model=openai_client.model,  # Use the model from the client
-            )
-            batch_response = await openai_client.create_batch_request(
-                input_file_id=file_id,
-                completion_window="24h",
-                endpoint="/v1/chat/completions",
-                metadata=batch_metadata.model_dump(),
-            )
+        await self._state_manager.add_batch_items(
+            db_manager, batch_response.id, batch_items
+        )
 
-            # Store batch record in database
-            if not batch_response.id:
-                raise RuntimeError("Batch response missing ID")
-
-            await self._state_manager.create_batch_record(
-                db_manager,
-                batch_id=batch_response.id,
-                input_file_id=file_id,
-                completion_window="24h",
-                endpoint="/v1/chat/completions",
-                metadata=batch_metadata.model_dump(),
-            )
-
-            # Add batch items to database
-            batch_items = []
-            for paper in papers:
-                batch_item = BatchItem(
-                    paper_id=paper.paper_id,
-                    input_data=json.dumps(
-                        {
-                            "paper_id": paper.paper_id,
-                            "title": paper.title,
-                            "abstract": paper.abstract,
-                            "arxiv_id": paper.arxiv_id,
-                        }
-                    ),
-                )
-                batch_items.append(batch_item.model_dump())
-
-            await self._state_manager.add_batch_items(
-                db_manager, batch_response.id, batch_items
-            )
-
-            logger.info(
-                f"Created batch request {batch_response.id} for {len(papers)} papers"
-            )
-
-        except Exception as e:
-            logger.error(f"Error creating batch request: {e}")
-            raise
+        logger.info(
+            f"Created batch request {batch_response.id} for {len(papers)} papers"
+        )
 
     def _create_batch_payload(
         self, papers: list[PaperSummary], openai_client: UnifiedOpenAIClient

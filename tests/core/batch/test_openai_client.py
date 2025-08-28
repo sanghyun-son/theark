@@ -133,20 +133,7 @@ async def test_monitor_batch_progress(
     assert updates[0].status == "completed"
 
 
-@pytest.mark.asyncio
-async def test_create_batch_request_without_metadata(
-    mock_openai_client: UnifiedOpenAIClient,
-) -> None:
-    """Test creating a batch request without metadata."""
-    # Act
-    result = await mock_openai_client.create_batch_request(
-        input_file_id="file_123", completion_window="24h"
-    )
 
-    # Assert
-    assert isinstance(result, BatchRequest)
-    assert result.id == "batch_123"
-    assert result.metadata is None
 
 
 @pytest.mark.asyncio

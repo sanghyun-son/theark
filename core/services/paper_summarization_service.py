@@ -62,80 +62,71 @@ class PaperSummarizationService:
         """Summarize a paper asynchronously."""
         logger.debug(f"Starting summarization for paper {paper.arxiv_id}")
 
-        try:
-            # Check if summary already exists and force_resummarize is False
-            if not force_resummarize and await self._has_existing_summary(
-                paper, db_manager, language
-            ):
+        # Check if summary already exists and force_resummarize is False
+        if not force_resummarize and await self._has_existing_summary(
+            paper, db_manager, language
+        ):
+            logger.info(
+                f"Summary already exists for paper {paper.arxiv_id} in {language}"
+            )
+            return
+
+        # Mark paper as processing to prevent batch manager from picking it up
+        if paper.paper_id:
+            batch_repo = LLMBatchRepository(db_manager)
+            await batch_repo.update_paper_summary_status(paper.paper_id, "processing")
+
+        # Get raw response from OpenAI with retry logic
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                response = await summary_client.summarize_paper(
+                    content=paper.abstract,
+                    interest_section=self.settings.default_interests,
+                    language=language,
+                    db_manager=db_manager,
+                    custom_id=paper.arxiv_id,
+                )
+
+                # Parse response into SummaryResponse
+                summary_response = parse_summary_response(
+                    response=response,
+                    original_content=paper.abstract,
+                    custom_id=paper.arxiv_id,
+                    model=summary_client.model,
+                    use_tools=summary_client.use_tools,
+                )
+
+                # Save summary to database
+                await self._save_summary(
+                    paper, summary_response, db_manager, language, force_resummarize
+                )
+
+                # Mark paper as done
+                if paper.paper_id:
+                    await batch_repo.update_paper_summary_status(paper.paper_id, "done")
+
                 logger.info(
-                    f"Summary already exists for paper {paper.arxiv_id} in {language}"
+                    f"Successfully summarized paper {paper.arxiv_id} in {language}"
                 )
                 return
 
-            # Mark paper as processing to prevent batch manager from picking it up
-            if paper.paper_id:
-                batch_repo = LLMBatchRepository(db_manager)
-                await batch_repo.update_paper_summary_status(
-                    paper.paper_id, "processing"
-                )
-
-            # Get raw response from OpenAI with retry logic
-            max_retries = 3
-            for attempt in range(max_retries):
-                try:
-                    response = await summary_client.summarize_paper(
-                        content=paper.abstract,
-                        interest_section=self.settings.default_interests,
-                        language=language,
-                        db_manager=db_manager,
-                        custom_id=paper.arxiv_id,
+            except httpx.ReadTimeout as e:
+                if attempt < max_retries - 1:
+                    wait_time = (attempt + 1) * 5  # 5, 10, 15 seconds
+                    logger.warning(
+                        f"Timeout on attempt {attempt + 1} for paper "
+                        f"{paper.arxiv_id}, retrying in {wait_time} seconds: {e}"
                     )
-
-                    # Parse response into SummaryResponse
-                    summary_response = parse_summary_response(
-                        response=response,
-                        original_content=paper.abstract,
-                        custom_id=paper.arxiv_id,
-                        model=summary_client.model,
-                        use_tools=summary_client.use_tools,
+                    await asyncio.sleep(wait_time)
+                else:
+                    logger.error(
+                        f"All retry attempts failed for paper {paper.arxiv_id}: {e}"
                     )
-
-                    # Save summary to database
-                    await self._save_summary(
-                        paper, summary_response, db_manager, language, force_resummarize
-                    )
-
-                    # Mark paper as done
-                    if paper.paper_id:
-                        await batch_repo.update_paper_summary_status(
-                            paper.paper_id, "done"
-                        )
-
-                    logger.info(
-                        f"Successfully summarized paper {paper.arxiv_id} in {language}"
-                    )
-                    return
-
-                except httpx.ReadTimeout as e:
-                    if attempt < max_retries - 1:
-                        wait_time = (attempt + 1) * 5  # 5, 10, 15 seconds
-                        logger.warning(
-                            f"Timeout on attempt {attempt + 1} for paper "
-                            f"{paper.arxiv_id}, retrying in {wait_time} seconds: {e}"
-                        )
-                        await asyncio.sleep(wait_time)
-                    else:
-                        logger.error(
-                            f"All retry attempts failed for paper {paper.arxiv_id}: {e}"
-                        )
-                        raise
-                except Exception as e:
-                    logger.error(f"Error summarizing paper {paper.arxiv_id}: {e}")
                     raise
-
-        except Exception as e:
-            logger.error(f"Error summarizing paper {paper.arxiv_id}: {e}")
-            raise
+            except Exception as e:
+                logger.error(f"Error summarizing paper {paper.arxiv_id}: {e}")
+                raise
 
     async def _has_existing_summary(
         self, paper: PaperEntity, db_manager: DatabaseManager, language: str

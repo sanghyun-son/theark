@@ -41,11 +41,7 @@ class PaperCreationService:
         db_manager: DatabaseManager,
     ) -> PaperEntity:
         """Create a paper using the new extractor system."""
-        try:
-            arxiv_id = self._extract_arxiv_id(paper_data)
-        except ValueError as e:
-            logger.error(f"Invalid URL: {e}")
-            raise ValueError(f"Invalid URL format: {e}")
+        arxiv_id = self._extract_arxiv_id(paper_data)
 
         paper_repo = PaperRepository(db_manager)
 

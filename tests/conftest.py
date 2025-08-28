@@ -57,7 +57,7 @@ def mock_openai_server(httpserver: HTTPServer) -> HTTPServer:
         method="POST",
     ).respond_with_handler(chat_completion_handler)
 
-    # Add a specific response for batch creation without metadata
+    # Add the POST /v1/batches endpoint that the official client uses
     httpserver.expect_request("/v1/batches", method="POST").respond_with_json(
         {
             "id": "batch_123",
@@ -72,7 +72,7 @@ def mock_openai_server(httpserver: HTTPServer) -> HTTPServer:
             "finalizing_at": 1234567892,
             "completed_at": 1234567893,
             "request_counts": {"total": 100, "completed": 95, "failed": 5},
-            "metadata": None,
+            "metadata": {"test": "data"},
         }
     )
 

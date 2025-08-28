@@ -54,7 +54,8 @@ class UnifiedBatchBuilder:
             return BatchRequestPayload(entries=[])
 
         logger.debug(
-            f"Creating batch for {len(papers)} papers with model={model}, use_tools={use_tools}"
+            f"Creating batch for {len(papers)} papers with "
+            f"model={model}, use_tools={use_tools}"
         )
 
         try:
@@ -67,12 +68,14 @@ class UnifiedBatchBuilder:
                     )
                     entries.append(entry)
                     logger.debug(
-                        f"Created batch entry {i+1}/{len(papers)} for paper {paper.get('paper_id', 'unknown')}"
+                        f"Created batch entry {i+1}/{len(papers)} for "
+                        f"paper {paper.get('paper_id', 'unknown')}"
                     )
 
                 except Exception as e:
                     logger.error(
-                        f"Failed to create batch entry for paper {paper.get('paper_id', 'unknown')}: {e}"
+                        f"Failed to create batch entry for "
+                        f"paper {paper.get('paper_id', 'unknown')}: {e}"
                     )
                     # Continue with other papers instead of failing completely
                     continue
@@ -110,45 +113,39 @@ class UnifiedBatchBuilder:
         Raises:
             BatchBuilderError: If entry creation fails
         """
-        try:
-            # Validate required paper fields
-            required_fields = ["paper_id", "abstract"]
-            missing_fields = [
-                field for field in required_fields if not paper.get(field)
-            ]
-            if missing_fields:
-                raise BatchBuilderError(f"Missing required fields: {missing_fields}")
+        # Validate required paper fields
+        required_fields = ["paper_id", "abstract"]
+        missing_fields = [field for field in required_fields if not paper.get(field)]
+        if missing_fields:
+            raise BatchBuilderError(f"Missing required fields: {missing_fields}")
 
-            # Create messages using the standard prompt structure
-            messages = UnifiedBatchBuilder._create_summarization_messages(
-                paper["abstract"],
-                interest_section,
-                language,
-            )
+        # Create messages using the standard prompt structure
+        messages = UnifiedBatchBuilder._create_summarization_messages(
+            paper["abstract"],
+            interest_section,
+            language,
+        )
 
-            # Build the request payload
-            payload = ChatCompletionRequest(model=model, messages=messages)
+        # Build the request payload
+        payload = ChatCompletionRequest(model=model, messages=messages)
 
-            # Add tools if requested
-            if use_tools:
-                payload.tools = [UnifiedBatchBuilder._create_paper_analysis_tool()]
-                payload.tool_choice = UnifiedBatchBuilder._create_tool_choice()
+        # Add tools if requested
+        if use_tools:
+            payload.tools = [UnifiedBatchBuilder._create_paper_analysis_tool()]
+            payload.tool_choice = UnifiedBatchBuilder._create_tool_choice()
 
-            # Convert to dict for batch entry
-            body = payload.model_dump()
+        # Convert to dict for batch entry
+        body = payload.model_dump()
 
-            # Create batch entry
-            entry = BatchRequestEntry(
-                custom_id=str(paper["paper_id"]),
-                method="POST",
-                url="/v1/chat/completions",
-                body=body,
-            )
+        # Create batch entry
+        entry = BatchRequestEntry(
+            custom_id=str(paper["paper_id"]),
+            method="POST",
+            url="/v1/chat/completions",
+            body=body,
+        )
 
-            return entry
-
-        except Exception as e:
-            raise BatchBuilderError(f"Failed to create batch entry: {e}")
+        return entry
 
     @staticmethod
     def _create_summarization_messages(
@@ -172,25 +169,22 @@ class UnifiedBatchBuilder:
         if not content or not content.strip():
             raise BatchBuilderError("Content cannot be empty")
 
-        try:
-            from core.llm.prompts import SYSTEM_PROMPT, USER_PROMPT
+        from core.llm.prompts import SYSTEM_PROMPT, USER_PROMPT
 
-            return [
-                OpenAIMessage(
-                    role="system",
-                    content=SYSTEM_PROMPT.format(language=language),
+        return [
+            OpenAIMessage(
+                role="system",
+                content=SYSTEM_PROMPT.format(language=language),
+            ),
+            OpenAIMessage(
+                role="user",
+                content=USER_PROMPT.format(
+                    language=language,
+                    interest_section=interest_section,
+                    content=content,
                 ),
-                OpenAIMessage(
-                    role="user",
-                    content=USER_PROMPT.format(
-                        language=language,
-                        interest_section=interest_section,
-                        content=content,
-                    ),
-                ),
-            ]
-        except Exception as e:
-            raise BatchBuilderError(f"Failed to create summarization messages: {e}")
+            ),
+        ]
 
     @staticmethod
     def _create_paper_analysis_tool() -> OpenAITool:
@@ -202,23 +196,20 @@ class UnifiedBatchBuilder:
         Raises:
             BatchBuilderError: If tool creation fails
         """
-        try:
-            function_parameters = OpenAIFunctionParameter(
-                type="object",
-                description="Paper analysis parameters",
-                properties=PaperAnalysis.create_paper_analysis_schema(),
-                required=PaperAnalysis.get_required_fields(),
-            )
+        function_parameters = OpenAIFunctionParameter(
+            type="object",
+            description="Paper analysis parameters",
+            properties=PaperAnalysis.create_paper_analysis_schema(),
+            required=PaperAnalysis.get_required_fields(),
+        )
 
-            function = OpenAIFunction(
-                name="Structure",
-                description="Analyze paper abstract and extract key information",
-                parameters=function_parameters,
-            )
+        function = OpenAIFunction(
+            name="Structure",
+            description="Analyze paper abstract and extract key information",
+            parameters=function_parameters,
+        )
 
-            return OpenAITool(function=function)
-        except Exception as e:
-            raise BatchBuilderError(f"Failed to create paper analysis tool: {e}")
+        return OpenAITool(function=function)
 
     @staticmethod
     def _create_tool_choice() -> OpenAIToolChoice:
@@ -230,7 +221,4 @@ class UnifiedBatchBuilder:
         Raises:
             BatchBuilderError: If tool choice creation fails
         """
-        try:
-            return OpenAIToolChoice(function={"name": "Structure"})
-        except Exception as e:
-            raise BatchBuilderError(f"Failed to create tool choice: {e}")
+        return OpenAIToolChoice(function={"name": "Structure"})

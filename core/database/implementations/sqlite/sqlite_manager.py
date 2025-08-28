@@ -323,7 +323,8 @@ class SQLiteManager(DatabaseManager):
             if "summary_status" not in columns:
                 logger.info("Adding summary_status column to paper table")
                 await self.execute(
-                    "ALTER TABLE paper ADD COLUMN summary_status TEXT NOT NULL DEFAULT 'done'"
+                    "ALTER TABLE paper ADD COLUMN summary_status TEXT NOT NULL "
+                    "DEFAULT 'done'"
                 )
                 logger.info("Migration completed: summary_status column added")
             else:

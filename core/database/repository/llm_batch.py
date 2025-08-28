@@ -26,13 +26,9 @@ class LLMBatchRepository:
         LIMIT 1000
         """
 
-        try:
-            papers = await self._db_manager.fetch_all(query)
-            logger.debug(f"Found {len(papers)} papers pending summarization")
-            return papers
-        except Exception as e:
-            logger.error(f"Failed to get pending summaries: {e}")
-            raise
+        papers = await self._db_manager.fetch_all(query)
+        logger.debug(f"Found {len(papers)} papers pending summarization")
+        return papers
 
     async def update_paper_summary_status(self, paper_id: int, status: str) -> None:
         """Update the summary status of a paper.
@@ -42,17 +38,13 @@ class LLMBatchRepository:
             status: New status ('batched', 'processing', 'done')
         """
         query = """
-        UPDATE paper 
+        UPDATE paper
         SET summary_status = ?
         WHERE paper_id = ?
         """
 
-        try:
-            await self._db_manager.execute(query, (status, paper_id))
-            logger.debug(f"Updated paper {paper_id} summary status to {status}")
-        except Exception as e:
-            logger.error(f"Failed to update paper {paper_id} summary status: {e}")
-            raise
+        await self._db_manager.execute(query, (status, paper_id))
+        logger.debug(f"Updated paper {paper_id} summary status to {status}")
 
     async def mark_papers_processing(self, paper_ids: list[int]) -> None:
         """Mark papers as being processed.
@@ -65,17 +57,13 @@ class LLMBatchRepository:
 
         placeholders = ",".join(["?" for _ in paper_ids])
         query = f"""
-        UPDATE paper 
+        UPDATE paper
         SET summary_status = 'processing'
         WHERE paper_id IN ({placeholders})
         """
 
-        try:
-            await self._db_manager.execute(query, paper_ids)
-            logger.debug(f"Marked {len(paper_ids)} papers as processing")
-        except Exception as e:
-            logger.error(f"Failed to mark papers as processing: {e}")
-            raise
+        await self._db_manager.execute(query, paper_ids)
+        logger.debug(f"Marked {len(paper_ids)} papers as processing")
 
     async def get_active_batches(self) -> list[dict[str, Any]]:
         """Get currently active batch requests."""
@@ -85,13 +73,9 @@ class LLMBatchRepository:
         ORDER BY created_at DESC
         """
 
-        try:
-            batches = await self._db_manager.fetch_all(query)
-            logger.debug(f"Found {len(batches)} active batch requests")
-            return batches
-        except Exception as e:
-            logger.error(f"Failed to get active batches: {e}")
-            raise
+        batches = await self._db_manager.fetch_all(query)
+        logger.debug(f"Found {len(batches)} active batch requests")
+        return batches
 
     async def create_batch_record(
         self,
@@ -114,15 +98,11 @@ class LLMBatchRepository:
 
             metadata_json = json.dumps(metadata)
 
-        try:
-            await self._db_manager.execute(
-                query,
-                (batch_id, input_file_id, completion_window, endpoint, metadata_json),
-            )
-            logger.debug(f"Created batch record: {batch_id}")
-        except Exception as e:
-            logger.error(f"Failed to create batch record {batch_id}: {e}")
-            raise
+        await self._db_manager.execute(
+            query,
+            (batch_id, input_file_id, completion_window, endpoint, metadata_json),
+        )
+        logger.debug(f"Created batch record: {batch_id}")
 
     async def update_batch_status(
         self,
@@ -174,12 +154,8 @@ class LLMBatchRepository:
         """
         params.append(batch_id)
 
-        try:
-            await self._db_manager.execute(query, tuple(params))
-            logger.debug(f"Updated batch {batch_id} status to {status}")
-        except Exception as e:
-            logger.error(f"Failed to update batch {batch_id} status: {e}")
-            raise
+        await self._db_manager.execute(query, tuple(params))
+        logger.debug(f"Updated batch {batch_id} status to {status}")
 
     async def add_batch_items(self, batch_id: str, items: list[dict[str, Any]]) -> None:
         """Add items to a batch request.
@@ -199,18 +175,14 @@ class LLMBatchRepository:
         ) VALUES (?, ?, ?)
         """
 
-        try:
-            # Execute batch insert
-            for item in items:
-                paper_id = item["paper_id"]
-                input_data = item["input_data"]
+        # Execute batch insert
+        for item in items:
+            paper_id = item["paper_id"]
+            input_data = item["input_data"]
 
-                await self._db_manager.execute(query, (batch_id, paper_id, input_data))
+            await self._db_manager.execute(query, (batch_id, paper_id, input_data))
 
-            logger.debug(f"Added {len(items)} items to batch {batch_id}")
-        except Exception as e:
-            logger.error(f"Failed to add items to batch {batch_id}: {e}")
-            raise
+        logger.debug(f"Added {len(items)} items to batch {batch_id}")
 
     async def get_batch_items(self, batch_id: str) -> list[dict[str, Any]]:
         """Get all items for a batch request.
@@ -227,13 +199,9 @@ class LLMBatchRepository:
         ORDER BY created_at ASC
         """
 
-        try:
-            items = await self._db_manager.fetch_all(query, (batch_id,))
-            logger.debug(f"Found {len(items)} items for batch {batch_id}")
-            return items
-        except Exception as e:
-            logger.error(f"Failed to get items for batch {batch_id}: {e}")
-            raise
+        items = await self._db_manager.fetch_all(query, (batch_id,))
+        logger.debug(f"Found {len(items)} items for batch {batch_id}")
+        return items
 
     async def update_batch_item_status(
         self,
@@ -276,11 +244,5 @@ class LLMBatchRepository:
         params.append(batch_id)
         params.append(str(paper_id))
 
-        try:
-            await self._db_manager.execute(query, tuple(params))
-            logger.debug(f"Updated batch item {batch_id}:{paper_id} status to {status}")
-        except Exception as e:
-            logger.error(
-                f"Failed to update batch item {batch_id}:{paper_id} status: {e}"
-            )
-            raise
+        await self._db_manager.execute(query, tuple(params))
+        logger.debug(f"Updated batch item {batch_id}:{paper_id} status to {status}")

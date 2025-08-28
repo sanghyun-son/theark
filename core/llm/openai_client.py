@@ -1,4 +1,4 @@
-"""Unified OpenAI client for both regular and batch requests using official OpenAI client."""
+"""Unified OpenAI client for both regular and batch requests using official client."""
 
 import asyncio
 from pathlib import Path
@@ -9,10 +9,13 @@ from openai import AsyncOpenAI
 from core.database.interfaces import DatabaseManager
 from core.log import get_logger
 from core.models.external.openai import (
+    BatchEndpoint,
     BatchRequest,
     BatchResponse,
     ChatCompletionRequest,
     ChatCompletionResponse,
+    CompletionWindow,
+    FilePurpose,
     OpenAIFunction,
     OpenAIFunctionParameter,
     OpenAIMessage,
@@ -37,7 +40,7 @@ class OpenAIRequestError(OpenAIError):
         self,
         message: str,
         status_code: int | None = None,
-        error_data: dict | None = None,
+        error_data: dict[str, Any] | None = None,
     ):
         super().__init__(message)
         self.status_code = status_code
@@ -45,7 +48,7 @@ class OpenAIRequestError(OpenAIError):
 
 
 class UnifiedOpenAIClient:
-    """Unified OpenAI client for both regular and batch requests using official client."""
+    """Unified OpenAI client for both regular and batch requests."""
 
     def __init__(
         self,
@@ -133,28 +136,23 @@ class UnifiedOpenAIClient:
         )
         logger.debug(f"Request payload:\n{payload.model_dump_json(indent=2)}")
 
-        try:
-            # Convert to dict for official client
-            request_data = payload.model_dump()
+        # Convert to dict for official client
+        request_data = payload.model_dump()
 
-            # Make request using official client (uses built-in retry)
-            response = await self._client.chat.completions.create(**request_data)
+        # Make request using official client (uses built-in retry)
+        response = await self._client.chat.completions.create(**request_data)
 
-            # Convert response to our model
-            response_dict = response.model_dump()
-            logger.debug(f"Response received: {response_dict}")
+        # Convert response to our model
+        response_dict = response.model_dump()
+        logger.debug(f"Response received: {response_dict}")
 
-            chat_response = ChatCompletionResponse.model_validate(response_dict)
+        chat_response = ChatCompletionResponse.model_validate(response_dict)
 
-            # Update tracking if provided
-            if db_manager and custom_id:
-                await self._update_tracking(custom_id, 200, chat_response, db_manager)
+        # Update tracking if provided
+        if db_manager and custom_id:
+            await self._update_tracking(custom_id, 200, chat_response, db_manager)
 
-            return chat_response
-
-        except Exception as e:
-            logger.error(f"Chat completion failed: {e}")
-            raise OpenAIRequestError(f"Chat completion failed: {e}")
+        return chat_response
 
     async def summarize_paper(
         self,
@@ -191,8 +189,8 @@ class UnifiedOpenAIClient:
     async def create_batch_request(
         self,
         input_file_id: str,
-        completion_window: str = "24h",
-        endpoint: str = "/v1/chat/completions",
+        completion_window: CompletionWindow = "24h",
+        endpoint: BatchEndpoint = "/v1/chat/completions",
         metadata: dict[str, Any] | None = None,
     ) -> BatchRequest:
         """Create a new batch request using official client.
@@ -208,24 +206,19 @@ class UnifiedOpenAIClient:
         """
         logger.debug(f"Creating batch request with file_id={input_file_id}")
 
-        try:
-            # Use the correct API structure for the official client
-            batch = await self._client.batches.create(
-                input_file_id=input_file_id,
-                completion_window=completion_window,
-                endpoint=endpoint,
-                metadata=metadata or {},
-            )
+        # Use the correct API structure for the official client
+        batch = await self._client.batches.create(
+            input_file_id=input_file_id,
+            completion_window=completion_window,
+            endpoint=endpoint,
+            metadata=metadata or {},
+        )
 
-            logger.info(f"Created batch request: {batch.id}")
+        logger.info(f"Created batch request: {batch.id}")
 
-            # Convert to our model
-            batch_dict = batch.model_dump()
-            return BatchRequest.model_validate(batch_dict)
-
-        except Exception as e:
-            logger.error(f"Batch request creation failed: {e}")
-            raise OpenAIRequestError(f"Batch request creation failed: {e}")
+        # Convert to our model
+        batch_dict = batch.model_dump()
+        return BatchRequest.model_validate(batch_dict)
 
     async def get_batch_status(self, batch_id: str) -> BatchResponse:
         """Get the status of a batch request.
@@ -238,18 +231,13 @@ class UnifiedOpenAIClient:
         """
         logger.debug(f"Getting batch status for {batch_id}")
 
-        try:
-            batch = await self._client.batches.retrieve(batch_id=batch_id)
+        batch = await self._client.batches.retrieve(batch_id=batch_id)
 
-            logger.debug(f"Batch {batch_id} status: {batch.status}")
+        logger.debug(f"Batch {batch_id} status: {batch.status}")
 
-            # Convert to our model
-            batch_dict = batch.model_dump()
-            return BatchResponse.model_validate(batch_dict)
-
-        except Exception as e:
-            logger.error(f"Failed to get batch status for {batch_id}: {e}")
-            raise OpenAIRequestError(f"Failed to get batch status: {e}")
+        # Convert to our model
+        batch_dict = batch.model_dump()
+        return BatchResponse.model_validate(batch_dict)
 
     async def cancel_batch_request(self, batch_id: str) -> BatchResponse:
         """Cancel a batch request.
@@ -262,18 +250,13 @@ class UnifiedOpenAIClient:
         """
         logger.debug(f"Cancelling batch request {batch_id}")
 
-        try:
-            batch = await self._client.batches.cancel(batch_id=batch_id)
+        batch = await self._client.batches.cancel(batch_id=batch_id)
 
-            logger.info(f"Cancelled batch request: {batch_id}")
+        logger.info(f"Cancelled batch request: {batch_id}")
 
-            # Convert to our model
-            batch_dict = batch.model_dump()
-            return BatchResponse.model_validate(batch_dict)
-
-        except Exception as e:
-            logger.error(f"Failed to cancel batch {batch_id}: {e}")
-            raise OpenAIRequestError(f"Failed to cancel batch: {e}")
+        # Convert to our model
+        batch_dict = batch.model_dump()
+        return BatchResponse.model_validate(batch_dict)
 
     async def list_batch_requests(
         self, limit: int = 10, after: str | None = None
@@ -289,25 +272,19 @@ class UnifiedOpenAIClient:
         """
         logger.debug(f"Listing batch requests with limit={limit}")
 
-        try:
-            params = {"limit": limit}
-            if after:
-                params["after"] = after
+        if after:
+            batches = await self._client.batches.list(limit=limit, after=after)
+        else:
+            batches = await self._client.batches.list(limit=limit)
 
-            batches = await self._client.batches.list(**params)
+        # Convert to our models
+        batch_responses = []
+        for batch in batches.data:
+            batch_dict = batch.model_dump()
+            batch_responses.append(BatchResponse.model_validate(batch_dict))
 
-            # Convert to our models
-            batch_responses = []
-            for batch in batches.data:
-                batch_dict = batch.model_dump()
-                batch_responses.append(BatchResponse.model_validate(batch_dict))
-
-            logger.debug(f"Retrieved {len(batch_responses)} batch requests")
-            return batch_responses
-
-        except Exception as e:
-            logger.error(f"Failed to list batch requests: {e}")
-            raise OpenAIRequestError(f"Failed to list batch requests: {e}")
+        logger.debug(f"Retrieved {len(batch_responses)} batch requests")
+        return batch_responses
 
     async def monitor_batch_progress(
         self, batch_id: str, check_interval: float = 10.0
@@ -347,7 +324,9 @@ class UnifiedOpenAIClient:
                 raise
 
     # File upload methods
-    async def upload_file(self, file_path: str | Path, purpose: str = "batch") -> str:
+    async def upload_file(
+        self, file_path: str | Path, purpose: FilePurpose = "batch"
+    ) -> str:
         """Upload a file to OpenAI.
 
         Args:
@@ -360,27 +339,19 @@ class UnifiedOpenAIClient:
         file_path = Path(file_path)
         logger.debug(f"Uploading file {file_path} with purpose={purpose}")
 
-        try:
-            # Check if file exists before attempting upload
-            if not file_path.exists():
-                raise FileNotFoundError(f"File not found: {file_path}")
+        # Check if file exists before attempting upload
+        if not file_path.exists():
+            raise FileNotFoundError(f"File not found: {file_path}")
 
-            with open(file_path, "rb") as f:
-                file_obj = await self._client.files.create(file=f, purpose=purpose)
+        with open(file_path, "rb") as f:
+            file_obj = await self._client.files.create(file=f, purpose=purpose)
 
-            file_id = str(file_obj.id)
-            logger.info(f"Uploaded file: {file_id}")
-            return file_id
-
-        except FileNotFoundError:
-            logger.error(f"File not found: {file_path}")
-            raise
-        except Exception as e:
-            logger.error(f"File upload failed for {file_path}: {e}")
-            raise OpenAIRequestError(f"File upload failed: {e}")
+        file_id = str(file_obj.id)
+        logger.info(f"Uploaded file: {file_id}")
+        return file_id
 
     async def upload_data(
-        self, data: str, filename: str, purpose: str = "batch"
+        self, data: str, filename: str, purpose: FilePurpose = "batch"
     ) -> str:
         """Upload data directly from memory to OpenAI.
 
@@ -394,22 +365,17 @@ class UnifiedOpenAIClient:
         """
         logger.debug(f"Uploading data as file {filename} with purpose={purpose}")
 
-        try:
-            # Convert string data to bytes
-            data_bytes = data.encode("utf-8")
+        # Convert string data to bytes
+        data_bytes = data.encode("utf-8")
 
-            file_obj = await self._client.files.create(
-                file=(filename, data_bytes, "application/json"),
-                purpose=purpose,
-            )
+        file_obj = await self._client.files.create(
+            file=(filename, data_bytes, "application/json"),
+            purpose=purpose,
+        )
 
-            file_id = str(file_obj.id)
-            logger.info(f"Uploaded data as file: {file_id}")
-            return file_id
-
-        except Exception as e:
-            logger.error(f"Data upload failed for {filename}: {e}")
-            raise OpenAIRequestError(f"Data upload failed: {e}")
+        file_id = str(file_obj.id)
+        logger.info(f"Uploaded data as file: {file_id}")
+        return file_id
 
     async def download_file(self, file_id: str, output_path: str | Path) -> None:
         """Download a file from OpenAI.
@@ -421,20 +387,15 @@ class UnifiedOpenAIClient:
         output_path = Path(output_path)
         logger.debug(f"Downloading file {file_id} to {output_path}")
 
-        try:
-            content = await self._client.files.content(file_id=file_id)
+        content = await self._client.files.content(file_id=file_id)
 
-            # Ensure parent directory exists
-            output_path.parent.mkdir(parents=True, exist_ok=True)
+        # Ensure parent directory exists
+        output_path.parent.mkdir(parents=True, exist_ok=True)
 
-            with open(output_path, "wb") as f:
-                f.write(content.read())
+        with open(output_path, "wb") as f:
+            f.write(content.read())
 
-            logger.info(f"Downloaded file {file_id} to {output_path}")
-
-        except Exception as e:
-            logger.error(f"File download failed for {file_id}: {e}")
-            raise OpenAIRequestError(f"File download failed: {e}")
+        logger.info(f"Downloaded file {file_id} to {output_path}")
 
     # Helper methods
     def _create_summarization_messages(
