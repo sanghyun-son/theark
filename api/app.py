@@ -55,14 +55,19 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     if openai_api_key == fake_key:
         logger.warning("OPENAI_API_KEY is not set.")
 
-    app.state.summary_client = UnifiedOpenAIClient(
+    # Create OpenAI client
+    openai_client = UnifiedOpenAIClient(
         api_key=openai_api_key,
         base_url=current_settings.llm_api_base_url,
         model=current_settings.llm_model,
     )
+    app.state.summary_client = openai_client
 
     # Initialize background batch manager
-    app.state.background_batch_manager = BackgroundBatchManager(current_settings)
+    app.state.background_batch_manager = BackgroundBatchManager(
+        current_settings,
+        language=current_settings.default_summary_language,
+    )
 
     # Start background batch processing if enabled
     if current_settings.batch_enabled:

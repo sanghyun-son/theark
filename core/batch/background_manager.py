@@ -9,6 +9,7 @@ from typing import Any
 from core.batch.state_manager import BatchStateManager
 from core.config import Settings
 from core.database.interfaces import DatabaseManager
+from core.llm.applications.summary import SummaryGenerator
 from core.llm.batch_builder import UnifiedBatchBuilder
 from core.llm.openai_client import UnifiedOpenAIClient
 from core.log import get_logger
@@ -26,13 +27,15 @@ logger = get_logger(__name__)
 class BackgroundBatchManager:
     """Manages background batch processing tasks."""
 
-    def __init__(self, settings: Settings) -> None:
+    def __init__(self, settings: Settings, language: str = "English") -> None:
         """Initialize background batch manager.
 
         Args:
             settings: Application settings
+            language: Language for batch summarization (default: "English")
         """
         self._settings = settings
+        self._language = language
         self._state_manager = BatchStateManager()
         self._running = False
         self._summary_task: asyncio.Task[Any] | None = None
@@ -272,22 +275,37 @@ class BackgroundBatchManager:
         Returns:
             Batch request payload
         """
-        papers_data = [
-            {
-                "paper_id": paper.paper_id,
-                "title": paper.title,
-                "abstract": paper.abstract,
-                "arxiv_id": paper.arxiv_id,
-            }
-            for paper in papers
-        ]
 
-        return UnifiedBatchBuilder.create_paper_summarization_batch(
-            papers_data,
-            interest_section="",  # TODO: Get from config or user preferences
-            language="English",
-            model=openai_client.model,  # Use the model from the client
-            use_tools=True,  # Batch API supports tool calling
+        summary_generator = SummaryGenerator()
+        requests = []
+
+        for paper in papers:
+            # Create messages for this paper
+            messages = summary_generator._create_summarization_messages(
+                paper.abstract,
+                interest_section="",  # TODO: Get from config or user preferences
+                language=self._language,
+            )
+
+            # Create tools if needed
+            tools = None
+            tool_choice = None
+            if openai_client.use_tools:
+                tools = [summary_generator._create_paper_analysis_tool(self._language)]
+                tool_choice = summary_generator._create_tool_choice()
+
+            # Create request data
+            request_data = {
+                "custom_id": str(paper.paper_id),
+                "messages": messages,
+                "tools": tools,
+                "tool_choice": tool_choice,
+            }
+            requests.append(request_data)
+
+        return UnifiedBatchBuilder.create_batch_from_requests(
+            requests,
+            model=openai_client.model,
         )
 
     async def _process_active_batches(

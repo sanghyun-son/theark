@@ -21,7 +21,7 @@ class StarManager {
                 this.starStates.set(paper.paper_id, paper.is_starred || false);
             }
         });
-        console.log('📚 Initialized star states for', papers.length, 'papers');
+
     }
 
     createStarButton(paper, context = 'paper-item') {
@@ -56,10 +56,8 @@ class StarManager {
     }
 
     async toggleStar(starButton, paper) {
-        console.log('⭐ toggleStar called from star manager:', { paperId: paper.paper_id });
         const isCurrentlyStarred = starButton.classList.contains('starred');
         const newStarredState = !isCurrentlyStarred;
-        console.log('⭐ Star state change:', { isCurrentlyStarred, newStarredState });
         
         try {
             if (newStarredState) {
@@ -72,7 +70,6 @@ class StarManager {
             this.updateStarButton(starButton, newStarredState);
             
             // Update all other star buttons for this paper
-            console.log('⭐ Calling updateAllStarButtons from toggleStar');
             this.updateAllStarButtons(paper.paper_id, newStarredState);
         } catch (error) {
             console.error('Failed to toggle star:', error);
@@ -83,33 +80,24 @@ class StarManager {
 
     updateAllStarButtons(paperId, isStarred) {
         try {
-            console.log('🔍 updateAllStarButtons called:', { paperId, isStarred });
-            
             // Update global star state tracker
             this.starStates.set(paperId, isStarred);
-            console.log('💾 Updated global star state for paper', paperId, 'to', isStarred);
             
             // Update paper-item star button using unique ID
             const paperItemStarId = `star-${paperId}-paper-item`;
             const paperItemStarButton = document.getElementById(paperItemStarId);
             if (paperItemStarButton) {
-                console.log('✅ Found and updating paper-item star button:', paperItemStarId);
                 this.updateStarButton(paperItemStarButton, isStarred);
-            } else {
-                console.log('❌ Paper-item star button not found:', paperItemStarId);
             }
             
             // Update modal star button using unique ID
             const modalStarId = `star-${paperId}-modal`;
             const modalStarButton = document.getElementById(modalStarId);
             if (modalStarButton) {
-                console.log('✅ Found and updating modal star button:', modalStarId);
                 this.updateStarButton(modalStarButton, isStarred);
-            } else {
-                console.log('❌ Modal star button not found:', modalStarId);
             }
         } catch (error) {
-            console.error('❌ Error in updateAllStarButtons:', error);
+            console.error('Error in updateAllStarButtons:', error);
         }
     }
 

@@ -22,7 +22,6 @@ class UtilityManager {
             
             // For streaming, the paper handling is done in handleStreamingData
             // This is just for button state update
-            console.log('Streaming success for paper:', result?.arxiv_id);
         } else {
             queueBtn.innerHTML = '✅ Queued!';
             setTimeout(() => {

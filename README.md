@@ -85,15 +85,6 @@ uv run python examples/arxiv_crawler_demo.py
 ```bash
 # Run all quality checks
 ./scripts/dev/check.sh
-
-# Individual checks
-uv run ruff check .     # Linting
-uv run black .          # Code formatting
-uv run isort .          # Import sorting
-uv run mypy .           # Type checking
-
-# Auto-fix issues
-./scripts/dev/check.sh --fix
 ```
 
 ### Testing

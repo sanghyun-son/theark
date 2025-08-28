@@ -137,33 +137,43 @@ class PaperAnalysis(BaseModel):
         return cls(**data)
 
     @classmethod
-    def create_paper_analysis_schema(cls) -> dict[str, OpenAIPropertyDefinition]:
+    def create_paper_analysis_schema(
+        cls, language: str
+    ) -> dict[str, OpenAIPropertyDefinition]:
         """Create the standard paper analysis properties schema."""
         return {
             "tldr": OpenAIPropertyDefinition(
                 type="string",
-                description="Generate a too long; didn't read summary in one line.",
+                description=f"Generate a too long; didn't read summary in {language}.",
             ),
             "motivation": OpenAIPropertyDefinition(
                 type="string",
-                description="Describe the motivation in this paper.",
+                description=f"Describe the motivation in this paper in {language}.",
             ),
             "method": OpenAIPropertyDefinition(
                 type="string",
-                description="Describe the method of this paper in detail.",
+                description=(
+                    f"Describe the method of this paper in detail in {language}."
+                ),
             ),
             "result": OpenAIPropertyDefinition(
                 type="string",
-                description="Describe the result and achievement of this paper.",
+                description=(
+                    f"Describe the result "
+                    f"and achievement of this paper in {language}."
+                ),
             ),
             "conclusion": OpenAIPropertyDefinition(
                 type="string",
-                description="Describe the conclusion and implication of this paper.",
+                description=(
+                    f"Describe the conclusion "
+                    f"and implication of this paper in {language}."
+                ),
             ),
             "relevance": OpenAIPropertyDefinition(
                 type="integer",
                 description=(
-                    "Relevance level (1-10) " "between the abstract and user interests."
+                    "Relevance level (1-10) between the abstract and user interests."
                 ),
             ),
         }

@@ -17,12 +17,7 @@ from core.models.external.openai import (
     ChatCompletionResponse,
     CompletionWindow,
     FilePurpose,
-    OpenAIFunction,
-    OpenAIFunctionParameter,
     OpenAIMessage,
-    OpenAITool,
-    OpenAIToolChoice,
-    PaperAnalysis,
 )
 
 logger = get_logger(__name__)
@@ -127,9 +122,8 @@ class UnifiedOpenAIClient:
             messages=messages,
         )
 
-        if use_tools:
-            payload.tools = [self._create_paper_analysis_tool()]
-            payload.tool_choice = self._create_tool_choice()
+        # Note: Tool creation is now handled by SummaryGenerator
+        # This client only handles the raw OpenAI API calls
 
         # Log request details
         logger.debug(
@@ -149,42 +143,9 @@ class UnifiedOpenAIClient:
 
         chat_response = ChatCompletionResponse.model_validate(response_dict)
 
-        # Update tracking if provided
-        if db_manager and custom_id:
-            await self._update_tracking(custom_id, 200, chat_response, db_manager)
+        # Note: Tracking is now handled by SummaryGenerator
 
         return chat_response
-
-    async def summarize_paper(
-        self,
-        content: str,
-        interest_section: str,
-        language: str = "English",
-        model: str | None = None,
-        use_tools: bool | None = None,
-        db_manager: DatabaseManager | None = None,
-        custom_id: str | None = None,
-    ) -> ChatCompletionResponse:
-        """Summarize a paper using the standard prompt structure.
-
-        Args:
-            content: Paper abstract content
-            interest_section: User's interest section
-            language: Language for the response
-            model: Model to use (defaults to client model)
-            use_tools: Whether to use tools (defaults to client setting)
-            db_manager: Database manager for tracking (optional)
-            custom_id: Custom identifier for tracking (optional)
-
-        Returns:
-            Chat completion response
-        """
-        messages = self._create_summarization_messages(
-            content, interest_section, language
-        )
-        return await self.create_chat_completion(
-            messages, model, use_tools, db_manager, custom_id
-        )
 
     # Batch processing methods
     async def create_batch_request(
@@ -397,61 +358,3 @@ class UnifiedOpenAIClient:
             f.write(content.read())
 
         logger.info(f"Downloaded file {file_id} to {output_path}")
-
-    # Helper methods
-    def _create_summarization_messages(
-        self, content: str, interest_section: str, language: str
-    ) -> list[OpenAIMessage]:
-        """Create messages for paper summarization."""
-        from core.llm.prompts import SYSTEM_PROMPT, USER_PROMPT
-
-        return [
-            OpenAIMessage(
-                role="system",
-                content=SYSTEM_PROMPT.format(language=language),
-            ),
-            OpenAIMessage(
-                role="user",
-                content=USER_PROMPT.format(
-                    language=language,
-                    interest_section=interest_section,
-                    content=content,
-                ),
-            ),
-        ]
-
-    def _create_paper_analysis_tool(self) -> OpenAITool:
-        """Create the paper analysis function calling tool."""
-        function_parameters = OpenAIFunctionParameter(
-            type="object",
-            description="Paper analysis parameters",
-            properties=PaperAnalysis.create_paper_analysis_schema(),
-            required=PaperAnalysis.get_required_fields(),
-        )
-
-        function = OpenAIFunction(
-            name="Structure",
-            description="Analyze paper abstract and extract key information",
-            parameters=function_parameters,
-        )
-
-        return OpenAITool(function=function)
-
-    def _create_tool_choice(self) -> OpenAIToolChoice:
-        """Create the tool choice configuration."""
-        return OpenAIToolChoice(function={"name": "Structure"})
-
-    async def _update_tracking(
-        self,
-        custom_id: str,
-        status_code: int,
-        chat_response: ChatCompletionResponse,
-        db_manager: DatabaseManager,
-    ) -> None:
-        """Update LLM request tracking in database."""
-        # This would integrate with the existing LLM tracking system
-        # For now, just log the tracking info
-        logger.debug(
-            f"Tracking request {custom_id}: "
-            f"status={status_code}, tokens={chat_response.usage}"
-        )

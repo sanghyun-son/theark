@@ -26,7 +26,7 @@ def mock_settings() -> Settings:
 @pytest.fixture
 def background_manager(mock_settings: Settings) -> BackgroundBatchManager:
     """Background batch manager instance."""
-    return BackgroundBatchManager(mock_settings)
+    return BackgroundBatchManager(mock_settings, language="English")
 
 
 @pytest.mark.asyncio
@@ -35,7 +35,7 @@ async def test_background_manager_initialization(
 ) -> None:
     """Test background manager initialization."""
     # Act
-    manager = BackgroundBatchManager(mock_settings)
+    manager = BackgroundBatchManager(mock_settings, language="English")
 
     # Assert
     assert manager._settings == mock_settings
@@ -72,7 +72,7 @@ async def test_start_background_manager_when_disabled(
     """Test starting background manager when disabled."""
     # Arrange
     mock_settings.batch_enabled = False
-    manager = BackgroundBatchManager(mock_settings)
+    manager = BackgroundBatchManager(mock_settings, language="English")
 
     # Act
     await manager.start(mock_db_manager, mock_openai_client)
@@ -360,7 +360,7 @@ async def test_different_intervals_work_correctly(
     # Arrange
     mock_settings.batch_summary_interval = 5
     mock_settings.batch_fetch_interval = 3
-    manager = BackgroundBatchManager(mock_settings)
+    manager = BackgroundBatchManager(mock_settings, language="English")
 
     # Act
     await manager.start(mock_db_manager, mock_openai_client)

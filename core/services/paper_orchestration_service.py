@@ -33,7 +33,7 @@ class PaperOrchestrationService:
         self,
         paper_data: PaperCreate,
         db_manager: DatabaseManager,
-        summary_client: UnifiedOpenAIClient,
+        llm_client: UnifiedOpenAIClient,
     ) -> PaperResponse:
         """Create paper with background summarization."""
         paper = await self.creation_service.create_paper(paper_data, db_manager)
@@ -43,7 +43,7 @@ class PaperOrchestrationService:
             self.summarization_service.start_background_summarization(
                 paper,
                 db_manager,
-                summary_client,
+                llm_client,
                 language=paper_data.summary_language,
             )
 
@@ -74,7 +74,7 @@ class PaperOrchestrationService:
         self,
         paper_identifier: str,
         db_manager: DatabaseManager,
-        summary_client: UnifiedOpenAIClient,
+        llm_client: UnifiedOpenAIClient,
         force_resummarize: bool = False,
         language: str = "Korean",
     ) -> None:
@@ -88,7 +88,7 @@ class PaperOrchestrationService:
         await self.summarization_service.summarize_paper(
             paper,
             db_manager,
-            summary_client,
+            llm_client,
             force_resummarize,
             language,
         )
@@ -97,7 +97,7 @@ class PaperOrchestrationService:
         self,
         paper_data: PaperCreate,
         db_manager: DatabaseManager,
-        summary_client: UnifiedOpenAIClient,
+        llm_client: UnifiedOpenAIClient,
     ) -> AsyncGenerator[str, None]:
         """Stream paper creation and immediate summarization process.
 
@@ -133,7 +133,7 @@ class PaperOrchestrationService:
                 paper_response,
                 db_manager,
                 paper_data.summary_language,
-                summary_client,
+                llm_client,
             ):
                 yield event
 
@@ -147,7 +147,7 @@ class PaperOrchestrationService:
         paper_response: PaperResponse,
         db_manager: DatabaseManager,
         language: str,
-        summary_client: UnifiedOpenAIClient,
+        llm_client: UnifiedOpenAIClient,
     ) -> AsyncGenerator[str, None]:
         """Stream the immediate summarization process."""
         try:
@@ -159,7 +159,7 @@ class PaperOrchestrationService:
             await self.summarization_service.summarize_paper(
                 paper,
                 db_manager,
-                summary_client,
+                llm_client,
                 force_resummarize=False,
                 language=language,
             )

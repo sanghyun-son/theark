@@ -42,9 +42,11 @@ async def saved_paper(
 async def test_summarize_paper_success(
     mock_paper: PaperEntity,
     mock_db_manager: DatabaseManager,
-    mock_openai_client: UnifiedOpenAIClient,
+    mock_openai_client,
 ) -> None:
     """Test successful paper summarization."""
+
+    
     service = PaperSummarizationService()
 
     # Save paper to database first
@@ -74,7 +76,7 @@ async def test_summarize_paper_success(
 async def test_summarize_paper_existing_summary(
     mock_paper: PaperEntity,
     mock_db_manager: DatabaseManager,
-    mock_openai_client: UnifiedOpenAIClient,
+    mock_openai_client,
 ) -> None:
     """Test summarization when summary already exists."""
     service = PaperSummarizationService()
@@ -108,7 +110,7 @@ async def test_summarize_paper_existing_summary(
 async def test_summarize_paper_force_resummarize(
     mock_paper: PaperEntity,
     mock_db_manager: DatabaseManager,
-    mock_openai_client: UnifiedOpenAIClient,
+    mock_openai_client,
 ) -> None:
     """Test summarization with force_resummarize=True."""
     service = PaperSummarizationService()
@@ -149,7 +151,7 @@ async def test_summarize_paper_force_resummarize(
 async def test_get_paper_summary_success(
     mock_paper: PaperEntity,
     mock_db_manager: DatabaseManager,
-    mock_openai_client: UnifiedOpenAIClient,
+    mock_openai_client,
 ) -> None:
     """Test getting paper summary successfully."""
     service = PaperSummarizationService()
@@ -179,7 +181,7 @@ async def test_get_paper_summary_success(
 async def test_get_paper_summary_fallback_to_english(
     mock_paper: PaperEntity,
     mock_db_manager: DatabaseManager,
-    mock_openai_client: UnifiedOpenAIClient,
+    mock_openai_client,
 ) -> None:
     """Test getting paper summary with fallback to English."""
     service = PaperSummarizationService()

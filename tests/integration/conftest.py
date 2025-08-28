@@ -48,7 +48,10 @@ async def integration_client(
         app.state.summary_client = mock_openai_client
 
         # Set up background batch manager for integration tests
-        app.state.background_batch_manager = BackgroundBatchManager(config.settings)
+        app.state.background_batch_manager = BackgroundBatchManager(
+            config.settings,
+            language=config.settings.default_summary_language,
+        )
         app.state.openai_batch_client = mock_openai_client
         # Start the background manager with the mock OpenAI client
         await app.state.background_batch_manager.start(

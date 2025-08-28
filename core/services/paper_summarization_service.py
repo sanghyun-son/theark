@@ -8,6 +8,7 @@ from core import get_logger
 from core.config import load_settings
 from core.database.interfaces import DatabaseManager
 from core.database.repository import LLMBatchRepository, SummaryRepository
+from core.llm.applications.summary import SummaryGenerator
 from core.llm.openai_client import UnifiedOpenAIClient
 from core.llm.response_parser import parse_summary_response
 from core.models.database.entities import PaperEntity, SummaryEntity
@@ -27,7 +28,7 @@ class PaperSummarizationService:
         self,
         paper: PaperEntity,
         db_manager: DatabaseManager,
-        summary_client: UnifiedOpenAIClient,
+        llm_client: UnifiedOpenAIClient,
         force_resummarize: bool = False,
         language: str = "Korean",
     ) -> None:
@@ -37,7 +38,7 @@ class PaperSummarizationService:
                 self.summarize_paper(
                     paper,
                     db_manager,
-                    summary_client,
+                    llm_client,
                     force_resummarize,
                     language,
                 )
@@ -55,7 +56,7 @@ class PaperSummarizationService:
         self,
         paper: PaperEntity,
         db_manager: DatabaseManager,
-        summary_client: UnifiedOpenAIClient,
+        llm_client: UnifiedOpenAIClient,
         force_resummarize: bool = False,
         language: str = "Korean",
     ) -> None:
@@ -80,7 +81,9 @@ class PaperSummarizationService:
         max_retries = 3
         for attempt in range(max_retries):
             try:
-                response = await summary_client.summarize_paper(
+                summary_generator = SummaryGenerator()
+                response = await summary_generator.summarize_paper(
+                    llm_client,
                     content=paper.abstract,
                     interest_section=self.settings.default_interests,
                     language=language,
@@ -93,8 +96,8 @@ class PaperSummarizationService:
                     response=response,
                     original_content=paper.abstract,
                     custom_id=paper.arxiv_id,
-                    model=summary_client.model,
-                    use_tools=summary_client.use_tools,
+                    model=llm_client.model,
+                    use_tools=llm_client.use_tools,
                 )
 
                 # Save summary to database
