@@ -1,6 +1,5 @@
 """Main FastAPI application."""
 
-import logging
 import os
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
@@ -20,19 +19,20 @@ from .routers import (
     papers_router,
 )
 
-settings = load_settings()
-log_level = getattr(logging, settings.log_level.upper(), logging.INFO)
-setup_logging(level=log_level, use_colors=True)
-
 logger = get_logger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Application lifespan context manager."""
-    current_settings = load_settings()
-    logger.info(f"TheArk: {current_settings.environment}")
-    logger.info(f"Authentication required: {current_settings.auth_required}")
+    settings = load_settings()
+    setup_logging(
+        level=settings.log_level.upper(),
+        use_colors=True,
+        enable_file_logging=True,
+    )
+    logger.info(f"TheArk: {settings.environment}")
+    logger.info(f"Authentication required: {settings.auth_required}")
 
     from core.batch.background_manager import BackgroundBatchManager
     from core.database.config import get_database_path
@@ -42,7 +42,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     from core.llm.openai_client import UnifiedOpenAIClient
 
     # Create tables on startup (without persistent connections)
-    db_path = get_database_path(current_settings.environment)
+    db_path = get_database_path(settings.environment)
     app.state.db_manager = SQLiteManager(db_path)
     await app.state.db_manager.connect()
     await app.state.db_manager.create_tables()
@@ -58,19 +58,19 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Create OpenAI client
     openai_client = UnifiedOpenAIClient(
         api_key=openai_api_key,
-        base_url=current_settings.llm_api_base_url,
-        model=current_settings.llm_model,
+        base_url=settings.llm_api_base_url,
+        model=settings.llm_model,
     )
     app.state.summary_client = openai_client
 
     # Initialize background batch manager
     app.state.background_batch_manager = BackgroundBatchManager(
-        current_settings,
-        language=current_settings.default_summary_language,
+        settings,
+        language=settings.default_summary_language,
     )
 
     # Start background batch processing if enabled
-    if current_settings.batch_enabled:
+    if settings.batch_enabled:
         try:
             await app.state.background_batch_manager.start(
                 app.state.db_manager,
@@ -98,18 +98,18 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
 def create_app() -> FastAPI:
     """Create FastAPI app with current settings."""
-    current_settings = load_settings()
+    settings = load_settings()
 
     app = FastAPI(
-        title=current_settings.api_title,
+        title=settings.api_title,
         description="Backend API for TheArk paper management system",
-        version=current_settings.api_version,
+        version=settings.api_version,
         lifespan=lifespan,
     )
 
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=current_settings.cors_allow_origins,
+        allow_origins=settings.cors_allow_origins,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],

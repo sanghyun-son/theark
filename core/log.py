@@ -12,7 +12,7 @@ BASE_LOG_FORMAT = "%(asctime)s %(levelname)8s %(message)s (%(filename)s:%(lineno
 
 
 def setup_logging(
-    level: int = logging.INFO,
+    level: str | int = logging.INFO,
     format_string: str | None = None,
     use_colors: bool = True,
     enable_file_logging: bool = False,

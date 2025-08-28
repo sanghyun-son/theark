@@ -135,7 +135,8 @@ class SQLiteManager(DatabaseManager):
                 url_abs         TEXT NOT NULL,
                 url_pdf         TEXT,
                 published_at    TEXT NOT NULL,
-                updated_at      TEXT NOT NULL
+                updated_at      TEXT NOT NULL,
+                summary_status  TEXT NOT NULL DEFAULT 'pending'
             )""",
             # 2) 요약
             """CREATE TABLE IF NOT EXISTS summary (
@@ -296,41 +297,9 @@ class SQLiteManager(DatabaseManager):
             for statement in statements:
                 await self.execute(statement)
 
-            # Run migrations
-            await self._run_migrations()
-
             logger.info("Database tables created successfully")
         except Exception as e:
             logger.error(f"Failed to create tables: {e}")
-            raise
-
-    async def _run_migrations(self) -> None:
-        """Run database migrations."""
-        try:
-            # Migration 1: Add summary_status column to paper table
-            await self._migrate_add_summary_status()
-        except Exception as e:
-            logger.error(f"Migration failed: {e}")
-            raise
-
-    async def _migrate_add_summary_status(self) -> None:
-        """Migration to add summary_status column to paper table."""
-        try:
-            # Check if summary_status column exists
-            result = await self.fetch_all("PRAGMA table_info(paper)")
-            columns = [row["name"] for row in result] if result else []
-
-            if "summary_status" not in columns:
-                logger.info("Adding summary_status column to paper table")
-                await self.execute(
-                    "ALTER TABLE paper ADD COLUMN summary_status TEXT NOT NULL "
-                    "DEFAULT 'done'"
-                )
-                logger.info("Migration completed: summary_status column added")
-            else:
-                logger.debug("summary_status column already exists")
-        except Exception as e:
-            logger.error(f"Failed to migrate summary_status column: {e}")
             raise
 
     async def drop_tables(self) -> None:
