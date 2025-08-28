@@ -2,16 +2,14 @@
 
 # Test script for theark project
 # Usage:
-#   ./test.sh              # Run fast tests only
-#   ./test.sh --all        # Run all tests (including slow)
-#   ./test.sh --slow       # Run slow tests only
-#   ./test.sh --verbose    # Run fast tests with verbose output
-#   ./test.sh --logs       # Run fast tests with application logs
-#   ./test.sh --all --verbose  # Run all tests with verbose output
-#   ./test.sh [TARGET]     # Run specific test target (predefined or directory)
-#   ./test.sh [TARGET] --verbose  # Run specific target with verbose output
-#   ./test.sh tests/core/  # Run tests in specific directory
-#   ./test.sh tests/crawler/database/  # Run tests in subdirectory
+#   ./test.sh                    # Run all tests
+#   ./test.sh --integration      # Run integration tests only
+#   ./test.sh --unit             # Run unit tests only (excluding integration)
+#   ./test.sh --verbose          # Run with verbose output
+#   ./test.sh --log-info         # Run with INFO level logging
+#   ./test.sh --log-debug        # Run with DEBUG level logging
+#   ./test.sh [TARGET1] [TARGET2] ...  # Run specific test directories
+#   ./test.sh tests/core/ tests/api/   # Run multiple specific directories
 
 set -e  # Exit on any error
 
@@ -41,63 +39,63 @@ print_error() {
 
 # Function to show usage
 show_usage() {
-    echo "Usage: $0 [OPTIONS] [TARGET]"
+    echo "Usage: $0 [OPTIONS] [TARGET1] [TARGET2] ..."
     echo ""
     echo "Options:"
-echo "  --all       Run all tests (including slow tests)"
-echo "  --slow      Run only slow tests"
-echo "  --verbose   Run with verbose output (test details)"
-echo "  --logs      Run with application logs (--log-cli-level=INFO)"
-echo "  --help      Show this help message"
+    echo "  --integration  Run integration tests only (tests/integration/)"
+    echo "  --unit         Run unit tests only (tests/* except tests/integration/)"
+    echo "  --verbose      Run with verbose output (test details)"
+    echo "  --log-info     Run with INFO level logging (--log-cli-level=INFO)"
+    echo "  --log-debug    Run with DEBUG level logging (--log-cli-level=DEBUG)"
+    echo "  --help         Show this help message"
     echo ""
     echo "Targets:"
-echo "  core        Run core module tests"
-echo "  database    Run database module tests"
-echo "  arxiv       Run arXiv module tests"
-echo "  crawler     Run crawler module tests"
-echo "  api         Run API module tests"
-echo ""
-echo "Directory Examples:"
-echo "  tests/core/              # Run tests in core directory"
-echo "  tests/crawler/database/  # Run tests in database subdirectory"
-echo "  tests/crawler/arxiv/     # Run tests in arxiv subdirectory"
-echo "  tests/core/test_log.py   # Run specific test file"
+    echo "  Multiple test directories can be specified"
+    echo "  Examples:"
+    echo "    tests/core/              # Run tests in core directory"
+    echo "    tests/api/               # Run tests in api directory"
+    echo "    tests/core/database/     # Run tests in database subdirectory"
+    echo "    tests/core/test_log.py   # Run specific test file"
     echo ""
     echo "Examples:"
-echo "  $0                    # Run fast tests only"
-echo "  $0 --all              # Run all tests"
-echo "  $0 --verbose          # Run fast tests with verbose output"
-echo "  $0 --logs             # Run fast tests with application logs"
-echo "  $0 core               # Run core tests only"
-echo "  $0 database --verbose # Run database tests with verbose output"
-echo "  $0 tests/core/        # Run tests in core directory"
-echo "  $0 tests/crawler/database/ --verbose  # Run database tests with verbose output"
-echo "  $0 --slow             # Run slow tests only"
+    echo "  $0                                    # Run all tests"
+    echo "  $0 --integration                      # Run integration tests only"
+    echo "  $0 --unit                            # Run unit tests only"
+    echo "  $0 --verbose                         # Run all tests with verbose output"
+    echo "  $0 --log-info                        # Run all tests with INFO level logging"
+    echo "  $0 --log-debug                       # Run all tests with DEBUG level logging"
+    echo "  $0 tests/core/                       # Run tests in core directory"
+    echo "  $0 tests/core/ tests/api/            # Run tests in multiple directories"
+    echo "  $0 tests/core/database/ --verbose    # Run database tests with verbose output"
 }
 
 # Parse arguments
-RUN_ALL=false
-RUN_SLOW=false
+RUN_INTEGRATION=false
+RUN_UNIT=false
 VERBOSE=false
-LOGS=false
-TARGET=""
+LOG_LEVEL=""
+TARGETS=()
 
 while [[ $# -gt 0 ]]; do
     case $1 in
-        --all)
-            RUN_ALL=true
+        --integration)
+            RUN_INTEGRATION=true
             shift
             ;;
-        --slow)
-            RUN_SLOW=true
+        --unit)
+            RUN_UNIT=true
             shift
             ;;
         --verbose|-v)
             VERBOSE=true
             shift
             ;;
-        --logs)
-            LOGS=true
+        --log-info)
+            LOG_LEVEL="INFO"
+            shift
+            ;;
+        --log-debug)
+            LOG_LEVEL="DEBUG"
             shift
             ;;
         --help|-h)
@@ -110,12 +108,7 @@ while [[ $# -gt 0 ]]; do
             exit 1
             ;;
         *)
-            if [[ -z "$TARGET" ]]; then
-                TARGET="$1"
-            else
-                print_error "Multiple targets specified: $TARGET and $1"
-                exit 1
-            fi
+            TARGETS+=("$1")
             shift
             ;;
     esac
@@ -129,60 +122,28 @@ if [[ "$VERBOSE" == true ]]; then
     PYTEST_CMD="$PYTEST_CMD -v"
 fi
 
-# Add logs flag if requested
-if [[ "$LOGS" == true ]]; then
-    PYTEST_CMD="$PYTEST_CMD --log-cli-level=INFO"
+# Add log level flag if requested
+if [[ -n "$LOG_LEVEL" ]]; then
+    PYTEST_CMD="$PYTEST_CMD --log-cli-level=$LOG_LEVEL"
 fi
 
 # Determine what to run
-if [[ "$RUN_SLOW" == true ]]; then
-    # Run only slow tests
-    print_info "Running slow tests only..."
-    $PYTEST_CMD -m slow
-elif [[ "$RUN_ALL" == true ]]; then
-    # Run all tests
-    print_info "Running all tests (including slow tests)..."
-    $PYTEST_CMD tests/
-elif [[ -n "$TARGET" ]]; then
-    # Check if it's a predefined target or a directory path
-    case $TARGET in
-        core)
-            print_info "Running core module tests..."
-            $PYTEST_CMD tests/core/
-            ;;
-        database)
-            print_info "Running database module tests..."
-            $PYTEST_CMD tests/crawler/database/
-            ;;
-        arxiv)
-            print_info "Running arXiv module tests..."
-            $PYTEST_CMD tests/crawler/arxiv/
-            ;;
-        crawler)
-            print_info "Running crawler module tests..."
-            $PYTEST_CMD tests/crawler/
-            ;;
-        api)
-            print_info "Running API module tests..."
-            $PYTEST_CMD tests/api/
-            ;;
-        *)
-            # Check if it's a valid directory or file path
-            if [[ -d "$TARGET" ]] || [[ -f "$TARGET" ]]; then
-                print_info "Running tests in: $TARGET"
-                $PYTEST_CMD "$TARGET"
-            else
-                print_error "Unknown target: $TARGET"
-                echo "Available predefined targets: core, database, arxiv, crawler, api"
-                echo "Or use directory paths like: tests/core/, tests/crawler/database/"
-                exit 1
-            fi
-            ;;
-    esac
+if [[ "$RUN_INTEGRATION" == true ]]; then
+    # Run integration tests only
+    print_info "Running integration tests only..."
+    $PYTEST_CMD tests/integration/
+elif [[ "$RUN_UNIT" == true ]]; then
+    # Run unit tests only (excluding integration)
+    print_info "Running unit tests only (excluding integration)..."
+    $PYTEST_CMD tests/core/ tests/api/
+elif [[ ${#TARGETS[@]} -gt 0 ]]; then
+    # Run specific targets
+    print_info "Running tests in specified targets: ${TARGETS[*]}"
+    $PYTEST_CMD "${TARGETS[@]}"
 else
-    # Run fast tests only (default)
-    print_info "Running fast tests only (excluding slow tests)..."
-    $PYTEST_CMD -m "not slow" tests/
+    # Run all tests (default)
+    print_info "Running all tests..."
+    $PYTEST_CMD tests/
 fi
 
 # Check if tests passed
