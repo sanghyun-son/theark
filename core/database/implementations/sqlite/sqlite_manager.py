@@ -1,7 +1,7 @@
 """SQLite database manager implementation using the new interface."""
 
 from pathlib import Path
-from typing import Any, Type, TypeVar
+from typing import Any, TypeVar
 
 from core.database.interfaces import DatabaseManager
 from core.database.interfaces.connection import DatabaseConnection
@@ -96,7 +96,7 @@ class SQLiteManager(DatabaseManager):
         """
         return await self._connection.fetch_all(query, params)
 
-    def get_repository(self, entity_type: Type[Any]) -> Repository[Any]:
+    def get_repository(self, entity_type: type[Any]) -> Repository[Any]:
         """Get repository for entity type.
 
         Args:

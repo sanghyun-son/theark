@@ -1,6 +1,7 @@
 """Error handling utilities for API endpoints."""
 
-from typing import Awaitable, Callable, TypeVar
+from collections.abc import Awaitable, Callable
+from typing import TypeVar
 
 from fastapi import HTTPException, status
 

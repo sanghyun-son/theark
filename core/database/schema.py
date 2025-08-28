@@ -1,7 +1,8 @@
 """Database schema utilities."""
 
+from collections.abc import Sequence
 from dataclasses import dataclass, field
-from typing import Any, Sequence
+from typing import Any
 
 
 @dataclass

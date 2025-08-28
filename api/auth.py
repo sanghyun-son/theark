@@ -1,6 +1,7 @@
 """Authentication middleware for the theark system."""
 
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 from fastapi import Request, status
 from fastapi.responses import JSONResponse

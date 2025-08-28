@@ -384,7 +384,7 @@ class BackgroundBatchManager:
             await openai_client.download_file(output_file_id, output_file_path)
 
             # Process each result
-            with open(output_file_path, "r") as f:
+            with open(output_file_path) as f:
                 for line in f:
                     if line.strip():
                         result = json.loads(line)
@@ -476,7 +476,7 @@ class BackgroundBatchManager:
             await openai_client.download_file(error_file_id, error_file_path)
 
             # Log errors
-            with open(error_file_path, "r") as f:
+            with open(error_file_path) as f:
                 for line in f:
                     if line.strip():
                         error = json.loads(line)

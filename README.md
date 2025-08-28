@@ -4,7 +4,7 @@
 [![Python 3.11](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
-[![Imports: isort](https://img.shields.io/badge/%20imports-isort-%231674b1?style=flat&labelColor=ef8336)](https://pycqa.github.io/isort/)
+[![Linting: ruff](https://img.shields.io/badge/linting-ruff-000000.svg)](https://github.com/astral-sh/ruff)
 
 A comprehensive paper management system with ArXiv crawling, AI-powered summarization, and LLM request tracking. Built with modern Python practices and FastAPI for scalable backend services.
 
@@ -17,7 +17,7 @@ A comprehensive paper management system with ArXiv crawling, AI-powered summariz
 - **💾 Database Management**: SQLite-based storage with LLM request tracking
 - **🔒 Type Safety**: Full type hints with mypy strict checking
 - **🧪 Comprehensive Testing**: Unit and integration tests with pytest
-- **📋 Code Quality**: Automated formatting, linting, and security checks
+- **📋 Code Quality**: Automated formatting, linting, and type checking
 
 ## 🚀 Quick Start
 
@@ -87,11 +87,13 @@ uv run python examples/arxiv_crawler_demo.py
 ./check.sh
 
 # Individual checks
+uv run ruff check .     # Linting
 uv run black .          # Code formatting
 uv run isort .          # Import sorting
-uv run flake8 .         # Linting
 uv run mypy .           # Type checking
-uv run bandit .         # Security checks
+
+# Auto-fix issues
+./check.sh --fix
 ```
 
 ### Testing
@@ -100,12 +102,8 @@ uv run bandit .         # Security checks
 # Run all tests
 uv run pytest
 
-# Run with coverage
-uv run pytest --cov=core --cov=crawler --cov=api --cov-report=term-missing
-
 # Run specific test categories
 uv run pytest tests/api/           # API tests
-uv run pytest tests/crawler/       # Crawler tests
 uv run pytest tests/core/          # Core functionality tests
 ```
 
@@ -155,6 +153,7 @@ theark/
 - Add type hints to all functions
 - Write tests for new functionality
 - Run `./check.sh` before committing
+- Use `./check.sh --fix` to auto-fix formatting issues
 - Use meaningful commit messages
 
 ## 📄 License

@@ -1,7 +1,7 @@
 """Database manager interface."""
 
 from abc import ABC, abstractmethod
-from typing import Any, Type
+from typing import Any
 
 from core.database.interfaces.connection import DatabaseConnection
 from core.database.interfaces.repository import Repository, RepositoryFactory
@@ -91,7 +91,7 @@ class DatabaseManager(ABC):
         pass
 
     @abstractmethod
-    def get_repository(self, entity_type: Type[Any]) -> Repository[Any]:
+    def get_repository(self, entity_type: type[Any]) -> Repository[Any]:
         """Get repository for entity type.
 
         Args:

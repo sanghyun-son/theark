@@ -1,7 +1,5 @@
 """Factory for creating and managing paper extractors."""
 
-from typing import Dict
-
 from core.extractors.base import BaseExtractor
 from core.extractors.exceptions import UnsupportedURLError
 from core.log import get_logger
@@ -14,7 +12,7 @@ class ExtractorFactory:
 
     def __init__(self) -> None:
         """Initialize extractor factory."""
-        self._extractors: Dict[str, BaseExtractor] = {}
+        self._extractors: dict[str, BaseExtractor] = {}
         self._register_default_extractors()
 
     def register_extractor(self, name: str, extractor: BaseExtractor) -> None:
@@ -61,7 +59,7 @@ class ExtractorFactory:
 
         raise UnsupportedURLError(f"No extractor found for URL: {url}")
 
-    def get_all_extractors(self) -> Dict[str, BaseExtractor]:
+    def get_all_extractors(self) -> dict[str, BaseExtractor]:
         """Get all registered extractors.
 
         Returns:

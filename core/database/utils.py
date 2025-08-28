@@ -30,7 +30,8 @@ def row_to_model(model_class: type[T], row: RepositoryRowType) -> T:
 
     # Use from_tuple if available, otherwise fallback to dict conversion
     if hasattr(model_class, "from_tuple"):
-        from_tuple_method = getattr(model_class, "from_tuple")
+        # Use getattr to satisfy mypy, but suppress ruff warning
+        from_tuple_method = getattr(model_class, "from_tuple")  # noqa: B009
         return cast(T, from_tuple_method(row))
 
     # Fallback: assume tuple order matches model field order
@@ -40,7 +41,7 @@ def row_to_model(model_class: type[T], row: RepositoryRowType) -> T:
             f"Tuple length ({len(row)}) doesn't match model fields "
             f"({len(field_names)})"
         )
-    return model_class.model_validate(dict(zip(field_names, row)))
+    return model_class.model_validate(dict(zip(field_names, row, strict=False)))
 
 
 def model_to_row(model: BaseModel) -> tuple[Any, ...]:

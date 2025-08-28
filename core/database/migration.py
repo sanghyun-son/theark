@@ -1,6 +1,7 @@
 """Database migration utilities."""
 
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 from core.database.interfaces.connection import DatabaseConnection
 

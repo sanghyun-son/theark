@@ -1,6 +1,6 @@
 """Paper service for CRUD operations using new architecture."""
 
-from typing import AsyncGenerator
+from collections.abc import AsyncGenerator
 
 from core import get_logger
 from core.config import load_settings

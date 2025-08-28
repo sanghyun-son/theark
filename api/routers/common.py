@@ -29,7 +29,7 @@ class HealthResponse(BaseModel):
 async def root() -> HTMLResponse:
     """Root endpoint with basic API information."""
     template_path = Path("templates", "root.html")
-    with open(template_path, "r", encoding="utf-8") as f:
+    with open(template_path, encoding="utf-8") as f:
         html_content = f.read()
 
     return HTMLResponse(content=html_content)

@@ -1,7 +1,7 @@
 """Paper orchestration service for coordinating paper creation and summarization."""
 
 import json
-from typing import AsyncGenerator
+from collections.abc import AsyncGenerator
 
 from core import get_logger
 from core.database.interfaces import DatabaseManager

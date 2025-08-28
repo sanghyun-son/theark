@@ -75,7 +75,7 @@ print_status "Starting code quality checks..."
 # Parse command line arguments
 CHECK_TYPE="all"
 VERBOSE=true
-FIX_MODE=false
+FIX_MODE=true  # Default to fix mode
 
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -95,8 +95,8 @@ while [[ $# -gt 0 ]]; do
             VERBOSE=false
             shift
             ;;
-        --fix)
-            FIX_MODE=true
+        --no-fix)
+            FIX_MODE=false
             shift
             ;;
         -h|--help)
@@ -107,11 +107,11 @@ while [[ $# -gt 0 ]]; do
             echo "  --lint-only         Run only linting"
             echo "  --format-only       Run only formatting checks"
             echo "  --quiet             Quiet output (default is verbose)"
-            echo "  --fix               Fix formatting and import issues automatically"
+            echo "  --no-fix            Disable auto-fixing (default is auto-fix)"
             echo "  -h, --help          Show this help message"
             echo ""
-            echo "Default behavior: Run all checks with verbose output"
-            echo "With --fix: Automatically fix formatting and import issues"
+            echo "Default behavior: Run all checks with verbose output and auto-fix enabled"
+            echo "Use --no-fix to disable auto-fixing and only check for issues"
             exit 0
             ;;
         *)
@@ -122,8 +122,15 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# Function to run formatting checks (black and isort)
+# Function to run formatting checks (ruff, black, and isort)
 run_formatting() {
+    # ruff - can be auto-fixed
+    if $FIX_MODE; then
+        run_command "ruff" "uv run ruff check --fix $SOURCE_DIRS" "Fixing linting issues"
+    else
+        run_command "ruff" "uv run ruff check $SOURCE_DIRS" "Checking linting issues"
+    fi
+    
     # Black - can be auto-fixed
     if $FIX_MODE; then
         run_command "black" "uv run black $SOURCE_DIRS" "Fixing code formatting"
@@ -144,29 +151,18 @@ run_typecheck() {
     run_command "mypy" "uv run mypy $SOURCE_DIRS --ignore-missing-imports --strict" "Running type checking"
 }
 
-# Function to run linting
-run_linting() {
-    # flake8 - cannot be auto-fixed
-    run_command "flake8" "uv run flake8 $SOURCE_DIRS" "Running linting"
-    
-    # bandit - security checks, always run
-    echo "[bandit]"
-    print_status "Running security checks..."
-    if $VERBOSE; then
-        uv run bandit -r $SOURCE_DIRS -f json -o bandit-report.json || true
-    else
-        uv run bandit -r $SOURCE_DIRS -f json -o bandit-report.json >/dev/null 2>&1 || true
-    fi
-    print_success "Security checks completed"
-}
-
 # Main execution
 case $CHECK_TYPE in
     "typecheck")
         run_typecheck
         ;;
     "lint")
-        run_linting
+        # ruff handles linting
+        if $FIX_MODE; then
+            run_command "ruff" "uv run ruff check --fix $SOURCE_DIRS" "Fixing linting issues"
+        else
+            run_command "ruff" "uv run ruff check $SOURCE_DIRS" "Checking linting issues"
+        fi
         ;;
     "format")
         run_formatting
@@ -175,23 +171,30 @@ case $CHECK_TYPE in
         print_status "Running all code quality checks..."
         echo ""
         
-        # Run formatting first (can be auto-fixed)
+        # Run ruff first (linting)
+        if $FIX_MODE; then
+            if ! run_command "ruff" "uv run ruff check --fix $SOURCE_DIRS" "Fixing linting issues"; then
+                print_error "Linting fixes failed!"
+                exit 1
+            fi
+        else
+            if ! run_command "ruff" "uv run ruff check $SOURCE_DIRS" "Checking linting issues"; then
+                print_error "Linting checks failed!"
+                exit 1
+            fi
+        fi
+        echo ""
+        
+        # Run formatting (black and isort)
         if ! run_formatting; then
             print_error "Formatting checks failed!"
             exit 1
         fi
         echo ""
         
-        # Run type checking
+        # Run type checking last
         if ! run_typecheck; then
             print_error "Type checking failed!"
-            exit 1
-        fi
-        echo ""
-        
-        # Run linting last (cannot be auto-fixed)
-        if ! run_linting; then
-            print_error "Linting failed!"
             exit 1
         fi
         echo ""

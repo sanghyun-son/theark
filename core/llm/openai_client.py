@@ -1,8 +1,9 @@
 """Unified OpenAI client for both regular and batch requests using official client."""
 
 import asyncio
+from collections.abc import AsyncGenerator
 from pathlib import Path
-from typing import Any, AsyncGenerator
+from typing import Any
 
 from openai import AsyncOpenAI
 
