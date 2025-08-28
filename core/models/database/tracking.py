@@ -2,7 +2,7 @@
 
 import json
 from datetime import datetime
-from typing import Any
+from typing import Any, TypeVar
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -13,8 +13,12 @@ from core.constants import (
     TOKENS_PER_MILLION,
 )
 
+from .entities import FromTupleMixinBase
 
-class LLMRequest(BaseModel):
+T = TypeVar("T", bound="LLMRequest")
+
+
+class LLMRequest(FromTupleMixinBase):
     """LLM request tracking database entity model."""
 
     request_id: int | None = None
@@ -80,31 +84,20 @@ class LLMRequest(BaseModel):
         return v
 
     @classmethod
-    def from_tuple(cls, row: tuple[Any, ...]) -> "LLMRequest":
-        """Create LLMRequest from database tuple row."""
-        metadata = None
-        if row[16]:  # metadata column index
-            metadata = json.loads(row[16])
+    def from_tuple(cls: type[T], row: tuple[Any, ...]) -> T:
+        """Create LLMRequest from database tuple row with JSON metadata handling."""
+        # Create a copy of the row to modify
+        row_list = list(row)
 
-        return cls(
-            request_id=row[0],  # request_id
-            timestamp=row[1],  # timestamp
-            model=row[2],  # model
-            provider=row[3],  # provider
-            endpoint=row[4],  # endpoint
-            is_batched=bool(row[5]),  # is_batched
-            request_type=row[6],  # request_type
-            custom_id=row[7],  # custom_id
-            prompt_tokens=row[8],  # prompt_tokens
-            completion_tokens=row[9],  # completion_tokens
-            total_tokens=row[10],  # total_tokens
-            response_time_ms=row[11],  # response_time_ms
-            status=row[12],  # status
-            error_message=row[13],  # error_message
-            http_status_code=row[14],  # http_status_code
-            estimated_cost_usd=row[15],  # estimated_cost_usd
-            metadata=metadata,
-        )
+        # Handle metadata: parse JSON if present
+        if len(row_list) > 16 and row_list[16]:  # metadata column index
+            try:
+                metadata = json.loads(row_list[16])
+                row_list[16] = metadata
+            except (json.JSONDecodeError, TypeError):
+                row_list[16] = None
+
+        return super().from_tuple(tuple(row_list))
 
     def calculate_cost(self) -> float:
         """Calculate the estimated cost based on OpenAI's current pricing.

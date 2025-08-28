@@ -1,12 +1,38 @@
-"""Database entity models that map directly to database tables."""
+"""Database entity models for TheArk."""
 
 from datetime import datetime
-from typing import Any
+from typing import Any, TypeVar
 
 from pydantic import BaseModel, Field, field_validator
 
+T = TypeVar("T", bound="FromTupleMixinBase")
 
-class PaperEntity(BaseModel):
+
+class FromTupleMixinBase(BaseModel):
+    """Mixin class providing from_tuple functionality for database entities."""
+
+    @classmethod
+    def from_tuple(cls: type[T], row: tuple[Any, ...]) -> T:
+        """Create model instance from database tuple row.
+
+        Args:
+            row: Database row as tuple
+
+        Returns:
+            Model instance
+
+        Raises:
+            ValueError: If tuple length doesn't match model fields
+        """
+        field_names = list(cls.model_fields.keys())
+        if len(field_names) != len(row):
+            raise ValueError(
+                f"Tuple length ({len(row)}) doesn't match model fields ({len(field_names)})"
+            )
+        return cls.model_validate(dict(zip(field_names, row, strict=False)))
+
+
+class PaperEntity(FromTupleMixinBase):
     """Paper database entity model."""
 
     paper_id: int | None = None
@@ -54,23 +80,23 @@ class PaperEntity(BaseModel):
 
     @classmethod
     def from_tuple(cls, row: tuple[Any, ...]) -> "PaperEntity":
-        """Create PaperEntity from database tuple row."""
-        return cls(
-            paper_id=row[0],
-            arxiv_id=row[1],
-            title=row[2],
-            authors=row[3],
-            abstract=row[4],
-            primary_category=row[5].split(".")[0],
-            categories=row[5],
-            published_at=row[6],
-            updated_at=row[7],
-            url_abs=row[8],
-            url_pdf=row[9],
-        )
+        """Create PaperEntity from database tuple row with special primary_category handling."""
+        # Create a copy of the row to modify
+        row_list = list(row)
+
+        # Handle primary_category: extract first category from categories field
+        if len(row_list) > 5 and row_list[5]:  # categories field
+            categories = row_list[5]
+            primary_category = (
+                categories.split(".")[0] if "." in categories else categories
+            )
+            # Insert primary_category at the correct position (after paper_id, arxiv_id, latest_version, title, abstract)
+            row_list.insert(5, primary_category)
+
+        return super().from_tuple(tuple(row_list))
 
 
-class SummaryEntity(BaseModel):
+class SummaryEntity(FromTupleMixinBase):
     """Summary database entity model."""
 
     summary_id: int | None = None
@@ -99,28 +125,8 @@ class SummaryEntity(BaseModel):
             raise ValueError(f"Invalid language. Must be one of: {valid_languages}")
         return v
 
-    @classmethod
-    def from_tuple(cls, row: tuple[Any, ...]) -> "SummaryEntity":
-        """Create SummaryEntity from database tuple row."""
-        return cls(
-            summary_id=row[0],
-            paper_id=row[1],
-            version=row[2],
-            overview=row[3],
-            motivation=row[4],
-            method=row[5],
-            result=row[6],
-            conclusion=row[7],
-            language=row[8],
-            interests=row[9],
-            relevance=row[10],
-            model=row[11],
-            is_read=bool(row[12]),
-            created_at=row[13],
-        )
 
-
-class UserEntity(BaseModel):
+class UserEntity(FromTupleMixinBase):
     """User database entity model."""
 
     user_id: int = Field(..., gt=0)
@@ -135,17 +141,8 @@ class UserEntity(BaseModel):
             raise ValueError("Invalid email format")
         return v.lower()
 
-    @classmethod
-    def from_tuple(cls, row: tuple[Any, ...]) -> "UserEntity":
-        """Create UserEntity from database tuple row."""
-        return cls(
-            user_id=row[0],
-            email=row[1],
-            display_name=row[2],
-        )
 
-
-class UserInterestEntity(BaseModel):
+class UserInterestEntity(FromTupleMixinBase):
     """User interest database entity model."""
 
     user_id: int = Field(..., gt=0)
@@ -162,18 +159,8 @@ class UserInterestEntity(BaseModel):
             raise ValueError(f"Invalid kind. Must be one of: {valid_kinds}")
         return v
 
-    @classmethod
-    def from_tuple(cls, row: tuple[Any, ...]) -> "UserInterestEntity":
-        """Create UserInterestEntity from database tuple row."""
-        return cls(
-            user_id=row[0],
-            kind=row[1],
-            value=row[2],
-            weight=row[3],
-        )
 
-
-class UserStarEntity(BaseModel):
+class UserStarEntity(FromTupleMixinBase):
     """User star/bookmark database entity model."""
 
     user_id: int = Field(..., gt=0)
@@ -181,18 +168,8 @@ class UserStarEntity(BaseModel):
     note: str | None = None
     created_at: str | None = None
 
-    @classmethod
-    def from_tuple(cls, row: tuple[Any, ...]) -> "UserStarEntity":
-        """Create UserStarEntity from database tuple row."""
-        return cls(
-            user_id=row[0],
-            paper_id=row[1],
-            note=row[2],
-            created_at=row[3],
-        )
 
-
-class FeedItem(BaseModel):
+class FeedItem(FromTupleMixinBase):
     """Feed item database entity model."""
 
     feed_item_id: int | None = None
@@ -212,20 +189,8 @@ class FeedItem(BaseModel):
         except ValueError:
             raise ValueError("Invalid date format. Use YYYY-MM-DD")
 
-    @classmethod
-    def from_tuple(cls, row: tuple[Any, ...]) -> "FeedItem":
-        """Create FeedItem from database tuple row."""
-        return cls(
-            feed_item_id=row[0],
-            user_id=row[1],
-            paper_id=row[2],
-            score=row[3],
-            feed_date=row[4],
-            created_at=row[5],
-        )
 
-
-class CrawlEvent(BaseModel):
+class CrawlEvent(FromTupleMixinBase):
     """Crawl event database entity model."""
 
     event_id: int | None = None
@@ -244,14 +209,3 @@ class CrawlEvent(BaseModel):
         if v not in valid_types:
             raise ValueError(f"Invalid event type. Must be one of: {valid_types}")
         return v
-
-    @classmethod
-    def from_tuple(cls, row: tuple[Any, ...]) -> "CrawlEvent":
-        """Create CrawlEvent from database tuple row."""
-        return cls(
-            event_id=row[0],
-            arxiv_id=row[1],
-            event_type=row[2],
-            detail=row[3],
-            created_at=row[4],
-        )

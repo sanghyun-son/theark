@@ -122,31 +122,23 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# Function to run formatting checks (ruff, black, and isort)
-run_formatting() {
-    # ruff - can be auto-fixed
+run_linting() {
     if $FIX_MODE; then
         run_command "ruff" "uv run ruff check --fix $SOURCE_DIRS" "Fixing linting issues"
     else
         run_command "ruff" "uv run ruff check $SOURCE_DIRS" "Checking linting issues"
     fi
-    
+}
+
+run_formatting() {
     # Black - can be auto-fixed
     if $FIX_MODE; then
         run_command "black" "uv run black $SOURCE_DIRS" "Fixing code formatting"
     else
         run_command "black" "uv run black --check $SOURCE_DIRS" "Checking code formatting"
     fi
-    
-    # isort - can be auto-fixed
-    if $FIX_MODE; then
-        run_command "isort" "uv run isort $SOURCE_DIRS" "Fixing import sorting"
-    else
-        run_command "isort" "uv run isort --check-only $SOURCE_DIRS" "Checking import sorting"
-    fi
 }
 
-# Function to run type checking
 run_typecheck() {
     run_command "mypy" "uv run mypy $SOURCE_DIRS --ignore-missing-imports --strict" "Running type checking"
 }
@@ -157,12 +149,7 @@ case $CHECK_TYPE in
         run_typecheck
         ;;
     "lint")
-        # ruff handles linting
-        if $FIX_MODE; then
-            run_command "ruff" "uv run ruff check --fix $SOURCE_DIRS" "Fixing linting issues"
-        else
-            run_command "ruff" "uv run ruff check $SOURCE_DIRS" "Checking linting issues"
-        fi
+        run_linting
         ;;
     "format")
         run_formatting
@@ -171,21 +158,13 @@ case $CHECK_TYPE in
         print_status "Running all code quality checks..."
         echo ""
         
-        # Run ruff first (linting)
-        if $FIX_MODE; then
-            if ! run_command "ruff" "uv run ruff check --fix $SOURCE_DIRS" "Fixing linting issues"; then
-                print_error "Linting fixes failed!"
-                exit 1
-            fi
-        else
-            if ! run_command "ruff" "uv run ruff check $SOURCE_DIRS" "Checking linting issues"; then
-                print_error "Linting checks failed!"
-                exit 1
-            fi
+        if ! run_linting; then
+            print_error "Linting checks failed!"
+            exit 1
         fi
         echo ""
         
-        # Run formatting (black and isort)
+        # Run formatting (black)
         if ! run_formatting; then
             print_error "Formatting checks failed!"
             exit 1

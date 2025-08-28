@@ -1,9 +1,10 @@
 """Database utilities for common operations."""
 
-from typing import Any, TypeVar, cast
+from typing import Any, TypeVar
 
 from pydantic import BaseModel
 
+from core.models.database.entities import FromTupleMixinBase
 from core.types import DatabaseParamType, RepositoryRowType
 
 T = TypeVar("T", bound=BaseModel)
@@ -28,13 +29,9 @@ def row_to_model(model_class: type[T], row: RepositoryRowType) -> T:
     if not isinstance(row, tuple):
         raise ValueError(f"Unsupported row type: {type(row)}")
 
-    # Use from_tuple if available, otherwise fallback to dict conversion
-    if hasattr(model_class, "from_tuple"):
-        # Use getattr to satisfy mypy, but suppress ruff warning
-        from_tuple_method = getattr(model_class, "from_tuple")  # noqa: B009
-        return cast(T, from_tuple_method(row))
+    if issubclass(model_class, FromTupleMixinBase):
+        return model_class.from_tuple(row)
 
-    # Fallback: assume tuple order matches model field order
     field_names = list(model_class.model_fields.keys())
     if len(field_names) != len(row):
         raise ValueError(

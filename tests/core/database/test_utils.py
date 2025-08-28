@@ -12,19 +12,15 @@ from core.database.utils import (
     build_order_by_clause,
     build_limit_clause,
 )
+from core.models.database.entities import FromTupleMixinBase
 
 
-class SampleModel(BaseModel):
+class SampleModel(FromTupleMixinBase):
     """Sample model for testing utilities."""
 
     id: int
     name: str
     email: str | None = None
-
-    @classmethod
-    def from_tuple(cls, row: tuple) -> "SampleModel":
-        """Create model from tuple."""
-        return cls(id=row[0], name=row[1], email=row[2])
 
 
 class SampleModelWithoutFromTuple(BaseModel):
