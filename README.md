@@ -48,16 +48,16 @@ export OPENAI_API_KEY="your-api-key-here"
 
 ```bash
 # Start the FastAPI server (default settings)
-./run.sh
+./scripts/run/start.sh
 
 # Start with custom port
-./run.sh --port 3000
+./scripts/run/start.sh --port 3000
 
 # Start in production mode
-./run.sh --prod
+./scripts/run/start.sh --prod
 
 # Get help with options
-./run.sh --help
+./scripts/run/start.sh --help
 
 # Server will be available at http://localhost:8000
 # API documentation at http://localhost:8000/docs
@@ -84,7 +84,7 @@ uv run python examples/arxiv_crawler_demo.py
 
 ```bash
 # Run all quality checks
-./check.sh
+./scripts/dev/check.sh
 
 # Individual checks
 uv run ruff check .     # Linting
@@ -93,18 +93,24 @@ uv run isort .          # Import sorting
 uv run mypy .           # Type checking
 
 # Auto-fix issues
-./check.sh --fix
+./scripts/dev/check.sh --fix
 ```
 
 ### Testing
 
 ```bash
 # Run all tests
-uv run pytest
+./scripts/dev/test.sh
 
 # Run specific test categories
-uv run pytest tests/api/           # API tests
-uv run pytest tests/core/          # Core functionality tests
+./scripts/dev/test.sh tests/api/           # API tests
+./scripts/dev/test.sh tests/core/          # Core functionality tests
+
+# Run with different options
+./scripts/dev/test.sh --integration        # Integration tests only
+./scripts/dev/test.sh --unit              # Unit tests only
+./scripts/dev/test.sh --log-debug         # With debug logging
+./scripts/dev/test.sh --verbose           # Verbose output
 ```
 
 ## 🏗️ Architecture
@@ -152,8 +158,8 @@ theark/
 - Follow PEP 8 style guidelines
 - Add type hints to all functions
 - Write tests for new functionality
-- Run `./check.sh` before committing
-- Use `./check.sh --fix` to auto-fix formatting issues
+- Run `./scripts/dev/check.sh` before committing
+- Use `./scripts/dev/check.sh --fix` to auto-fix formatting issues
 - Use meaningful commit messages
 
 ## 📄 License

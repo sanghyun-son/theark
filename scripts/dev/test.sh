@@ -124,7 +124,7 @@ fi
 
 # Add log level flag if requested
 if [[ -n "$LOG_LEVEL" ]]; then
-    PYTEST_CMD="$PYTEST_CMD --log-cli-level=$LOG_LEVEL"
+    PYTEST_CMD="$PYTEST_CMD --log-cli-level=$LOG_LEVEL --capture=no"
 fi
 
 # Determine what to run
