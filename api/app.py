@@ -1,4 +1,4 @@
-"""Main FastAPI application."""
+"""FastAPI application factory."""
 
 import os
 from collections.abc import AsyncGenerator
@@ -8,44 +8,43 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from core import get_logger, setup_logging
-from core.config import load_settings
-
-from .routers import (
+from api.routers import (
     batch_router,
     common_router,
     config_router,
     main_router,
     papers_router,
 )
+from core import get_logger, setup_logging
+from core.config import load_settings
+from core.database.engine import create_database_tables
+from core.services.paper_summarization_service import PaperSummarizationService
 
 logger = get_logger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
-    """Application lifespan context manager."""
+    """Application lifespan manager."""
     settings = load_settings()
+    app.state.settings = settings
     setup_logging(
-        level=settings.log_level.upper(),
-        use_colors=True,
+        level=settings.log_level,
         enable_file_logging=True,
     )
-    logger.info(f"TheArk: {settings.environment}")
+    logger.info(f"Starting TheArk API server in {settings.environment} mode")
     logger.info(f"Authentication required: {settings.auth_required}")
 
     from core.batch.background_manager import BackgroundBatchManager
-    from core.database.config import get_database_path
-    from core.database.implementations.sqlite import SQLiteManager
+    from core.database.engine import create_database_engine
     from core.extractors import extractor_factory
     from core.extractors.concrete import ArxivExtractor
     from core.llm.openai_client import UnifiedOpenAIClient
 
-    # Create tables on startup (without persistent connections)
-    db_path = get_database_path(settings.environment)
-    app.state.db_manager = SQLiteManager(db_path)
-    await app.state.db_manager.connect()
-    await app.state.db_manager.create_tables()
+    # Create tables on startup
+    engine = create_database_engine(settings.environment)
+    create_database_tables(engine)
+    app.state.engine = engine
 
     # Setup extractors
     extractor_factory.register_extractor("arxiv", ArxivExtractor())
@@ -60,26 +59,30 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         api_key=openai_api_key,
         base_url=settings.llm_api_base_url,
         model=settings.llm_model,
+        max_retries=settings.max_retries,
     )
     app.state.summary_client = openai_client
 
-    # Initialize background batch manager
     app.state.background_batch_manager = BackgroundBatchManager(
-        settings,
+        PaperSummarizationService(
+            version=settings.version,
+            default_interests=settings.default_interests_list,
+        ),
+        batch_enabled=settings.batch_enabled,
+        batch_summary_interval=settings.batch_summary_interval,
+        batch_fetch_interval=settings.batch_fetch_interval,
+        batch_max_items=settings.batch_max_items,
         language=settings.default_summary_language,
+        interests=settings.default_interests_list,
     )
 
-    # Start background batch processing if enabled
-    if settings.batch_enabled:
-        try:
-            await app.state.background_batch_manager.start(
-                app.state.db_manager,
-                app.state.summary_client,
-            )
-        except Exception as e:
-            logger.error(f"Failed to start background batch manager: {e}")
-    else:
-        logger.info("Background batch processing is disabled")
+    try:
+        await app.state.background_batch_manager.start(
+            engine,
+            app.state.summary_client,
+        )
+    except Exception as e:
+        logger.error(f"Failed to start background batch manager: {e}")
 
     logger.info("TheArk API server initialized successfully")
 
@@ -92,7 +95,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         except Exception as e:
             logger.error(f"Error stopping background batch manager: {e}")
 
-    await app.state.db_manager.disconnect()
     logger.info("TheArk API server shutting down")
 
 

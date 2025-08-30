@@ -1,19 +1,24 @@
 """Repository layer for database operations."""
 
-from .crawl_event import CrawlEventRepository
-from .feed import FeedRepository
-from .llm import LLMRequestRepository
+from sqlmodel import Session
+
+# SQLModel repositories
 from .llm_batch import LLMBatchRepository
 from .paper import PaperRepository
 from .summary import SummaryRepository
-from .user import UserRepository
+from .summary_read import SummaryReadRepository
+from .user import (
+    UserInterestRepository,
+    UserRepository,
+    UserStarRepository,
+)
 
 __all__ = [
     "PaperRepository",
     "SummaryRepository",
+    "SummaryReadRepository",
     "UserRepository",
-    "FeedRepository",
-    "CrawlEventRepository",
-    "LLMRequestRepository",
+    "UserInterestRepository",
+    "UserStarRepository",
     "LLMBatchRepository",
 ]

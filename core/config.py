@@ -13,6 +13,7 @@ class Settings(BaseModel):
     """Application settings."""
 
     # Environment
+    version: str = Field(default="0.1.0", description="Application version")
     environment: Environment = Field(
         default=Environment.DEVELOPMENT,
         description="Application environment (development/production/testing)",
@@ -69,6 +70,10 @@ class Settings(BaseModel):
         default=True,
         description="Whether to use function calling for structured output",
     )
+    max_retries: int = Field(
+        default=3,
+        description="Maximum number of retries for OpenAI API requests",
+    )
 
     # Batch Processing Settings
     batch_summary_interval: int = Field(
@@ -95,6 +100,8 @@ class Settings(BaseModel):
         # Set auth_required based on environment
         if self.environment == Environment.PRODUCTION:
             self.auth_required = True
+        else:  # DEVELOPMENT and TESTING
+            self.auth_required = False
 
     @property
     def is_development(self) -> bool:
@@ -119,6 +126,11 @@ class Settings(BaseModel):
         For testing: should be overridden by test fixtures
         """
         return self.arxiv_api_base_url
+
+    @property
+    def default_interests_list(self) -> list[str]:
+        """Get default interests as a list."""
+        return [interest.strip() for interest in self.default_interests.split(",")]
 
 
 def load_settings() -> Settings:
@@ -161,7 +173,7 @@ def load_settings() -> Settings:
         cors_allow_origins=cors_origins,
         auth_required=auth_required,
         auth_header_name=os.getenv("THEARK_AUTH_HEADER", "Authorization"),
-        log_level=os.getenv("THEARK_LOG_LEVEL", "INFO"),
+        log_level=os.getenv("THEARK_LOG_LEVEL", "INFO").upper(),
         default_summary_language=os.getenv("THEARK_DEFAULT_SUMMARY_LANGUAGE", "Korean"),
         default_interests=os.getenv(
             "THEARK_DEFAULT_INTERESTS", "Machine Learning,Deep Learning"
@@ -175,6 +187,7 @@ def load_settings() -> Settings:
             "THEARK_LLM_API_BASE_URL", "https://api.openai.com/v1"
         ),
         llm_use_tools=llm_use_tools,
+        max_retries=int(os.getenv("THEARK_LLM_MAX_RETRIES", "3")),
         batch_summary_interval=batch_summary_interval,
         batch_fetch_interval=batch_fetch_interval,
         batch_max_items=batch_max_items,

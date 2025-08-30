@@ -31,7 +31,7 @@ USER_PROMPT = """Please analyze the given abstract in {language}.
 Based on the provided interest sections, evaluate the relevance of the paper and provide the value.
 
 Interest:
-{interest_section}
+{interests}
 
 Content (Abstract):
 {content}"""

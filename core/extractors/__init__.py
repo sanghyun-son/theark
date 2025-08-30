@@ -1,6 +1,7 @@
 """Paper extractors package."""
 
 from core.extractors.base import BaseExtractor, BaseSourceExplorer
+from core.extractors.concrete.arxiv_extractor import ArxivExtractor
 from core.extractors.exceptions import (
     ExtractionError,
     ExtractorError,
@@ -28,4 +29,5 @@ __all__ = [
     "extractor_factory",
     # Models
     "PaperMetadata",
+    "ArxivExtractor",
 ]

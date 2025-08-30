@@ -133,9 +133,6 @@ async def test_monitor_batch_progress(
     assert updates[0].status == "completed"
 
 
-
-
-
 @pytest.mark.asyncio
 async def test_list_batch_requests_with_pagination(
     mock_openai_client: UnifiedOpenAIClient,

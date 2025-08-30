@@ -3,7 +3,8 @@
 import pytest
 from fastapi.testclient import TestClient
 
-from tests.integration.conftest import integration_client, parse_sse_events
+from core.utils import parse_sse_events
+from tests.integration.conftest import integration_client
 
 
 class TestPaperSummaryIntegration:

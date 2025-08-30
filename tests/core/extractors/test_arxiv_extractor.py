@@ -1,10 +1,11 @@
 """Tests for ArXiv extractor."""
 
-import pytest
 from unittest.mock import patch
 
+import pytest
+
 from core.extractors.concrete.arxiv_extractor import ArxivExtractor
-from core.extractors.exceptions import InvalidIdentifierError, ExtractionError
+from core.extractors.exceptions import ExtractionError, InvalidIdentifierError
 from core.models.domain.paper_extraction import PaperMetadata
 
 

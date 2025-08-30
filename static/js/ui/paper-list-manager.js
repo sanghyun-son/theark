@@ -42,9 +42,8 @@ class PaperListManager {
         const paperDiv = document.createElement('div');
         paperDiv.className = 'paper-item';
         
-        // Add 'unread' class if summary exists and hasn't been read
-        // or paper.summary is null
-        if ((paper.summary && !paper.summary.is_read) || !paper.summary) {
+        // Add 'unread' class if paper hasn't been read
+        if (!paper.is_read) {
             paperDiv.classList.add('unread');
         }
         
@@ -294,7 +293,7 @@ class PaperListManager {
         }
         
         // Mark summary as read if it exists and hasn't been read
-        if (paper.summary && paper.summary.summary_id && !paper.summary.is_read) {
+        if (paper.summary && paper.summary.summary_id && !paper.is_read) {
             try {
                 const response = await fetch(`/v1/papers/${paper.paper_id}/summary/${paper.summary.summary_id}/read`, {
                     method: 'POST',
@@ -311,7 +310,7 @@ class PaperListManager {
                 await response.json();
                 
                 // Update the paper's read status locally
-                paper.summary.is_read = true;
+                paper.is_read = true;
                 
                 // Update the UI to remove 'unread' styling
                 const paperElement = this.findPaperElement(paper.arxiv_id);

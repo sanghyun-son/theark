@@ -99,6 +99,64 @@ and propose future directions and improvements.</summary>
     <category term="I.4.8; I.5.2" scheme="http://arxiv.org/schemas/atom"/>
   </entry>
 </feed>""",
+    "new_papers_cs_ai": """<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <opensearch:totalResults xmlns:opensearch="http://a9.com/-/spec/opensearch/1.1/">2</opensearch:totalResults>
+  <opensearch:startIndex xmlns:opensearch="http://a9.com/-/spec/opensearch/1.1/">0</opensearch:startIndex>
+  <opensearch:itemsPerPage xmlns:opensearch="http://a9.com/-/spec/opensearch/1.1/">2</opensearch:itemsPerPage>
+  <entry>
+    <id>http://arxiv.org/abs/2401.00001</id>
+    <updated>2024-01-01T10:00:00Z</updated>
+    <published>2024-01-01T10:00:00Z</published>
+    <title>Recent Advances in Machine Learning</title>
+    <summary>This paper presents recent advances in machine learning techniques, focusing on deep learning architectures and their applications in various domains.</summary>
+    <author>
+      <name>John Doe</name>
+    </author>
+    <author>
+      <name>Jane Smith</name>
+    </author>
+    <link href="http://arxiv.org/abs/2401.00001" rel="alternate" type="text/html"/>
+    <link title="pdf" href="http://arxiv.org/pdf/2401.00001" rel="related" type="application/pdf"/>
+    <arxiv:primary_category xmlns:arxiv="http://arxiv.org/schemas/atom" term="cs.AI" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.AI" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.LG" scheme="http://arxiv.org/schemas/atom"/>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2401.00002</id>
+    <updated>2024-01-01T11:00:00Z</updated>
+    <published>2024-01-01T11:00:00Z</published>
+    <title>Neural Network Optimization</title>
+    <summary>This paper explores optimization techniques for neural networks, including gradient descent variants and adaptive learning rates.</summary>
+    <author>
+      <name>Alice Johnson</name>
+    </author>
+    <link href="http://arxiv.org/abs/2401.00002" rel="alternate" type="text/html"/>
+    <link title="pdf" href="http://arxiv.org/pdf/2401.00002" rel="related" type="application/pdf"/>
+    <arxiv:primary_category xmlns:arxiv="http://arxiv.org/schemas/atom" term="cs.AI" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.AI" scheme="http://arxiv.org/schemas/atom"/>
+  </entry>
+</feed>""",
+    "historical_papers_cs_ai": """<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <opensearch:totalResults xmlns:opensearch="http://a9.com/-/spec/opensearch/1.1/">1</opensearch:totalResults>
+  <opensearch:startIndex xmlns:opensearch="http://a9.com/-/spec/opensearch/1.1/">0</opensearch:startIndex>
+  <opensearch:itemsPerPage xmlns:opensearch="http://a9.com/-/spec/opensearch/1.1/">1</opensearch:itemsPerPage>
+  <entry>
+    <id>http://arxiv.org/abs/2020.00001</id>
+    <updated>2020-01-01T10:00:00Z</updated>
+    <published>2020-01-01T10:00:00Z</published>
+    <title>Historical Machine Learning Paper</title>
+    <summary>This is a historical paper from 2020 about machine learning foundations.</summary>
+    <author>
+      <name>Historical Author</name>
+    </author>
+    <link href="http://arxiv.org/abs/2020.00001" rel="alternate" type="text/html"/>
+    <link title="pdf" href="http://arxiv.org/pdf/2020.00001" rel="related" type="application/pdf"/>
+    <arxiv:primary_category xmlns:arxiv="http://arxiv.org/schemas/atom" term="cs.AI" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.AI" scheme="http://arxiv.org/schemas/atom"/>
+  </entry>
+</feed>""",
 }
 
 # OpenAI Mock Data
