@@ -1,6 +1,5 @@
 """Batch models for background processing."""
 
-from datetime import datetime
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -9,7 +8,7 @@ from pydantic import BaseModel, Field
 class BatchItemCreate(BaseModel):
     """Model for creating batch items."""
 
-    paper_id: int = Field(..., description="Paper identifier")
+    paper_id: int | None = Field(..., description="Paper identifier")
     input_data: str = Field(..., description="Input data for processing")
 
 
@@ -49,18 +48,14 @@ class BatchResult(BaseModel):
     error: dict[str, Any] | None = Field(None, description="Error information")
 
 
-class PaperSummary(BaseModel):
-    """Model for paper summary data."""
-
-    paper_id: int = Field(..., description="Paper identifier")
-    title: str = Field(..., description="Paper title")
-    abstract: str = Field(..., description="Paper abstract")
-    arxiv_id: str = Field(..., description="ArXiv ID")
-    published_at: datetime | None = Field(None, description="Publication date")
-
-
 # API Response Models
-class BatchStatusResponse(BaseModel):
+class BatchResponseBase(BaseModel):
+    """Base class for batch API responses."""
+
+    message: str | None = Field(None, description="Response message")
+
+
+class BatchStatusResponse(BatchResponseBase):
     """Model for batch status response."""
 
     pending_summaries: int = Field(..., description="Number of pending summaries")
@@ -68,34 +63,33 @@ class BatchStatusResponse(BaseModel):
     batch_details: list[dict[str, Any]] = Field(..., description="Batch details")
 
 
-class BatchListResponse(BaseModel):
+class BatchListResponse(BatchResponseBase):
     """Model for batch list response."""
 
     batches: list[dict[str, Any]] = Field(..., description="List of batches")
 
 
-class BatchDetailsResponse(BaseModel):
+class BatchDetailsResponse(BatchResponseBase):
     """Model for batch details response."""
 
     batch: dict[str, Any] = Field(..., description="Batch information")
     items: list[dict[str, Any]] = Field(..., description="Batch items")
 
 
-class BatchItemsResponse(BaseModel):
+class BatchItemsResponse(BatchResponseBase):
     """Model for batch items response."""
 
     batch_id: str = Field(..., description="Batch ID")
     items: list[dict[str, Any]] = Field(..., description="Batch items")
 
 
-class BatchActionResponse(BaseModel):
+class BatchActionResponse(BatchResponseBase):
     """Model for batch action response."""
 
-    message: str = Field(..., description="Action message")
     batch_id: str | None = Field(None, description="Batch ID")
 
 
-class PendingSummariesResponse(BaseModel):
+class PendingSummariesResponse(BatchResponseBase):
     """Model for pending summaries response."""
 
     pending_summaries: int = Field(..., description="Number of pending summaries")

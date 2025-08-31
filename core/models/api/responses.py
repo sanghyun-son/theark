@@ -3,23 +3,15 @@
 from pydantic import BaseModel, Field
 
 from core.log import get_logger
-from core.models.rows import Paper, Summary
+from core.models.rows import Paper, PaperBase, Summary
 
 logger = get_logger(__name__)
 
 
-class PaperResponse(BaseModel):
+class PaperResponse(PaperBase, table=False):
     """Response model for paper details."""
 
-    paper_id: int
-    arxiv_id: str
-    title: str
-    authors: list[str]
-    abstract: str
-    categories: list[str]
-    pdf_url: str
-    published_at: str | None = None
-    updated_at: str | None = None
+    # Response-specific fields
     summary: Summary | None = None
     is_starred: bool = False
     is_read: bool = False
@@ -34,19 +26,13 @@ class PaperResponse(BaseModel):
     ) -> "PaperResponse":
         """Create PaperResponse from Paper (SQLModel)."""
 
+        # Create base paper data from Paper model
+        paper_data = paper.model_dump()
         return cls(
-            paper_id=paper.paper_id or 0,
-            arxiv_id=paper.arxiv_id,
-            title=paper.title,
-            authors=paper.authors.split(";") if paper.authors else [],
-            abstract=paper.abstract,
-            categories=paper.categories.split(",") if paper.categories else [],
-            pdf_url=paper.url_pdf or "",
-            published_at=paper.published_at,
-            updated_at=paper.updated_at,
             summary=summary,
             is_starred=is_starred,
             is_read=is_read,
+            **paper_data,
         )
 
 

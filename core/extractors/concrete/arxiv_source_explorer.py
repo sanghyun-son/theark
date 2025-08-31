@@ -12,6 +12,12 @@ from core.extractors.exceptions import NetworkError, ParsingError
 from core.log import get_logger
 from core.models.domain.arxiv import ArxivPaper
 from core.models.domain.paper_extraction import PaperMetadata
+from core.utils import (
+    extract_xml_authors,
+    extract_xml_categories,
+    extract_xml_date,
+    extract_xml_text,
+)
 
 from .arxiv_extractor import ArxivExtractor
 
@@ -285,16 +291,18 @@ class ArxivSourceExplorer(BaseSourceExplorer):
             ArxivPaper instance
         """
         # Extract ArXiv ID from the entry ID
-        entry_id = self.extractor._extract_text(entry, "atom:id")
+        entry_id = extract_xml_text(entry, "atom:id", self.extractor.namespace)
         arxiv_id = entry_id.split("/")[-1] if entry_id else ""
 
-        # Extract basic metadata using ArxivExtractor methods
-        title = self.extractor._extract_text(entry, "atom:title")
-        abstract = self.extractor._extract_text(entry, "atom:summary")
-        authors = self.extractor._extract_authors(entry)
-        categories = self.extractor._extract_categories(entry)
-        published_date = self.extractor._extract_date(entry, "atom:published")
-        updated_date = self.extractor._extract_date(entry, "atom:updated")
+        # Extract basic metadata using utility functions
+        title = extract_xml_text(entry, "atom:title", self.extractor.namespace)
+        abstract = extract_xml_text(entry, "atom:summary", self.extractor.namespace)
+        authors = extract_xml_authors(entry, self.extractor.namespace)
+        categories = extract_xml_categories(entry, self.extractor.namespace)
+        published_date = extract_xml_date(
+            entry, "atom:published", self.extractor.namespace
+        )
+        updated_date = extract_xml_date(entry, "atom:updated", self.extractor.namespace)
 
         # Determine primary category
         primary_category = categories[0] if categories else ""

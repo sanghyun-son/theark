@@ -9,8 +9,8 @@ from core.types import PaperSummaryStatus
 from core.utils import get_current_timestamp
 
 
-class Paper(SQLModel, table=True):
-    """Paper database model using SQLModel."""
+class PaperBase(SQLModel):
+    """Base paper model with common fields."""
 
     paper_id: int | None = Field(default=None, primary_key=True)
     arxiv_id: str = Field(
@@ -33,6 +33,10 @@ class Paper(SQLModel, table=True):
         default=PaperSummaryStatus.BATCHED,
         description="Summary status: batched, processing, done",
     )
+
+
+class Paper(PaperBase, table=True):
+    """Paper database model using SQLModel."""
 
 
 class Summary(SQLModel, table=True):

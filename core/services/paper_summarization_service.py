@@ -98,7 +98,7 @@ class PaperSummarizationService:
         interests: list[str],
         use_tools: bool = True,
     ) -> Summary:
-        """Parse OpenAI chat completion response into SummaryResponse."""
+        """Parse OpenAI chat completion response into Summary."""
 
         if not response.choices or not response.choices[0].message:
             raise ValueError("No response content received")

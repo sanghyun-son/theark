@@ -99,8 +99,8 @@ class PaperListManager {
         // Meta
         const metaDiv = document.createElement('div');
         metaDiv.className = 'paper-meta';
-        metaDiv.innerHTML = `👥 ${paper.authors.join(', ')}`;
-        metaDiv.title = paper.authors.join(', ');
+        metaDiv.innerHTML = `👥 ${paper.authors}`;
+        metaDiv.title = paper.authors;
         
         paperDiv.appendChild(metaDiv);
         
@@ -122,7 +122,7 @@ class PaperListManager {
         }
         
         // Categories
-        if (paper.categories && paper.categories.length > 0) {
+        if (paper.categories && paper.categories.trim()) {
             const categoriesDiv = this.renderCategories(paper.categories);
             paperDiv.appendChild(categoriesDiv);
         } else {
@@ -234,7 +234,8 @@ class PaperListManager {
         const categoriesDiv = document.createElement('div');
         categoriesDiv.className = 'paper-categories';
         
-        categories.forEach(category => {
+        const categoryList = categories.split(',').map(cat => cat.trim()).filter(cat => cat);
+        categoryList.forEach(category => {
             const categorySpan = document.createElement('span');
             categorySpan.className = 'paper-category';
             categorySpan.textContent = category;

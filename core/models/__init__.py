@@ -21,6 +21,22 @@ from core.models.api.streaming import (
     StreamingStatusEvent,
 )
 
+# Batch models
+from core.models.batch import (
+    BatchActionResponse,
+    BatchDetailsResponse,
+    BatchItemCreate,
+    BatchItemsResponse,
+    BatchListResponse,
+    BatchMetadata,
+    BatchRequestEntry,
+    BatchRequestPayload,
+    BatchResponseBase,
+    BatchResult,
+    BatchStatusResponse,
+    PendingSummariesResponse,
+)
+
 # Domain models (core business logic)
 from core.models.domain.task import TaskManagerStatus, TaskStats
 
@@ -39,14 +55,12 @@ from core.models.rows import (
     FeedItem,
     LLMRequest,
     Paper,
+    PaperBase,
     Summary,
     User,
     UserInterest,
     UserStar,
 )
-
-# Summarization models
-from core.models.summarization import SummaryRequest, SummaryResponse
 
 __all__ = [
     # Domain models
@@ -71,6 +85,7 @@ __all__ = [
     "StarredPapersResponse",
     # Database models (SQLModel rows)
     "Paper",
+    "PaperBase",
     "Summary",
     "User",
     "UserInterest",
@@ -78,13 +93,23 @@ __all__ = [
     "FeedItem",
     "CrawlEvent",
     "LLMRequest",
+    # Batch models
+    "BatchActionResponse",
+    "BatchDetailsResponse",
+    "BatchItemCreate",
+    "BatchItemsResponse",
+    "BatchListResponse",
+    "BatchMetadata",
+    "BatchRequestEntry",
+    "BatchRequestPayload",
+    "BatchResult",
+    "BatchResponseBase",
+    "BatchStatusResponse",
+    "PendingSummariesResponse",
     # External models
     "OpenAIMessage",
     "OpenAITool",
     "ChatCompletionRequest",
     "ChatCompletionResponse",
     "PaperAnalysis",
-    # Summarization models
-    "SummaryRequest",
-    "SummaryResponse",
 ]

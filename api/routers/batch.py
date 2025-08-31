@@ -32,6 +32,7 @@ async def get_batch_status() -> BatchStatusResponse:
             pending_summaries=0,
             active_batches=0,
             batch_details=[],
+            message="Batch status retrieved successfully",
         )
     except Exception as e:
         import traceback
@@ -49,7 +50,9 @@ async def list_batches(
         state_manager = BatchStateManager()
         active_batches = state_manager.get_active_batches(db_engine)
 
-        return BatchListResponse(batches=active_batches)
+        return BatchListResponse(
+            batches=active_batches, message="Batch list retrieved successfully"
+        )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to list batches: {str(e)}")
 
@@ -72,7 +75,11 @@ async def get_batch_details(
         # Get batch items
         batch_items = state_manager.get_batch_items(db_engine, batch_id)
 
-        return BatchDetailsResponse(batch=batch, items=batch_items)
+        return BatchDetailsResponse(
+            batch=batch,
+            items=batch_items,
+            message="Batch details retrieved successfully",
+        )
     except HTTPException:
         raise
     except Exception as e:
@@ -91,7 +98,11 @@ async def get_batch_items(
         state_manager = BatchStateManager()
         batch_items = state_manager.get_batch_items(db_engine, batch_id)
 
-        return BatchItemsResponse(batch_id=batch_id, items=batch_items)
+        return BatchItemsResponse(
+            batch_id=batch_id,
+            items=batch_items,
+            message="Batch items retrieved successfully",
+        )
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Failed to get batch items: {str(e)}"
@@ -141,6 +152,7 @@ async def get_pending_summaries(
                 }
                 for paper in pending_papers[:10]  # Limit to first 10 for display
             ],
+            message="Pending summaries retrieved successfully",
         )
     except Exception as e:
         raise HTTPException(

@@ -17,10 +17,9 @@ from core.models.batch import (
     BatchMetadata,
     BatchRequestPayload,
     BatchResult,
-    PaperSummary,
 )
+from core.models.rows import Paper
 from core.services.paper_summarization_service import PaperSummarizationService
-from core.utils import parse_iso_date
 
 logger = get_logger(__name__)
 
@@ -190,29 +189,17 @@ class BackgroundBatchManager:
 
             logger.info(f"Processing {len(pending_papers)} pending summaries")
 
-            # Convert Paper objects to PaperSummary objects
-            paper_summaries = []
+            # Use Paper objects directly
             paper_ids = []
 
             for paper in pending_papers:
                 if paper.paper_id is None:  # Skip papers without ID
                     continue
-
-                # Convert string date to datetime if needed
-                published_at = parse_iso_date(paper.published_at)
-                paper_summary = PaperSummary(
-                    paper_id=paper.paper_id,
-                    title=paper.title,
-                    abstract=paper.abstract,
-                    arxiv_id=paper.arxiv_id,
-                    published_at=published_at,
-                )
-                paper_summaries.append(paper_summary)
                 paper_ids.append(paper.paper_id)
             self._state_manager.mark_papers_processing(db_engine, paper_ids)
 
             # Create batch request
-            await self._create_batch_request(db_engine, paper_summaries, openai_client)
+            await self._create_batch_request(db_engine, pending_papers, openai_client)
 
         except Exception as e:
             logger.error(f"Error processing pending summaries: {e}")
@@ -220,7 +207,7 @@ class BackgroundBatchManager:
     async def _create_batch_request(
         self,
         db_engine: Engine,
-        papers: list[PaperSummary],
+        papers: list[Paper],
         openai_client: UnifiedOpenAIClient,
     ) -> None:
         """Create a batch request for paper summarization.
@@ -289,7 +276,7 @@ class BackgroundBatchManager:
         )
 
     def _create_batch_payload(
-        self, papers: list[PaperSummary], openai_client: UnifiedOpenAIClient
+        self, papers: list[Paper], openai_client: UnifiedOpenAIClient
     ) -> BatchRequestPayload:
         """Create batch request payload using unified prompt structure.
 
