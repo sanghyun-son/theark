@@ -15,7 +15,6 @@ from api.dependencies import (
     get_settings,
     get_summary_generator,
 )
-from api.literals import CONTENT_TYPE_EVENT_STREAM, EventType
 from api.utils.error_handler import handle_async_api_operation
 from core.config import Settings
 from core.database.repository.summary import SummaryRepository
@@ -24,7 +23,7 @@ from core.llm.openai_client import UnifiedOpenAIClient
 from core.models import PaperCreateRequest
 from core.models.api.responses import SummaryReadResponse
 from core.models.rows import User
-from core.services.paper_orchestration_service import PaperOrchestrationService
+from core.services.stream_service import StreamService
 
 router = APIRouter()
 
@@ -49,27 +48,19 @@ async def stream_paper_summary(
     """
 
     async def generate_stream() -> AsyncGenerator[str, None]:
-        try:
-            service = PaperOrchestrationService(
-                default_interests=settings.default_interests_list,
-            )
-            with Session(db_engine) as session:
-                async for event in service.summarize_stream(
-                    paper_data,
-                    session,
-                    summary_client,
-                ):
-                    yield f"{event}\n"
-        except Exception as e:
-            error_event = {
-                "type": EventType.ERROR,
-                "message": str(e),
-            }
-            yield f"data: {error_event}\n"
+        stream_service = StreamService(
+            default_interests=settings.default_interests_list
+        )
+
+        with Session(db_engine) as session:
+            async for event in stream_service.stream_paper_summarization(
+                paper_data, session, summary_client
+            ):
+                yield event
 
     return StreamingResponse(
         generate_stream(),
-        media_type=CONTENT_TYPE_EVENT_STREAM,
+        media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",

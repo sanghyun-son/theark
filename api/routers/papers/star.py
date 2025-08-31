@@ -12,6 +12,7 @@ from core.models.api.requests import StarRequest
 from core.models.api.responses import StarredPapersResponse, StarResponse
 from core.models.rows import User
 from core.services.paper_service import PaperService
+from core.services.star_service import StarService
 
 router = APIRouter()
 
@@ -38,9 +39,9 @@ async def add_star(
     """
 
     async def add_star_operation() -> StarResponse:
-        paper_service = PaperService()
+        star_service = StarService()
         user_id = current_user.user_id
-        return paper_service.add_star(db_session, user_id, paper_id, star_data.note)
+        return star_service.add_star(db_session, user_id, paper_id, star_data.note)
 
     return await handle_async_api_operation(
         add_star_operation,
@@ -109,9 +110,9 @@ async def remove_star(
     """
 
     async def remove_star_operation() -> StarResponse:
-        paper_service = PaperService()
+        star_service = StarService()
         user_id = current_user.user_id
-        return paper_service.remove_star(db_session, user_id, paper_id)
+        return star_service.remove_star(db_session, user_id, paper_id)
 
     return await handle_async_api_operation(
         remove_star_operation,
@@ -140,9 +141,9 @@ async def get_star_status(
     """
 
     async def get_star_status_operation() -> StarResponse:
-        paper_service = PaperService()
+        star_service = StarService()
         user_id = current_user.user_id
-        return paper_service.is_paper_starred(db_session, user_id, paper_id)
+        return star_service.is_paper_starred(db_session, user_id, paper_id)
 
     return await handle_async_api_operation(
         get_star_status_operation,

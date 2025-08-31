@@ -8,10 +8,10 @@ from .log import (
     setup_test_logging,
 )
 from .services import (
-    PaperCreationService,
-    PaperOrchestrationService,
     PaperService,
     PaperSummarizationService,
+    StarService,
+    StreamService,
 )
 from .types import Environment
 
@@ -23,8 +23,8 @@ __all__ = [
     "setup_logging",
     "setup_production_logging",
     "setup_test_logging",
-    "PaperCreationService",
-    "PaperOrchestrationService",
     "PaperService",
     "PaperSummarizationService",
+    "StarService",
+    "StreamService",
 ]

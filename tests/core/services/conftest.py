@@ -8,12 +8,19 @@ from sqlmodel import Session
 from core.database.repository import PaperRepository, SummaryRepository, UserRepository
 from core.models.rows import Paper, User
 from core.services.paper_service import PaperService
+from core.services.star_service import StarService
 
 
 @pytest.fixture
 def paper_service() -> PaperService:
     """Create PaperService instance."""
     return PaperService()
+
+
+@pytest.fixture
+def star_service() -> StarService:
+    """Create StarService instance."""
+    return StarService()
 
 
 @pytest.fixture
