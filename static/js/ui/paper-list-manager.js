@@ -99,8 +99,15 @@ class PaperListManager {
         // Meta
         const metaDiv = document.createElement('div');
         metaDiv.className = 'paper-meta';
-        metaDiv.innerHTML = `👥 ${paper.authors}`;
-        metaDiv.title = paper.authors;
+        
+        // Handle authors - split by semicolon if it's a string
+        let authorsText = paper.authors;
+        if (typeof paper.authors === 'string' && paper.authors.includes(';')) {
+            authorsText = paper.authors.split(';').map(author => author.trim()).join(', ');
+        }
+        
+        metaDiv.innerHTML = `👥 ${authorsText}`;
+        metaDiv.title = authorsText;
         
         paperDiv.appendChild(metaDiv);
         
@@ -234,7 +241,17 @@ class PaperListManager {
         const categoriesDiv = document.createElement('div');
         categoriesDiv.className = 'paper-categories';
         
-        const categoryList = categories.split(',').map(cat => cat.trim()).filter(cat => cat);
+        // Handle both string (comma-separated) and array formats
+        let categoryList;
+        if (typeof categories === 'string') {
+            categoryList = categories.split(',').map(cat => cat.trim()).filter(cat => cat);
+        } else if (Array.isArray(categories)) {
+            categoryList = categories;
+        } else {
+            console.warn('Invalid categories format:', categories);
+            return categoriesDiv;
+        }
+        
         categoryList.forEach(category => {
             const categorySpan = document.createElement('span');
             categorySpan.className = 'paper-category';
