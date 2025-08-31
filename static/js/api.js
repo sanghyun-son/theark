@@ -7,10 +7,21 @@ class ApiService {
     }
 
     async getPapers(limit = 20, offset = 0, language = 'Korean') {
-        const response = await fetch(`${this.apiBaseUrl}/?limit=${limit}&offset=${offset}&language=${language}`);
+        const response = await fetch(`${this.apiBaseUrl}/lightweight?limit=${limit}&offset=${offset}&language=${language}`);
         
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        return await response.json();
+    }
+
+    async getPaperSummary(paperId, language = 'Korean') {
+        const response = await fetch(`${this.apiBaseUrl}/${paperId}/summary?language=${language}`);
+        
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to get paper summary');
         }
         
         return await response.json();

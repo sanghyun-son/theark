@@ -18,7 +18,10 @@ class PaperListManager {
 
     renderPaperList(papers) {
         const paperList = document.getElementById('paper-list');
-        if (!paperList) return;
+        if (!paperList) {
+            console.error('PaperListManager: paper-list element not found!');
+            return;
+        }
 
         // Initialize star states for all papers
         if (window.starManager) {
@@ -111,21 +114,21 @@ class PaperListManager {
         
         paperDiv.appendChild(metaDiv);
         
-        // TLDR Summary with relevance tag
-        if (paper.summary) {
-            const tldrContainer = document.createElement('div');
-            tldrContainer.className = 'paper-tldr-container';
+        // Overview (lightweight summary) with relevance tag
+        if (paper.overview || paper.has_summary) {
+            const overviewContainer = document.createElement('div');
+            overviewContainer.className = 'paper-overview-container';
             
-            // Add relevance tag if exists (positioned at top-left of TLDR)
-            if (paper.summary.relevance !== undefined && paper.summary.relevance !== null) {
-                const relevanceTag = this.createRelevanceTag(paper.summary.relevance, true);
-                tldrContainer.appendChild(relevanceTag);
+            // Add relevance tag if exists (positioned at top-left of overview)
+            if (paper.relevance !== undefined && paper.relevance !== null) {
+                const relevanceTag = this.createRelevanceTag(paper.relevance, true);
+                overviewContainer.appendChild(relevanceTag);
             }
             
-            const tldrContent = this.createTLDR(paper.summary);
-            tldrContainer.appendChild(tldrContent);
+            const overviewContent = this.createOverview(paper);
+            overviewContainer.appendChild(overviewContent);
             
-            paperDiv.appendChild(tldrContainer);
+            paperDiv.appendChild(overviewContainer);
         }
         
         // Categories
@@ -154,15 +157,15 @@ class PaperListManager {
         };
         paperDiv.appendChild(deleteBtn);
         
-        // Add click handler for modal
-        paperDiv.addEventListener('click', (e) => {
+        // Add click handler for modal with lazy loading
+        paperDiv.addEventListener('click', async (e) => {
             // Don't open modal if clicking on links, star button, or delete button
             if (e.target.closest('.paper-link') || e.target.closest('.star-button') || e.target.closest('.delete-btn')) {
                 return;
             }
             
-            // Use the showSummaryModal method for proper handling
-            this.showSummaryModal(paper);
+            // Use the showSummaryModal method for proper handling with lazy loading
+            await this.showSummaryModal(paper);
         });
         
         return paperDiv;
@@ -196,6 +199,36 @@ class PaperListManager {
         
         tldrDiv.textContent = tldrText;
         return tldrDiv;
+    }
+
+    createOverview(paper) {
+        const overviewDiv = document.createElement('div');
+        overviewDiv.className = 'paper-overview korean-text clickable';
+        
+        // Add unread class if paper is unread
+        if (!paper.is_read) {
+            overviewDiv.classList.add('unread');
+        }
+        
+        let overviewText = '';
+        
+        // Use overview field from lightweight response
+        if (paper.overview) {
+            overviewText = paper.overview;
+        } else if (paper.has_summary) {
+            overviewText = 'Click to load full summary...';
+            overviewDiv.classList.add('loading-placeholder');
+        } else {
+            overviewText = 'No summary available.';
+        }
+        
+        overviewDiv.title = overviewText;
+        if (overviewText.length > 200) {
+            overviewText = overviewText.substring(0, 197) + '...';
+        }
+        
+        overviewDiv.textContent = overviewText;
+        return overviewDiv;
     }
 
     findPaperElement(arxivId) {
@@ -304,16 +337,69 @@ class PaperListManager {
     }
 
     async showSummaryModal(paper) {
-        // Create and show modal
+        // Check if we need to load the full summary
+        let paperWithFullSummary = paper;
+        
+        if (paper.has_summary && !paper.summary) {
+            try {
+                // Start loading timer - show loading modal after 1 second
+                let loadingModal = null;
+                const loadingTimer = setTimeout(() => {
+                    loadingModal = this.createLoadingModal();
+                    document.body.appendChild(loadingModal);
+                }, 1000);
+                
+                // Load full summary from API
+                const language = document.getElementById('summary-language')?.value || 'Korean';
+                const summaryData = await window.apiService.getPaperSummary(paper.paper_id, language);
+                
+                // Clear the timer and remove loading modal if it was shown
+                clearTimeout(loadingTimer);
+                if (loadingModal) {
+                    loadingModal.remove();
+                }
+                
+                // Create paper object with full summary
+                paperWithFullSummary = {
+                    ...paper,
+                    summary: summaryData.summary,
+                    is_read: summaryData.is_read
+                };
+                
+                // Update the paper in the papers array
+                const papers = window.paperManager?.getPapers() || [];
+                const paperIndex = papers.findIndex(p => p.paper_id === paper.paper_id);
+                if (paperIndex !== -1) {
+                    papers[paperIndex] = paperWithFullSummary;
+                    if (window.paperManager) {
+                        window.paperManager.infiniteScrollService.setPapers(papers);
+                    }
+                }
+                
+            } catch (error) {
+                console.error('Failed to load full summary:', error);
+                // Remove loading modal if it was shown
+                const loadingModal = document.querySelector('.loading-modal');
+                if (loadingModal) {
+                    loadingModal.remove();
+                }
+                
+                // Show error and return early
+                alert('Failed to load full summary. Please try again.');
+                return;
+            }
+        }
+        
+        // Create and show modal with full summary
         if (window.ModalManager) {
-            const modal = new window.ModalManager(paper);
+            const modal = new window.ModalManager(paperWithFullSummary);
             modal.show();
         }
         
         // Mark summary as read if it exists and hasn't been read
-        if (paper.summary && paper.summary.summary_id && !paper.is_read) {
+        if (paperWithFullSummary.summary && paperWithFullSummary.summary.summary_id && !paperWithFullSummary.is_read) {
             try {
-                const response = await fetch(`/v1/papers/${paper.paper_id}/summary/${paper.summary.summary_id}/read`, {
+                const response = await fetch(`/v1/papers/${paperWithFullSummary.paper_id}/summary/${paperWithFullSummary.summary.summary_id}/read`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -328,17 +414,35 @@ class PaperListManager {
                 await response.json();
                 
                 // Update the paper's read status locally
-                paper.is_read = true;
+                paperWithFullSummary.is_read = true;
                 
-                // Update the UI to remove 'unread' styling
-                const paperElement = this.findPaperElement(paper.arxiv_id);
+                // Update the UI to remove 'unread' styling from both paper-item and paper-overview
+                const paperElement = this.findPaperElement(paperWithFullSummary.arxiv_id);
                 if (paperElement) {
                     paperElement.classList.remove('unread');
+                    
+                    // Also remove unread class from paper-overview
+                    const overviewElement = paperElement.querySelector('.paper-overview');
+                    if (overviewElement) {
+                        overviewElement.classList.remove('unread');
+                    }
                 }
             } catch (error) {
                 console.error('Failed to mark summary as read:', error);
             }
         }
+    }
+
+    createLoadingModal() {
+        const loadingModal = document.createElement('div');
+        loadingModal.className = 'loading-modal';
+        loadingModal.innerHTML = `
+            <div class="loading-modal-content">
+                <div class="loading-spinner">⏳</div>
+                <div class="loading-text">Loading full summary...</div>
+            </div>
+        `;
+        return loadingModal;
     }
 }
 

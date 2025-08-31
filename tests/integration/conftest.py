@@ -1,8 +1,8 @@
 """Common fixtures for integration tests."""
 
 import os
+from collections.abc import AsyncGenerator
 from pathlib import Path
-from typing import AsyncGenerator
 
 import pytest_asyncio
 from fastapi.testclient import TestClient

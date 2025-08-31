@@ -1,9 +1,10 @@
 """Global pytest configuration and fixtures."""
 
 import json
+from collections.abc import Generator
 from logging import Logger
 from pathlib import Path
-from typing import Any, Generator
+from typing import Any
 from urllib.parse import parse_qs, urlparse
 
 import pytest
@@ -25,7 +26,7 @@ from core.database.repository import (
 )
 from core.extractors.concrete.arxiv_extractor import ArxivExtractor
 from core.llm.openai_client import UnifiedOpenAIClient
-from core.models.rows import Paper, Summary, SummaryRead, User, UserStar
+from core.models.rows import Paper, Summary, User
 from core.services.paper_summarization_service import PaperSummarizationService
 from core.types import PaperSummaryStatus
 from tests.shared_test_data import ARXIV_RESPONSES, OPENAI_RESPONSES

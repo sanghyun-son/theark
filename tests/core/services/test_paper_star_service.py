@@ -48,7 +48,7 @@ def test_add_star_user_not_found(
     """Test star addition with non-existent paper."""
 
     with pytest.raises(ValueError, match="not found"):
-        response = star_service.add_star(
+        star_service.add_star(
             mock_db_session,
             999,
             saved_paper.paper_id,

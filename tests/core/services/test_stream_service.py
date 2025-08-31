@@ -95,6 +95,17 @@ async def test_stream_paper_summarization_success(
         status_events = [e for e in events if '"type": "status"' in e]
         assert len(status_events) == 4
 
+        # Check that "Paper created successfully" status includes paper data
+        paper_created_status = [
+            e for e in status_events if '"message": "Paper created successfully"' in e
+        ]
+        assert len(paper_created_status) == 1
+        paper_created_event = json.loads(
+            paper_created_status[0].replace("data: ", "").strip()
+        )
+        assert "paper" in paper_created_event
+        assert paper_created_event["paper"]["arxiv_id"] == "2101.00001"
+
         # Check complete event
         complete_events = [e for e in events if '"type": "complete"' in e]
         assert len(complete_events) == 1
@@ -345,6 +356,22 @@ def test_create_status_event(stream_service: StreamService) -> None:
 
     assert parsed_event["type"] == "status"
     assert parsed_event["message"] == "Test message"
+    assert "paper" not in parsed_event
+
+
+def test_create_status_event_with_paper(
+    stream_service: StreamService, sample_paper_response: PaperResponse
+) -> None:
+    """Test status event creation with paper data."""
+    event = stream_service._create_status_event(
+        "Paper created successfully", sample_paper_response
+    )
+    parsed_event = json.loads(event.replace("data: ", "").strip())
+
+    assert parsed_event["type"] == "status"
+    assert parsed_event["message"] == "Paper created successfully"
+    assert "paper" in parsed_event
+    assert parsed_event["paper"]["arxiv_id"] == "2101.00001"
 
 
 def test_create_complete_event(

@@ -113,6 +113,10 @@ class UIService {
     createTLDR(summary) {
         return this.paperListManager.createTLDR(summary);
     }
+
+    createOverview(paper) {
+        return this.paperListManager.createOverview(paper);
+    }
 }
 
 // Export for use in other modules

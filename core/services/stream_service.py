@@ -2,6 +2,7 @@
 
 import json
 from collections.abc import AsyncGenerator
+from typing import Any
 
 from sqlmodel import Session
 
@@ -51,7 +52,9 @@ class StreamService:
                 paper_data, paper_repo, summary_client
             )
 
-            yield self._create_status_event("Paper created successfully")
+            yield self._create_status_event(
+                "Paper created successfully", paper_response
+            )
 
             # Step 2: Get the actual paper object for summarization
             paper = self.paper_service._get_paper_by_identifier(
@@ -91,14 +94,20 @@ class StreamService:
         except Exception as e:
             yield self._create_error_event(str(e))
 
-    def _create_status_event(self, message: str) -> str:
+    def _create_status_event(
+        self,
+        message: str,
+        paper_response: PaperResponse | None = None,
+    ) -> str:
         """Create a status event."""
-        event = {"type": "status", "message": message}
+        event: dict[str, Any] = {"type": "status", "message": message}
+        if paper_response:
+            event["paper"] = paper_response.model_dump()
         return f"data: {json.dumps(event)}\n"
 
     def _create_complete_event(self, paper_response: PaperResponse) -> str:
         """Create a complete event with paper data."""
-        event = {
+        event: dict[str, Any] = {
             "type": "complete",
             "paper": paper_response.model_dump(),
         }
@@ -106,5 +115,5 @@ class StreamService:
 
     def _create_error_event(self, message: str) -> str:
         """Create an error event."""
-        event = {"type": "error", "message": message}
+        event: dict[str, Any] = {"type": "error", "message": message}
         return f"data: {json.dumps(event)}\n"

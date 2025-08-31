@@ -36,10 +36,70 @@ class PaperResponse(PaperBase, table=False):
         )
 
 
+class PaperListItemResponse(PaperBase, table=False):
+    """Lightweight response model for paper list items with overview only."""
+
+    # Lightweight fields for list view
+    overview: str | None = None  # Uses existing summary.overview
+    has_summary: bool = False  # Flag indicating if full summary exists
+    relevance: int | None = None  # Relevance score for tags
+    is_starred: bool = False
+    is_read: bool = False
+
+    @classmethod
+    def from_paper_with_overview(
+        cls,
+        paper: Paper,
+        overview: str | None = None,
+        has_summary: bool = False,
+        relevance: int | None = None,
+        is_starred: bool = False,
+        is_read: bool = False,
+    ) -> "PaperListItemResponse":
+        """Create PaperListItemResponse from Paper with overview."""
+        paper_data = paper.model_dump()
+        return cls(
+            overview=overview,
+            has_summary=has_summary,
+            relevance=relevance,
+            is_starred=is_starred,
+            is_read=is_read,
+            **paper_data,
+        )
+
+
+class SummaryDetailResponse(BaseModel):
+    """Response model for full summary details."""
+
+    summary: Summary
+    is_read: bool = False
+
+
+class PaperOverviewData(BaseModel):
+    """Model for paper overview data returned by repository."""
+
+    paper: Paper
+    overview: str | None = None
+    has_summary: bool = False
+    relevance: int | None = None
+
+
 class PaperListResponse(BaseModel):
     """Response model for paper list with pagination."""
 
     papers: list[PaperResponse] = Field(..., description="List of papers")
+    total_count: int = Field(..., description="Total number of papers")
+    limit: int = Field(..., description="Number of papers per page")
+    offset: int = Field(..., description="Number of papers skipped")
+    has_more: bool = Field(..., description="Whether there are more papers")
+
+
+class PaperListLightweightResponse(BaseModel):
+    """Lightweight response model for paper list with overview only."""
+
+    papers: list[PaperListItemResponse] = Field(
+        ..., description="List of papers with overview"
+    )
     total_count: int = Field(..., description="Total number of papers")
     limit: int = Field(..., description="Number of papers per page")
     offset: int = Field(..., description="Number of papers skipped")

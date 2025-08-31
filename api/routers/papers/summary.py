@@ -3,7 +3,7 @@
 from collections.abc import AsyncGenerator
 from typing import Any
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy.engine import Engine
 from sqlmodel import Session
@@ -21,8 +21,9 @@ from core.database.repository.summary import SummaryRepository
 from core.database.repository.summary_read import SummaryReadRepository
 from core.llm.openai_client import UnifiedOpenAIClient
 from core.models import PaperCreateRequest
-from core.models.api.responses import SummaryReadResponse
+from core.models.api.responses import SummaryDetailResponse, SummaryReadResponse
 from core.models.rows import User
+from core.services.paper_service import PaperService
 from core.services.stream_service import StreamService
 
 router = APIRouter()
@@ -151,5 +152,43 @@ async def mark_summary_as_read(
     return await handle_async_api_operation(
         mark_read_operation,
         error_message="Failed to mark summary as read",
+        not_found_message="Summary not found",
+    )
+
+
+@router.get("/{paper_id}/summary", response_model=SummaryDetailResponse)
+async def get_paper_summary(
+    paper_id: int,
+    language: str = Query(default="Korean", description="Language for summary"),
+    db_session: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> SummaryDetailResponse:
+    """Get full summary for a specific paper on demand.
+
+    This endpoint loads the full summary when user clicks on a paper,
+    enabling lazy loading for better performance.
+
+    Args:
+        paper_id: Paper ID
+        language: Language for summary
+        current_user: Current user information
+
+    Returns:
+        Full summary details with read status
+
+    Raises:
+        HTTPException: If summary not found
+    """
+
+    async def get_paper_summary_operation() -> SummaryDetailResponse:
+        paper_service = PaperService()
+        user_id = current_user.user_id
+        return await paper_service.get_paper_summary(
+            paper_id, db_session, user_id, language
+        )
+
+    return await handle_async_api_operation(
+        get_paper_summary_operation,
+        error_message="Failed to get paper summary",
         not_found_message="Summary not found",
     )

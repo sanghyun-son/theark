@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from core import get_logger, setup_production_logging, setup_test_logging
+from core import get_logger, setup_test_logging
 
 
 def test_test_logging_setup():

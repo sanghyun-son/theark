@@ -1,6 +1,5 @@
 """Tests for paper source enumeration."""
 
-import pytest
 
 from core.models.domain.paper_source import PaperSource
 

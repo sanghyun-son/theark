@@ -1,27 +1,20 @@
 """Tests for PaperService."""
 
-from unittest.mock import AsyncMock, patch
 
 import pytest
 from sqlmodel import Session
 
 from core.database.repository import (
     PaperRepository,
-    SummaryRepository,
-    UserRepository,
-    UserStarRepository,
 )
-from core.database.repository.summary_read import SummaryReadRepository
 from core.extractors import extractor_factory
 from core.extractors.concrete import ArxivExtractor
 from core.llm.openai_client import UnifiedOpenAIClient
 from core.models import PaperCreateRequest
 from core.models.api.responses import (
-    PaperListResponse,
     PaperResponse,
-    StarredPapersResponse,
 )
-from core.models.rows import Paper, Summary, User
+from core.models.rows import Paper
 from core.services.paper_service import PaperService
 
 
@@ -188,3 +181,31 @@ async def test_create_paper_success(
     assert result.is_starred is False
     assert result.is_read is False
     assert result.summary is None
+
+
+@pytest.mark.asyncio
+async def test_get_papers_lightweight(
+    paper_service: PaperService,
+    saved_paper,
+    saved_summary,
+    mock_db_session: Session,
+) -> None:
+    """Test getting papers with overview only."""
+    # Execute
+    result = await paper_service.get_papers_lightweight(
+        mock_db_session, user_id=1, skip=0, limit=10, language="Korean"
+    )
+
+    # Assert
+    assert len(result.papers) > 0
+    assert result.total_count > 0
+    assert result.has_more is not None
+
+    # Check that papers have overview but not full summary
+    for paper in result.papers:
+        assert hasattr(paper, "overview")
+        assert hasattr(paper, "has_summary")
+        assert hasattr(paper, "is_starred")
+        assert hasattr(paper, "is_read")
+        # Should not have full summary object
+        assert not hasattr(paper, "summary")

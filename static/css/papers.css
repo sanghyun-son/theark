@@ -12,7 +12,7 @@
 
 .paper-item {
     background: white;
-    border: 1px solid #e1e5e9;
+    border: 1px solid #495057;
     border-radius: 8px;
     padding: 0.5rem;
     padding-top: 0.25rem;
@@ -34,15 +34,17 @@
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
 }
 
-/* Unread paper styling - light yellow background for entire item */
+/* Unread paper styling - subtle yellow background with dark brown border */
 .paper-item.unread {
-    background: #fffbeb;
-    border-color: #f59e0b;
+    background: #fef3c7;
+    border-color: #d4a574;
+    box-shadow: 0 2px 4px rgba(139, 69, 19, 0.1);
 }
 
 .paper-item.unread:hover {
-    background: #fef3c7;
-    border-color: #d97706;
+    background: #fde68a;
+    border-color: #c19a6b;
+    box-shadow: 0 4px 8px rgba(139, 69, 19, 0.15);
 }
 
 /* Paper title row layout */
@@ -311,4 +313,49 @@
 /* Paper TLDR container */
 .paper-tldr-container {
     position: relative;
+}
+
+/* Paper overview (lightweight summary) styling */
+.paper-overview {
+    cursor: pointer;
+    background-color: transparent;
+    border: 1px solid #6c757d;
+    border-radius: 6px;
+    padding: 8px 12px;
+    margin: 8px 0;
+    font-size: 14px;
+    line-height: 1.4;
+    color: #404040;
+    transition: all 0.2s ease;
+    position: relative;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+}
+
+.paper-overview:hover {
+    border-color: #495057;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* For unread styling on paper-overview, transparent background with dark brown border */
+.paper-overview.unread {
+    border: 1px solid #e6c384;
+    background-color: transparent;
+    box-shadow: 0 2px 4px rgba(139, 69, 19, 0.1);
+    color: #404040;
+}
+
+.paper-overview.unread:hover {
+    border: 1px solid #d4a574;
+    background-color: transparent;
+    box-shadow: 0 4px 8px rgba(139, 69, 19, 0.15);
+    color: #404040;
+}
+
+.paper-overview-container {
+    position: relative;
+    margin: 0px;
 }

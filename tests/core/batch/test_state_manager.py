@@ -2,8 +2,8 @@
 
 from unittest.mock import Mock
 
-from sqlmodel import Session
 from sqlalchemy.engine import Engine
+from sqlmodel import Session
 
 from core.batch.state_manager import BatchStateManager
 from core.database.repository.paper import PaperRepository

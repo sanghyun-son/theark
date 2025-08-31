@@ -7,6 +7,9 @@ class PaperManager {
         this.uiService = new UIService();
         this.infiniteScrollService = new InfiniteScrollService(this.apiService, this.uiService);
         
+        // Make API service globally available for other modules
+        window.apiService = this.apiService;
+        
         // State
         this.selectedCategories = new Set();
         
@@ -150,7 +153,28 @@ class PaperManager {
     handleStreamingData(data) {
         switch (data.type) {
             case 'status':
-                // Button status updates removed - allow concurrent submissions
+                // Handle "Paper created successfully" status to add paper immediately
+                if (data.message === "Paper created successfully" && data.paper) {
+                    const papers = this.infiniteScrollService.getPapers();
+                    const existingPaper = papers.find(p => p.arxiv_id === data.paper.arxiv_id);
+                    
+                    if (!existingPaper) {
+                        // Create a lightweight paper object with "Loading..." overview
+                        const lightweightPaper = {
+                            ...data.paper,
+                            overview: "Loading...",
+                            has_summary: false,
+                            relevance: 0
+                        };
+                        
+                        // Add new paper to the beginning of the list
+                        papers.unshift(lightweightPaper);
+                        this.infiniteScrollService.setPapers(papers);
+                        
+                        // Add the paper element to the UI
+                        this.uiService.addPaperElement(lightweightPaper);
+                    }
+                }
                 break;
             case 'complete':
                 // Add the paper to the list if it's not already there
@@ -158,24 +182,32 @@ class PaperManager {
                     const papers = this.infiniteScrollService.getPapers();
                     const existingPaper = papers.find(p => p.arxiv_id === data.paper.arxiv_id);
                     
+                    // Convert full paper response to lightweight format for list view
+                    const lightweightPaper = {
+                        ...data.paper,
+                        overview: data.paper.summary?.overview || "No overview available",
+                        has_summary: !!data.paper.summary,
+                        relevance: data.paper.summary?.relevance || 0
+                    };
+                    
                     if (!existingPaper) {
                         // Add new paper to the beginning of the list
-                        papers.unshift(data.paper);
+                        papers.unshift(lightweightPaper);
                         this.infiniteScrollService.setPapers(papers);
                         
                         // Add the paper element to the UI
-                        this.uiService.addPaperElement(data.paper);
+                        this.uiService.addPaperElement(lightweightPaper);
                     } else {
                         // Update existing paper
                         const paperIndex = papers.findIndex(p => p.arxiv_id === data.paper.arxiv_id);
-                        papers[paperIndex] = data.paper;
+                        papers[paperIndex] = lightweightPaper;
                         this.infiniteScrollService.setPapers(papers);
                         
                         // Update the paper element in the UI
-                        this.uiService.updatePaperElement(data.paper.arxiv_id, data.paper);
+                        this.uiService.updatePaperElement(data.paper.arxiv_id, lightweightPaper);
                         
                         // Show success only for the final complete event (summary completion)
-                        this.uiService.showSuccess(true, data.paper);
+                        this.uiService.showSuccess(true, lightweightPaper);
                     }
                 }
                 break;

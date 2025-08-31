@@ -1,6 +1,5 @@
 """Tests for ArXiv extractor."""
 
-from unittest.mock import patch
 
 import pytest
 

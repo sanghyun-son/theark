@@ -2,8 +2,6 @@
 
 import logging
 
-import pytest
-
 from core import get_logger, setup_logging
 
 

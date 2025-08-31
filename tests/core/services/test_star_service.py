@@ -48,7 +48,7 @@ def test_add_star_user_not_found(
     """Test star addition with non-existent paper."""
 
     with pytest.raises(ValueError, match="not found"):
-        response = star_service.add_star(
+        star_service.add_star(
             mock_db_session,
             999,
             saved_paper.paper_id,
@@ -86,7 +86,7 @@ def test_remove_star_paper_not_found(
     """Test star addition with non-existent paper."""
 
     with pytest.raises(ValueError, match="not found"):
-        response = star_service.remove_star(
+        star_service.remove_star(
             mock_db_session,
             saved_user.user_id,
             999,
@@ -100,7 +100,7 @@ def test_remove_star_user_not_found(
 ) -> None:
     """Test star addition with non-existent paper."""
     with pytest.raises(ValueError, match="not found"):
-        response = star_service.remove_star(
+        star_service.remove_star(
             mock_db_session,
             999,
             saved_paper.paper_id,

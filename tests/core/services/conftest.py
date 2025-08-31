@@ -1,11 +1,11 @@
 """Tests for PaperService star functionality."""
 
-from typing import Generator
+from collections.abc import Generator
 
 import pytest
 from sqlmodel import Session
 
-from core.database.repository import PaperRepository, SummaryRepository, UserRepository
+from core.database.repository import PaperRepository, UserRepository
 from core.models.rows import Paper, User
 from core.services.paper_service import PaperService
 from core.services.star_service import StarService

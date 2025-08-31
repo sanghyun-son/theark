@@ -14,6 +14,7 @@ from core.llm.openai_client import UnifiedOpenAIClient
 from core.models import (
     PaperCreateRequest,
     PaperDeleteResponse,
+    PaperListLightweightResponse,
     PaperListResponse,
     PaperResponse,
 )
@@ -60,6 +61,50 @@ async def get_papers(
 
     return await handle_async_api_operation(
         get_papers_operation, error_message="Failed to get papers"
+    )
+
+
+@router.get("/lightweight", response_model=PaperListLightweightResponse)
+async def get_papers_lightweight(
+    db_session: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    limit: int = Query(
+        default=20, ge=1, le=100, description="Number of papers to return"
+    ),
+    offset: int = Query(default=0, ge=0, description="Number of papers to skip"),
+    language: str = Query(default="Korean", description="Language for summaries"),
+) -> PaperListLightweightResponse:
+    """Get papers with overview only for better performance.
+
+    This endpoint returns papers with only overview (not full summaries)
+    for improved frontend performance. Full summaries are loaded on demand.
+
+    Args:
+        limit: Number of papers to return (1-100)
+        offset: Number of papers to skip
+        language: Language for summaries
+        current_user: Current user information
+
+    Returns:
+        Lightweight list of papers with overview only
+
+    Raises:
+        HTTPException: If retrieval fails
+    """
+
+    async def get_papers_lightweight_operation() -> PaperListLightweightResponse:
+        paper_service = PaperService()
+        user_id = current_user.user_id
+        return await paper_service.get_papers_lightweight(
+            db_session,
+            user_id,
+            skip=offset,  # Convert offset to skip
+            limit=limit,
+            language=language,
+        )
+
+    return await handle_async_api_operation(
+        get_papers_lightweight_operation, error_message="Failed to get papers"
     )
 
 

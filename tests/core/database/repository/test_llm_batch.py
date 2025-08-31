@@ -1,7 +1,5 @@
 """Tests for LLM batch repository."""
 
-import pytest
-from sqlmodel import Session
 
 from core.database.repository.llm_batch import LLMBatchRepository
 from core.database.repository.paper import PaperRepository

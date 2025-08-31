@@ -20,8 +20,14 @@ from core.models import (
     StarredPapersResponse,
     SummaryReadResponse,
 )
-from core.models.api.responses import PaperListResponse
+from core.models.api.responses import (
+    PaperListItemResponse,
+    PaperListLightweightResponse,
+    PaperListResponse,
+    SummaryDetailResponse,
+)
 from core.models.rows import Paper, Summary
+from core.services.paper_summarization_service import PaperSummarizationService
 
 logger = get_logger(__name__)
 
@@ -217,6 +223,121 @@ class PaperService:
             offset=skip,
             has_more=has_more,
         )
+
+    async def get_papers_lightweight(
+        self,
+        db_session: Session,
+        user_id: int | None = None,
+        skip: int = 0,
+        limit: int = 100,
+        language: str | None = None,
+    ) -> PaperListLightweightResponse:
+        """Get a lightweight list of papers with overview only.
+
+        This method retrieves papers with only overview for better performance.
+        Full summaries are loaded on demand when user clicks on a paper.
+
+        Args:
+            db_session: Database session
+            user_id: User ID for star/read status
+            skip: Number of records to skip
+            limit: Maximum number of records to return
+            language: Language for summaries
+
+        Returns:
+            Lightweight paper list with overview only
+        """
+        paper_repo = PaperRepository(db_session)
+        paper_overview_data = paper_repo.get_papers_with_overview(
+            skip=skip, limit=limit, language=language
+        )
+
+        # Create lightweight responses with overview
+        paper_responses = []
+        for overview_data in paper_overview_data:
+            # Get star and read status
+            is_starred = False
+            is_read = False
+
+            if user_id and overview_data.paper.paper_id:
+                star_repo = UserStarRepository(db_session)
+                summary_read_repo = SummaryReadRepository(db_session)
+
+                # Check star status
+                is_starred = star_repo.is_paper_starred(
+                    user_id, overview_data.paper.paper_id
+                )
+
+                # Check read status (only if summary exists)
+                if overview_data.has_summary:
+                    # Get summary to check read status
+                    summary_repo = SummaryRepository(db_session)
+                    summary = summary_repo.get_by_paper_id_and_language(
+                        overview_data.paper.paper_id, language or "Korean"
+                    )
+                    if summary and summary.summary_id:
+                        is_read = summary_read_repo.is_summary_read_by_user(
+                            user_id, summary.summary_id
+                        )
+
+            paper_response = PaperListItemResponse.from_paper_with_overview(
+                paper=overview_data.paper,
+                overview=overview_data.overview,
+                has_summary=overview_data.has_summary,
+                relevance=overview_data.relevance,
+                is_starred=is_starred,
+                is_read=is_read,
+            )
+            paper_responses.append(paper_response)
+
+        # Get total count for pagination
+        total_count = paper_repo.get_total_count()
+        has_more = (skip + limit) < total_count
+
+        return PaperListLightweightResponse(
+            papers=paper_responses,
+            total_count=total_count,
+            limit=limit,
+            offset=skip,
+            has_more=has_more,
+        )
+
+    async def get_paper_summary(
+        self,
+        paper_id: int,
+        db_session: Session,
+        user_id: int | None = None,
+        language: str = "Korean",
+    ) -> SummaryDetailResponse:
+        """Get full summary for a specific paper on demand.
+
+        Args:
+            paper_id: Paper ID
+            db_session: Database session
+            user_id: User ID for read status
+            language: Language for summary
+
+        Returns:
+            Full summary details with read status
+        """
+        # Get the full summary
+        summarization_service = PaperSummarizationService()
+        summary = await summarization_service.get_summary(
+            paper_id, db_session, language
+        )
+
+        if not summary:
+            raise ValueError(f"No summary found for paper {paper_id} in {language}")
+
+        # Check read status
+        is_read = False
+        if user_id and summary.summary_id:
+            summary_read_repo = SummaryReadRepository(db_session)
+            is_read = summary_read_repo.is_summary_read_by_user(
+                user_id, summary.summary_id
+            )
+
+        return SummaryDetailResponse(summary=summary, is_read=is_read)
 
     def _get_paper_by_identifier(
         self, paper_identifier: str, db_session: Session

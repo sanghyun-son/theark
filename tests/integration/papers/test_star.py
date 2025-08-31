@@ -4,7 +4,6 @@ import pytest
 from fastapi.testclient import TestClient
 
 from core.utils import parse_sse_events
-from tests.integration.conftest import integration_client
 
 
 @pytest.fixture
