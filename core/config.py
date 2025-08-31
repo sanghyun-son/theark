@@ -94,6 +94,23 @@ class Settings(BaseModel):
     batch_max_retries: int = Field(
         default=3, description="Maximum number of retries for failed batches"
     )
+    # ArXiv background explorer settings
+    arxiv_categories: str = Field(
+        default="cs.AI,cs.LG,cs.CL",
+        description="Comma-separated ArXiv categories to explore",
+    )
+    arxiv_paper_interval_seconds: int = Field(
+        default=2, description="Interval between processing individual papers (seconds)"
+    )
+    arxiv_fetch_interval_minutes: int = Field(
+        default=10, description="Interval between fetch cycles (minutes)"
+    )
+    arxiv_retry_attempts: int = Field(
+        default=3, description="Number of retry attempts for failed papers"
+    )
+    arxiv_retry_base_delay_seconds: int = Field(
+        default=2, description="Base delay for exponential backoff retries (seconds)"
+    )
 
     def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
@@ -166,6 +183,19 @@ def load_settings() -> Settings:
     batch_enabled = batch_enabled_str in ["true", "1", "yes", "on"]
     batch_max_retries = int(os.getenv("THEARK_BATCH_MAX_RETRIES", "3"))
 
+    # Parse ArXiv settings
+    arxiv_categories = os.getenv("THEARK_ARXIV_CATEGORIES", "cs.AI,cs.LG,cs.CL")
+    arxiv_paper_interval_seconds = int(
+        os.getenv("THEARK_ARXIV_PAPER_INTERVAL_SECONDS", "2")
+    )
+    arxiv_fetch_interval_minutes = int(
+        os.getenv("THEARK_ARXIV_FETCH_INTERVAL_MINUTES", "10")
+    )
+    arxiv_retry_attempts = int(os.getenv("THEARK_ARXIV_RETRY_ATTEMPTS", "3"))
+    arxiv_retry_base_delay_seconds = int(
+        os.getenv("THEARK_ARXIV_RETRY_BASE_DELAY_SECONDS", "2")
+    )
+
     return Settings(
         environment=Environment(os.getenv("THEARK_ENV", "development")),
         api_title=os.getenv("THEARK_API_TITLE", "TheArk API"),
@@ -194,6 +224,11 @@ def load_settings() -> Settings:
         batch_daily_limit=batch_daily_limit,
         batch_enabled=batch_enabled,
         batch_max_retries=batch_max_retries,
+        arxiv_categories=arxiv_categories,
+        arxiv_paper_interval_seconds=arxiv_paper_interval_seconds,
+        arxiv_fetch_interval_minutes=arxiv_fetch_interval_minutes,
+        arxiv_retry_attempts=arxiv_retry_attempts,
+        arxiv_retry_base_delay_seconds=arxiv_retry_base_delay_seconds,
     )
 
 

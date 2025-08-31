@@ -3,7 +3,6 @@
 import asyncio
 from datetime import datetime, timedelta
 from typing import Any
-from urllib.parse import urlencode
 
 import httpx
 
@@ -61,9 +60,9 @@ class ArxivSourceExplorer(BaseSourceExplorer):
             List of recent paper metadata
         """
         # Calculate the start date based on days_back
-
-        start_date = (datetime.now() - timedelta(days=days_back)).strftime("%Y-%m-%d")
-        query = f"submittedDate:[{start_date}+TO+now]"
+        start_date = (datetime.now() - timedelta(days=days_back)).strftime("%Y%m%d0000")
+        end_date = datetime.now().strftime("%Y%m%d2359")
+        query = f"submittedDate:[{start_date}+TO+{end_date}]"
         return await self._explore_with_query(query, limit)
 
     async def explore_by_category(
@@ -95,7 +94,16 @@ class ArxivSourceExplorer(BaseSourceExplorer):
         Returns:
             List of ArXiv papers
         """
-        query = f"submittedDate:[{start_date}+TO+now]+AND+cat:{category}"
+        # Convert YYYY-MM-DD to YYYYMMDD format for ArXiv API
+        start_date_formatted = start_date.replace("-", "") + "0000"
+        # Use next day 00:00 as end date to match the reference URL format
+        # This creates a range like: 202508150000+TO+202508160000
+        from datetime import datetime, timedelta
+
+        start_dt = datetime.strptime(start_date, "%Y-%m-%d")
+        end_dt = start_dt + timedelta(days=1)
+        end_date_formatted = end_dt.strftime("%Y%m%d0000")
+        query = f"submittedDate:[{start_date_formatted}+TO+{end_date_formatted}]+AND+cat:{category}"
         result = await self._explore_papers_with_query(query, start_index, limit)
         return result
 
@@ -113,7 +121,11 @@ class ArxivSourceExplorer(BaseSourceExplorer):
         Returns:
             List of ArXiv papers
         """
-        query = f"submittedDate:[{date}+TO+{date}]+AND+cat:{category}"
+        # Convert YYYY-MM-DD to YYYYMMDD format for ArXiv API
+        date_formatted = date.replace("-", "")
+        start_time = date_formatted + "0000"
+        end_time = date_formatted + "2359"
+        query = f"submittedDate:[{start_time}+TO+{end_time}]+AND+cat:{category}"
         return await self._explore_papers_with_query(query, start_index, limit)
 
     async def explore_new_papers_by_category_as_arxiv(
@@ -225,15 +237,16 @@ class ArxivSourceExplorer(BaseSourceExplorer):
             NetworkError: If network request fails
             ParsingError: If response parsing fails
         """
-        params = {
-            "search_query": query,
-            "start": str(start),
-            "max_results": str(max_results),
-            "sortBy": "submittedDate",
-            "sortOrder": "descending",
-        }
-
-        url = f"{self.api_base_url}?{urlencode(params)}"
+        # Build URL manually to preserve + characters in the query
+        # ArXiv API expects + characters to remain as +, not encoded as %2B
+        url = (
+            f"{self.api_base_url}?"
+            f"search_query={query}&"
+            f"start={start}&"
+            f"max_results={max_results}&"
+            f"sortBy=submittedDate&"
+            f"sortOrder=descending"
+        )
 
         try:
             async with httpx.AsyncClient(timeout=30.0) as client:

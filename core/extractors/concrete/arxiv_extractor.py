@@ -72,9 +72,10 @@ class ArxivExtractor(BaseExtractor):
         Raises:
             InvalidIdentifierError: If URL format is invalid
         """
-        # Direct arXiv ID
-        if re.match(r"^\d{4}\.\d{4,5}$", url):
-            return url
+        # Direct arXiv ID (with or without version)
+        if re.match(r"^\d{4}\.\d{4,5}(v\d+)?$", url):
+            # Remove version suffix if present
+            return re.sub(r"v\d+$", "", url)
 
         # Abstract URL
         abs_match = re.search(r"arxiv\.org/abs/(\d{4}\.\d{4,5})", url)

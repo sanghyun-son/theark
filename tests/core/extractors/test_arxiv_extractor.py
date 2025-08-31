@@ -1,6 +1,5 @@
 """Tests for ArXiv extractor."""
 
-
 import pytest
 
 from core.extractors.concrete.arxiv_extractor import ArxivExtractor
@@ -93,6 +92,18 @@ async def test_extract_metadata_server_error(mock_arxiv_extractor) -> None:
         await mock_arxiv_extractor.extract_metadata_async(
             "https://arxiv.org/abs/1706.99999"
         )
+
+
+@pytest.mark.asyncio
+async def test_extract_metadata_with_mock_response(mock_arxiv_extractor) -> None:
+    """Test metadata extraction using the mock response."""
+    # Test with a paper ID from our example XML
+    metadata = await mock_arxiv_extractor.extract_metadata_async("2501.00961v3")
+
+    # Check that we got a PaperMetadata with the expected fields
+    assert metadata.title == "ImageNet Large Scale Visual Recognition Challenge"
+    assert "cs.CV" in metadata.categories
+    assert metadata.raw_metadata["arxiv_id"] == "2501.00961"
 
 
 def test_get_source_name() -> None:

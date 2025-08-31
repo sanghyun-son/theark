@@ -1,7 +1,11 @@
 // Paper list management module for TheArk
+import { ModalManager } from './modal-manager.js';
 
-class PaperListManager {
-    constructor() {
+export class PaperListManager {
+    constructor(starManager, apiService, paperManager) {
+        this.starManager = starManager;
+        this.apiService = apiService;
+        this.paperManager = paperManager;
         this.papers = [];
         
         // Bind methods to maintain context
@@ -24,8 +28,8 @@ class PaperListManager {
         }
 
         // Initialize star states for all papers
-        if (window.starManager) {
-            window.starManager.initializeStarStates(papers);
+        if (this.starManager) {
+            this.starManager.initializeStarStates(papers);
         }
 
         paperList.innerHTML = '';
@@ -92,8 +96,8 @@ class PaperListManager {
         titleRow.appendChild(titleDiv);
         
         // Star button (fixed width)
-        if (window.starManager) {
-            const starButton = window.starManager.createStarButton(paper);
+        if (this.starManager) {
+            const starButton = this.starManager.createStarButton(paper);
             titleRow.appendChild(starButton);
         }
         
@@ -149,8 +153,8 @@ class PaperListManager {
         deleteBtn.title = 'Delete paper';
         deleteBtn.onclick = (e) => {
             e.stopPropagation(); // Prevent modal from opening
-            if (window.paperManager) {
-                window.paperManager.deletePaper(paper.arxiv_id);
+            if (this.paperManager) {
+                this.paperManager.deletePaper(paper.arxiv_id);
             } else {
                 console.error('PaperManager not initialized');
             }
@@ -351,7 +355,7 @@ class PaperListManager {
                 
                 // Load full summary from API
                 const language = document.getElementById('summary-language')?.value || 'Korean';
-                const summaryData = await window.apiService.getPaperSummary(paper.paper_id, language);
+                const summaryData = await this.apiService.getPaperSummary(paper.paper_id, language);
                 
                 // Clear the timer and remove loading modal if it was shown
                 clearTimeout(loadingTimer);
@@ -367,12 +371,12 @@ class PaperListManager {
                 };
                 
                 // Update the paper in the papers array
-                const papers = window.paperManager?.getPapers() || [];
+                const papers = this.paperManager?.getPapers() || [];
                 const paperIndex = papers.findIndex(p => p.paper_id === paper.paper_id);
                 if (paperIndex !== -1) {
                     papers[paperIndex] = paperWithFullSummary;
-                    if (window.paperManager) {
-                        window.paperManager.infiniteScrollService.setPapers(papers);
+                    if (this.paperManager) {
+                        this.paperManager.infiniteScrollService.setPapers(papers);
                     }
                 }
                 
@@ -391,10 +395,8 @@ class PaperListManager {
         }
         
         // Create and show modal with full summary
-        if (window.ModalManager) {
-            const modal = new window.ModalManager(paperWithFullSummary);
-            modal.show();
-        }
+        const modal = new ModalManager(paperWithFullSummary, this.starManager);
+        modal.show();
         
         // Mark summary as read if it exists and hasn't been read
         if (paperWithFullSummary.summary && paperWithFullSummary.summary.summary_id && !paperWithFullSummary.is_read) {
@@ -446,5 +448,3 @@ class PaperListManager {
     }
 }
 
-// Export for use in other modules
-window.PaperListManager = PaperListManager;

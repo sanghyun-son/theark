@@ -1,6 +1,6 @@
 // Loading indicators module for TheArk
 
-class LoadingIndicators {
+export class LoadingIndicators {
     constructor() {
         // Bind methods to maintain context
         this.showLoadingIndicator = this.showLoadingIndicator.bind(this);
@@ -122,5 +122,3 @@ class LoadingIndicators {
     }
 }
 
-// Export for use in other modules
-window.LoadingIndicators = LoadingIndicators;

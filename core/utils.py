@@ -128,20 +128,21 @@ def extract_xml_categories(
         List of categories
     """
     categories = []
-    category_elements = element.findall("arxiv:primary_category", namespace)
 
-    for category_elem in category_elements:
+    # Get primary category (with arxiv: namespace)
+    primary_elements = element.findall("arxiv:primary_category", namespace)
+    for category_elem in primary_elements:
         category = category_elem.get("term")
         if category:
             categories.append(category)
 
-    # Also get secondary categories
-    secondary_elements = element.findall("arxiv:category", namespace)
+    # Also get secondary categories (with atom: namespace)
+    secondary_elements = element.findall("atom:category", namespace)
+
     for category_elem in secondary_elements:
         category = category_elem.get("term")
         if category and category not in categories:
             categories.append(category)
-
     return categories
 
 

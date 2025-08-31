@@ -74,8 +74,8 @@ export OPENAI_API_KEY="your-api-key-here"
 ### Running the Demo
 
 ```bash
-# Run the ArXiv crawler demo with summarization
-uv run python examples/arxiv_crawler_demo.py
+# Run the comprehensive TheArk demo
+uv run python examples/theark_demo.py
 ```
 
 ## 🛠️ Development

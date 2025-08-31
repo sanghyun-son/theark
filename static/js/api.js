@@ -1,6 +1,6 @@
 // API communication module for TheArk
 
-class ApiService {
+export class ApiService {
     constructor() {
         this.apiBaseUrl = '/v1/papers';
         this.configApiUrl = '/v1/config';
@@ -104,5 +104,3 @@ class ApiService {
     }
 }
 
-// Export for use in other modules
-window.ApiService = ApiService;

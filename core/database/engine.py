@@ -7,8 +7,11 @@ from sqlmodel import SQLModel, create_engine
 
 from core.log import get_logger
 from core.models.rows import (
+    ArxivCrawlProgress,
+    ArxivFailedPaper,
     BatchItem,
     CrawlEvent,
+    CrawlExecutionState,
     FeedItem,
     LLMBatchRequest,
     LLMRequest,
@@ -24,11 +27,12 @@ from core.types import Environment
 logger = get_logger(__name__)
 
 
-def setup_database_url(environment: Environment) -> str:
+def setup_database_url(environment: Environment, db_path: Path | None = None) -> str:
     """Construct database URL based on environment configuration.
 
     Args:
-        settings: Application settings
+        environment: Environment type
+        db_path: Optional custom database path. If provided, overrides default path.
 
     Returns:
         Database connection URL
@@ -36,13 +40,20 @@ def setup_database_url(environment: Environment) -> str:
 
     if environment == Environment.TESTING:
         return "sqlite:///:memory:"
-    if environment == Environment.PRODUCTION:
-        db_path = Path("db", "theark.db")
-    elif environment == Environment.DEVELOPMENT:
-        db_path = Path("db", "theark.dev.db")
-    else:
-        raise ValueError(f"Unknown environment: {environment}")
 
+    if db_path is not None:
+        # Use custom path if provided
+        db_path = Path(db_path)
+    else:
+        # Use default paths based on environment
+        if environment == Environment.PRODUCTION:
+            db_path = Path("db", "theark.db")
+        elif environment == Environment.DEVELOPMENT:
+            db_path = Path("db", "theark.dev.db")
+        else:
+            raise ValueError(f"Unknown environment: {environment}")
+
+    # Ensure the directory exists
     db_path.parent.mkdir(parents=True, exist_ok=True)
     return f"sqlite:///{db_path}"
 
@@ -50,14 +61,20 @@ def setup_database_url(environment: Environment) -> str:
 def create_database_engine(
     environment: Environment,
     echo: bool = False,
+    db_path: Path | None = None,
 ) -> Engine:
     """Create database engine based on environment configuration.
+
+    Args:
+        environment: Environment type
+        echo: Enable SQL echo for debugging
+        db_path: Optional custom database path. If provided, overrides default path.
 
     Returns:
         Configured SQLModel engine
     """
     # Create SQLite URL
-    database_url = setup_database_url(environment)
+    database_url = setup_database_url(environment, db_path)
     logger.info(f"Creating database engine for: {database_url}")
 
     # Create engine with SQLite-specific configuration
@@ -85,6 +102,9 @@ def create_database_tables(engine: Engine) -> None:
     SQLModel.metadata.create_all(engine)
 
     row_models = [
+        ArxivCrawlProgress,
+        ArxivFailedPaper,
+        CrawlExecutionState,
         Paper,
         Summary,
         SummaryRead,

@@ -1,14 +1,14 @@
 // Main controller for TheArk Paper Management
+import { ApiService } from './api.js';
+import { UIService } from './ui.js';
+import { InfiniteScrollService } from './infinite-scroll.js';
 
-class PaperManager {
+export class PaperManager {
     constructor() {
         // Initialize services
         this.apiService = new ApiService();
-        this.uiService = new UIService();
+        this.uiService = new UIService(this.apiService, this);
         this.infiniteScrollService = new InfiniteScrollService(this.apiService, this.uiService);
-        
-        // Make API service globally available for other modules
-        window.apiService = this.apiService;
         
         // State
         this.selectedCategories = new Set();
@@ -17,10 +17,8 @@ class PaperManager {
         this.initializeEventListeners();
         this.loadCategories();
         
-        // Load papers after PaperManager is fully initialized
-        window.addEventListener('paperManagerReady', () => {
-            this.infiniteScrollService.loadPapers();
-        }, { once: true });
+        // Load initial papers
+        this.infiniteScrollService.loadPapers();
     }
 
     initializeEventListeners() {
@@ -273,6 +271,3 @@ class PaperManager {
         return this.infiniteScrollService.loadPapers();
     }
 }
-
-// Export for use in other modules
-window.PaperManager = PaperManager;

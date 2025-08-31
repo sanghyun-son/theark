@@ -1,0 +1,30 @@
+{
+  "name": "theark",
+  "version": "1.0.0",
+  "description": "[![CI](https://github.com/sanghyun-son/theark/actions/workflows/ci.yml/badge.svg)](https://github.com/sanghyun-son/theark/actions/workflows/ci.yml) [![Python 3.11](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT) [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black) [![Linting: ruff](https://img.shields.io/badge/linting-ruff-000000.svg)](https://github.com/astral-sh/ruff)",
+  "main": "index.js",
+  "directories": {
+    "example": "examples",
+    "test": "tests"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sanghyun-son/theark.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/sanghyun-son/theark/issues"
+  },
+  "homepage": "https://github.com/sanghyun-son/theark#readme",
+  "devDependencies": {
+    "vite": "^7.1.3"
+  }
+}

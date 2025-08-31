@@ -207,3 +207,67 @@ class BatchItem(SQLModel, table=True):
         default=None, description="ISO timestamp when item completed"
     )
     request_metadata: str | None = Field(default=None, description="JSON metadata")
+
+
+class ArxivCrawlProgress(SQLModel, table=True):
+    """ArXiv crawl progress tracking database model using SQLModel."""
+
+    progress_id: int | None = Field(default=None, primary_key=True)
+    category: str = Field(description="ArXiv category (e.g., cs.AI)")
+    last_crawled_date: str = Field(description="Last crawled date (YYYY-MM-DD)")
+    last_crawled_index: int = Field(default=0, description="Last crawled paper index")
+    is_active: bool = Field(
+        default=True, description="Whether this category is active for crawling"
+    )
+    created_at: str = Field(
+        default_factory=get_current_timestamp,
+        description="ISO8601 datetime - automatically updated",
+    )
+    updated_at: str = Field(
+        default_factory=get_current_timestamp,
+        description="ISO8601 datetime - automatically updated",
+    )
+
+
+class ArxivFailedPaper(SQLModel, table=True):
+    """ArXiv failed paper tracking database model using SQLModel."""
+
+    failed_id: int | None = Field(default=None, primary_key=True)
+    arxiv_id: str = Field(description="ArXiv ID (e.g., 2101.00001)")
+    category: str = Field(description="ArXiv category (e.g., cs.AI)")
+    error_message: str = Field(description="Error message from failed processing")
+    retry_count: int = Field(default=0, description="Number of retry attempts made")
+    last_retry_at: str | None = Field(
+        default=None, description="ISO8601 datetime of last retry attempt"
+    )
+    created_at: str = Field(
+        default_factory=get_current_timestamp,
+        description="ISO8601 datetime - automatically updated",
+    )
+    updated_at: str = Field(
+        default_factory=get_current_timestamp,
+        description="ISO8601 datetime - automatically updated",
+    )
+
+
+class CrawlExecutionState(SQLModel, table=True):
+    """Crawl execution state database model using SQLModel."""
+
+    state_id: int | None = Field(default=None, primary_key=True)
+    last_execution_date: str = Field(description="Last execution date (YYYY-MM-DD)")
+    historical_crawl_date: str = Field(
+        description="Current historical crawl date (YYYY-MM-DD)"
+    )
+    historical_crawl_index: int = Field(
+        default=0, description="Current historical crawl index"
+    )
+    today_crawler_active: bool = Field(
+        default=True, description="Today crawler active status"
+    )
+    historical_crawler_active: bool = Field(
+        default=True, description="Historical crawler active status"
+    )
+    updated_at: str = Field(
+        default_factory=get_current_timestamp,
+        description="ISO8601 datetime - automatically updated",
+    )

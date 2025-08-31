@@ -25,6 +25,7 @@ from core.database.repository import (
     UserStarRepository,
 )
 from core.extractors.concrete.arxiv_extractor import ArxivExtractor
+from core.extractors.concrete.arxiv_source_explorer import ArxivSourceExplorer
 from core.llm.openai_client import UnifiedOpenAIClient
 from core.models.rows import Paper, Summary, User
 from core.services.summarization_service import PaperSummarizationService
@@ -237,8 +238,21 @@ def mock_arxiv_server(httpserver: HTTPServer) -> HTTPServer:
         parsed_url = urlparse(request.url)
         query_params = parse_qs(parsed_url.query)
         id_list = query_params.get("id_list", [""])[0]
+        search_query = query_params.get("search_query", [""])[0]
 
-        # Handle different paper scenarios
+        # Handle any cs.AI category search with date range
+        if "cat:cs.AI" in search_query and "submittedDate:" in search_query:
+            # Return the example XML response for any cs.AI category search
+            example_path = Path("tests", "assets", "example_arxiv_response.xml")
+            with open(example_path, "r", encoding="utf-8") as f:
+                response_data = f.read()
+            return Response(
+                response_data,
+                status=200,
+                headers={"Content-Type": "application/xml"},
+            )
+
+        # Handle different paper scenarios for individual paper queries
         if id_list == "1706.99999":
             # Server error scenario
             return Response(
@@ -272,6 +286,13 @@ def mock_arxiv_extractor(mock_arxiv_server: HTTPServer) -> ArxivExtractor:
     """Provide a mock ArxivExtractor instance configured with mock server."""
     base_url = f"http://{mock_arxiv_server.host}:{mock_arxiv_server.port}/api/query"
     return ArxivExtractor(api_base_url=base_url)
+
+
+@pytest.fixture(scope="function")
+def mock_arxiv_source_explorer(mock_arxiv_server: HTTPServer) -> ArxivSourceExplorer:
+    """Provide a mock ArxivSourceExplorer instance configured with mock server."""
+    base_url = f"http://{mock_arxiv_server.host}:{mock_arxiv_server.port}/api/query"
+    return ArxivSourceExplorer(api_base_url=base_url)
 
 
 @pytest.fixture
