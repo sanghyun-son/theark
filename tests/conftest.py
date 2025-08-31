@@ -27,7 +27,7 @@ from core.database.repository import (
 from core.extractors.concrete.arxiv_extractor import ArxivExtractor
 from core.llm.openai_client import UnifiedOpenAIClient
 from core.models.rows import Paper, Summary, User
-from core.services.paper_summarization_service import PaperSummarizationService
+from core.services.summarization_service import PaperSummarizationService
 from core.types import PaperSummaryStatus
 from tests.shared_test_data import ARXIV_RESPONSES, OPENAI_RESPONSES
 

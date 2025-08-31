@@ -27,7 +27,7 @@ from core.models.api.responses import (
     SummaryDetailResponse,
 )
 from core.models.rows import Paper, Summary
-from core.services.paper_summarization_service import PaperSummarizationService
+from core.services.summarization_service import PaperSummarizationService
 
 logger = get_logger(__name__)
 

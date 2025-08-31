@@ -5,7 +5,7 @@ from sqlmodel import Session
 
 from core.llm.openai_client import UnifiedOpenAIClient
 from core.models.rows import Paper
-from core.services.paper_summarization_service import PaperSummarizationService
+from core.services.summarization_service import PaperSummarizationService
 
 
 @pytest.mark.asyncio

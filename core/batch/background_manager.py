@@ -19,7 +19,7 @@ from core.models.batch import (
     BatchResult,
 )
 from core.models.rows import Paper
-from core.services.paper_summarization_service import PaperSummarizationService
+from core.services.summarization_service import PaperSummarizationService
 
 logger = get_logger(__name__)
 

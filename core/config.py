@@ -162,7 +162,7 @@ def load_settings() -> Settings:
     batch_fetch_interval = int(os.getenv("THEARK_BATCH_FETCH_INTERVAL", "600"))
     batch_max_items = int(os.getenv("THEARK_BATCH_MAX_ITEMS", "1000"))
     batch_daily_limit = int(os.getenv("THEARK_BATCH_DAILY_LIMIT", "10000"))
-    batch_enabled_str = os.getenv("THEARK_BATCH_ENABLED", "true").lower()
+    batch_enabled_str = os.getenv("THEARK_BATCH_ENABLED", "false").lower()
     batch_enabled = batch_enabled_str in ["true", "1", "yes", "on"]
     batch_max_retries = int(os.getenv("THEARK_BATCH_MAX_RETRIES", "3"))
 

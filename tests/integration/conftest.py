@@ -15,7 +15,7 @@ from core.database.engine import create_database_tables
 from core.extractors import extractor_factory
 from core.llm.openai_client import UnifiedOpenAIClient
 from core.log import get_logger
-from core.services.paper_summarization_service import PaperSummarizationService
+from core.services.summarization_service import PaperSummarizationService
 
 logger = get_logger(__name__)
 

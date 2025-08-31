@@ -18,7 +18,7 @@ from api.routers import (
 from core import get_logger, setup_logging
 from core.config import load_settings
 from core.database.engine import create_database_tables
-from core.services.paper_summarization_service import PaperSummarizationService
+from core.services.summarization_service import PaperSummarizationService
 
 logger = get_logger(__name__)
 

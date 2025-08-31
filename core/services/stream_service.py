@@ -12,7 +12,7 @@ from core.llm.openai_client import UnifiedOpenAIClient
 from core.models import PaperCreateRequest
 from core.models.api.responses import PaperResponse
 from core.services.paper_service import PaperService
-from core.services.paper_summarization_service import PaperSummarizationService
+from core.services.summarization_service import PaperSummarizationService
 
 logger = get_logger(__name__)
 
