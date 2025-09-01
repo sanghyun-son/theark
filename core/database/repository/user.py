@@ -226,3 +226,22 @@ class UserStarRepository(BaseRepository[UserStar]):
                 papers.append(paper)
 
         return papers
+
+    def get_starred_paper_ids(self, user_id: int, paper_ids: list[int]) -> list[int]:
+        """Get list of paper IDs that are starred by user (batch operation).
+
+        Args:
+            user_id: User ID
+            paper_ids: List of paper IDs to check
+
+        Returns:
+            List of paper IDs that are starred by the user
+        """
+        if not paper_ids:
+            return []
+
+        statement = select(UserStar.paper_id).where(
+            (UserStar.user_id == user_id) & (UserStar.paper_id.in_(paper_ids))
+        )
+        result = self.db.exec(statement)
+        return list(result.all())

@@ -3,7 +3,7 @@
 from typing import Any
 
 from sqlalchemy import JSON, Column
-from sqlmodel import Field, SQLModel
+from sqlmodel import Field, Relationship, SQLModel
 
 from core.types import PaperSummaryStatus
 from core.utils import get_current_timestamp
@@ -38,6 +38,10 @@ class PaperBase(SQLModel):
 class Paper(PaperBase, table=True):
     """Paper database model using SQLModel."""
 
+    # Relationship attributes
+    summaries: list["Summary"] = Relationship(back_populates="paper")
+    user_stars: list["UserStar"] = Relationship(back_populates="paper")
+
 
 class Summary(SQLModel, table=True):
     """Summary database model using SQLModel."""
@@ -59,6 +63,10 @@ class Summary(SQLModel, table=True):
         description="ISO8601 datetime - automatically updated",
     )
 
+    # Relationship attributes
+    paper: Paper = Relationship(back_populates="summaries")
+    summary_reads: list["SummaryRead"] = Relationship(back_populates="summary")
+
 
 class SummaryRead(SQLModel, table=True):
     """Summary read status for users."""
@@ -68,6 +76,10 @@ class SummaryRead(SQLModel, table=True):
     summary_id: int = Field(foreign_key="summary.summary_id")
     read_at: str = Field(description="ISO8601 datetime when summary was read")
 
+    # Relationship attributes
+    summary: Summary = Relationship(back_populates="summary_reads")
+    user: "User" = Relationship(back_populates="summary_reads")
+
 
 class User(SQLModel, table=True):
     """User database model using SQLModel."""
@@ -75,6 +87,11 @@ class User(SQLModel, table=True):
     user_id: int | None = Field(default=None, primary_key=True)
     email: str = Field(unique=True, index=True, description="User email")
     display_name: str | None = Field(default=None, description="User display name")
+
+    # Relationship attributes
+    user_stars: list["UserStar"] = Relationship(back_populates="user")
+    summary_reads: list[SummaryRead] = Relationship(back_populates="user")
+    user_interests: list["UserInterest"] = Relationship(back_populates="user")
 
 
 class UserInterest(SQLModel, table=True):
@@ -85,6 +102,9 @@ class UserInterest(SQLModel, table=True):
     category: str = Field(description="Interest category")
     weight: int = Field(default=1, ge=1, le=10, description="Interest weight (1-10)")
 
+    # Relationship attributes
+    user: User = Relationship(back_populates="user_interests")
+
 
 class UserStar(SQLModel, table=True):
     """User star database model using SQLModel."""
@@ -93,6 +113,10 @@ class UserStar(SQLModel, table=True):
     user_id: int = Field(foreign_key="user.user_id")
     paper_id: int = Field(foreign_key="paper.paper_id")
     note: str | None = Field(default=None, description="User note for the star")
+
+    # Relationship attributes
+    user: User = Relationship(back_populates="user_stars")
+    paper: Paper = Relationship(back_populates="user_stars")
 
 
 class FeedItem(SQLModel, table=True):
@@ -209,26 +233,6 @@ class BatchItem(SQLModel, table=True):
     request_metadata: str | None = Field(default=None, description="JSON metadata")
 
 
-class ArxivCrawlProgress(SQLModel, table=True):
-    """ArXiv crawl progress tracking database model using SQLModel."""
-
-    progress_id: int | None = Field(default=None, primary_key=True)
-    category: str = Field(description="ArXiv category (e.g., cs.AI)")
-    last_crawled_date: str = Field(description="Last crawled date (YYYY-MM-DD)")
-    last_crawled_index: int = Field(default=0, description="Last crawled paper index")
-    is_active: bool = Field(
-        default=True, description="Whether this category is active for crawling"
-    )
-    created_at: str = Field(
-        default_factory=get_current_timestamp,
-        description="ISO8601 datetime - automatically updated",
-    )
-    updated_at: str = Field(
-        default_factory=get_current_timestamp,
-        description="ISO8601 datetime - automatically updated",
-    )
-
-
 class ArxivFailedPaper(SQLModel, table=True):
     """ArXiv failed paper tracking database model using SQLModel."""
 
@@ -250,22 +254,67 @@ class ArxivFailedPaper(SQLModel, table=True):
     )
 
 
+class CategoryDateProgress(SQLModel, table=True):
+    """Category-date combination crawl progress tracking."""
+
+    progress_id: int | None = Field(default=None, primary_key=True)
+    category: str = Field(description="ArXiv category (e.g., cs.AI)")
+    date: str = Field(description="Date in YYYY-MM-DD format")
+    is_completed: bool = Field(
+        default=False, description="Whether this date is completed for this category"
+    )
+    papers_found: int = Field(
+        default=0, description="Number of papers found for this date-category"
+    )
+    papers_stored: int = Field(
+        default=0, description="Number of papers successfully stored"
+    )
+    error_message: str | None = Field(
+        default=None, description="Error message if failed"
+    )
+    started_at: str | None = Field(
+        default=None, description="When crawling started for this date-category"
+    )
+    completed_at: str | None = Field(
+        default=None, description="When crawling completed for this date-category"
+    )
+    created_at: str = Field(
+        default_factory=get_current_timestamp,
+        description="ISO8601 datetime - automatically updated",
+    )
+    updated_at: str = Field(
+        default_factory=get_current_timestamp,
+        description="ISO8601 datetime - automatically updated",
+    )
+
+
 class CrawlExecutionState(SQLModel, table=True):
     """Crawl execution state database model using SQLModel."""
 
     state_id: int | None = Field(default=None, primary_key=True)
-    last_execution_date: str = Field(description="Last execution date (YYYY-MM-DD)")
-    historical_crawl_date: str = Field(
-        description="Current historical crawl date (YYYY-MM-DD)"
+    current_date: str = Field(description="Current crawling date (YYYY-MM-DD)")
+    current_category_index: int = Field(
+        default=0, description="Current category index being processed"
     )
-    historical_crawl_index: int = Field(
-        default=0, description="Current historical crawl index"
+    categories: list[str] = Field(
+        default_factory=list,
+        sa_column=Column(JSON),
+        description="List of categories to crawl",
     )
-    today_crawler_active: bool = Field(
-        default=True, description="Today crawler active status"
+    is_active: bool = Field(default=True, description="Whether crawling is active")
+    total_papers_found: int = Field(
+        default=0, description="Total papers found across all categories"
     )
-    historical_crawler_active: bool = Field(
-        default=True, description="Historical crawler active status"
+    total_papers_stored: int = Field(
+        default=0, description="Total papers successfully stored"
+    )
+    last_activity_at: str = Field(
+        default_factory=get_current_timestamp,
+        description="ISO8601 datetime of last activity",
+    )
+    created_at: str = Field(
+        default_factory=get_current_timestamp,
+        description="ISO8601 datetime - automatically updated",
     )
     updated_at: str = Field(
         default_factory=get_current_timestamp,

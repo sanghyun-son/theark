@@ -248,47 +248,94 @@ class PaperService:
             Lightweight paper list with overview only
         """
         paper_repo = PaperRepository(db_session)
-        paper_overview_data = paper_repo.get_papers_with_overview(
-            skip=skip, limit=limit, language=language
-        )
 
-        # Create lightweight responses with overview
-        paper_responses = []
-        for overview_data in paper_overview_data:
-            # Get star and read status
-            is_starred = False
-            is_read = False
+        # Use optimized batch method if user_id is provided
+        if user_id:
+            paper_overview_data = paper_repo.get_papers_with_overview_optimized(
+                skip=skip, limit=limit, language=language
+            )
 
-            if user_id and overview_data.paper.paper_id:
+            # Create responses with user status
+            paper_responses = []
+            for overview_data in paper_overview_data:
+                paper_response = PaperListItemResponse.from_paper_with_overview(
+                    paper=overview_data.paper,
+                    overview=overview_data.overview,
+                    has_summary=overview_data.has_summary,
+                    relevance=overview_data.relevance,
+                    is_starred=False,  # Will be handled by separate batch query
+                    is_read=False,  # Will be handled by separate batch query
+                )
+                paper_responses.append(paper_response)
+
+            # Batch fetch user status for better performance
+            if paper_responses:
+                paper_ids = [
+                    data.paper.paper_id
+                    for data in paper_overview_data
+                    if data.paper.paper_id
+                ]
+
+                # Batch fetch star status
                 star_repo = UserStarRepository(db_session)
-                summary_read_repo = SummaryReadRepository(db_session)
-
-                # Check star status
-                is_starred = star_repo.is_paper_starred(
-                    user_id, overview_data.paper.paper_id
+                starred_paper_ids = set(
+                    star_repo.get_starred_paper_ids(user_id, paper_ids)
                 )
 
-                # Check read status (only if summary exists)
-                if overview_data.has_summary:
-                    # Get summary to check read status
-                    summary_repo = SummaryRepository(db_session)
-                    summary = summary_repo.get_by_paper_id_and_language(
-                        overview_data.paper.paper_id, language or "Korean"
-                    )
-                    if summary and summary.summary_id:
-                        is_read = summary_read_repo.is_summary_read_by_user(
-                            user_id, summary.summary_id
-                        )
+                # Batch fetch read status
+                summary_read_repo = SummaryReadRepository(db_session)
+                summary_repo = SummaryRepository(db_session)
 
-            paper_response = PaperListItemResponse.from_paper_with_overview(
-                paper=overview_data.paper,
-                overview=overview_data.overview,
-                has_summary=overview_data.has_summary,
-                relevance=overview_data.relevance,
-                is_starred=is_starred,
-                is_read=is_read,
+                summary_paper_ids = [
+                    data.paper.paper_id
+                    for data in paper_overview_data
+                    if data.paper.paper_id and data.has_summary
+                ]
+
+                summaries = {}
+                if summary_paper_ids:
+                    summaries = summary_repo.get_by_paper_ids_and_language(
+                        summary_paper_ids, language or "Korean"
+                    )
+
+                summary_ids = [s.summary_id for s in summaries.values() if s.summary_id]
+                read_summary_ids = set()
+                if summary_ids:
+                    read_summary_ids = set(
+                        summary_read_repo.get_read_summary_ids(user_id, summary_ids)
+                    )
+
+                # Update user status
+                for i, overview_data in enumerate(paper_overview_data):
+                    paper_id = overview_data.paper.paper_id
+                    is_starred = paper_id in starred_paper_ids if paper_id else False
+
+                    is_read = False
+                    if paper_id and overview_data.has_summary:
+                        summary = summaries.get(paper_id)
+                        if summary and summary.summary_id:
+                            is_read = summary.summary_id in read_summary_ids
+
+                    paper_responses[i].is_starred = is_starred
+                    paper_responses[i].is_read = is_read
+        else:
+            # No user_id, use simple optimized method
+            paper_overview_data = paper_repo.get_papers_with_overview_optimized(
+                skip=skip, limit=limit, language=language
             )
-            paper_responses.append(paper_response)
+
+            # Create responses without user-specific data
+            paper_responses = []
+            for overview_data in paper_overview_data:
+                paper_response = PaperListItemResponse.from_paper_with_overview(
+                    paper=overview_data.paper,
+                    overview=overview_data.overview,
+                    has_summary=overview_data.has_summary,
+                    relevance=overview_data.relevance,
+                    is_starred=False,
+                    is_read=False,
+                )
+                paper_responses.append(paper_response)
 
         # Get total count for pagination
         total_count = paper_repo.get_total_count()

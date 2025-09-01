@@ -10,7 +10,7 @@ from sqlmodel import Session, select
 
 from core.log import get_logger
 from core.models.domain.arxiv import ArxivPaper
-from core.models.rows import ArxivCrawlProgress, ArxivFailedPaper, Paper
+from core.models.rows import ArxivFailedPaper, Paper
 from core.types import PaperSummaryStatus
 from core.utils import get_current_timestamp
 
@@ -75,85 +75,38 @@ class ArxivBackgroundExplorer:
         logger.info(f"Parsed {len(categories)} ArXiv categories: {categories}")
         return categories
 
-    async def load_crawl_progress(
-        self, category: str, today_date: str
-    ) -> tuple[str, int]:
-        """Load crawl progress for a specific category.
+    async def explore_papers_by_category_and_date(
+        self, category: str, date: str, start_index: int, limit: int
+    ) -> list[ArxivPaper]:
+        """Explore new papers for a specific category and date.
 
         Args:
             category: ArXiv category (e.g., "cs.AI")
-            today_date: Today's date in YYYY-MM-DD format
+            date: Date in YYYY-MM-DD format
+            start_index: Index to start fetching from
+            limit: Maximum number of papers to fetch
 
         Returns:
-            Tuple of (last_crawled_date, last_crawled_index)
-            If no progress exists, returns (today_date, 0)
+            List of ArXivPaper objects
         """
-        with Session(self.engine) as session:
-            progress = session.exec(
-                select(ArxivCrawlProgress).where(
-                    ArxivCrawlProgress.category == category
-                )
-            ).first()
+        from core.extractors.concrete.arxiv_source_explorer import ArxivSourceExplorer
 
-            if progress is None:
-                logger.info(
-                    f"No progress found for category {category}, starting fresh"
-                )
-                return today_date, 0
-
-            if progress.last_crawled_date != today_date:
-                logger.info(
-                    f"New day detected for {category}: "
-                    f"last_crawled_date={progress.last_crawled_date}, "
-                    f"today={today_date}, resetting index to 0"
-                )
-                return today_date, 0
+        try:
+            explorer = ArxivSourceExplorer(
+                delay_seconds=0.1
+            )  # Minimal delay for historical crawling
+            papers = await explorer.explore_historical_papers_by_category(
+                category, date, start_index, limit
+            )
 
             logger.info(
-                f"Loaded progress for {category}: "
-                f"date={progress.last_crawled_date}, "
-                f"index={progress.last_crawled_index}"
+                f"Successfully fetched {len(papers)} papers for {category} on {date}"
             )
-            return progress.last_crawled_date, progress.last_crawled_index
+            return papers
 
-    async def save_crawl_progress(
-        self, category: str, crawled_date: str, crawled_index: int
-    ) -> None:
-        """Save or update crawl progress for a specific category.
-
-        Args:
-            category: ArXiv category (e.g., "cs.AI")
-            crawled_date: Date that was crawled (YYYY-MM-DD format)
-            crawled_index: Index of the last processed paper
-        """
-        with Session(self.engine) as session:
-            progress = session.exec(
-                select(ArxivCrawlProgress).where(
-                    ArxivCrawlProgress.category == category
-                )
-            ).first()
-
-            if progress is None:
-                progress = ArxivCrawlProgress(
-                    category=category,
-                    last_crawled_date=crawled_date,
-                    last_crawled_index=crawled_index,
-                    is_active=True,
-                )
-                session.add(progress)
-                logger.info(
-                    f"Created new progress for {category}: "
-                    f"date={crawled_date}, index={crawled_index}"
-                )
-            else:
-                progress.last_crawled_date = crawled_date
-                progress.last_crawled_index = crawled_index
-                logger.info(
-                    f"Updated progress for {category}: "
-                    f"date={crawled_date}, index={crawled_index}"
-                )
-
-            session.commit()
+        except Exception as e:
+            logger.error(f"Error fetching papers for {category} on {date}: {e}")
+            raise
 
     async def store_paper_metadata(self, paper: ArxivPaper) -> "Paper":
         """Store paper metadata in the database with batched status.
@@ -341,10 +294,10 @@ class ArxivBackgroundExplorer:
         logger.info(f"Starting to process category {category} for date {today_date}")
 
         # Load progress for this category
-        crawled_date, crawled_index = await self.load_crawl_progress(
-            category, today_date
-        )
-        logger.info(f"Resuming from index {crawled_index} for category {category}")
+        # crawled_date, crawled_index = await self.load_crawl_progress(
+        #     category, today_date
+        # )
+        # logger.info(f"Resuming from index {crawled_index} for category {category}")
 
         # Initialize the source explorer
         explorer = ArxivSourceExplorer()
@@ -355,17 +308,15 @@ class ArxivBackgroundExplorer:
         try:
             # Get papers for this category and date
             papers = await explorer.explore_new_papers_by_category(
-                category, crawled_date, crawled_index, limit=100
+                category, today_date, 0, 100
             )
 
             if not papers:
-                logger.info(
-                    f"No papers found for category {category} on {crawled_date}"
-                )
+                logger.info(f"No papers found for category {category} on {today_date}")
                 return processed_count, failed_count
 
             # Process papers starting from the last crawled index
-            for i, paper in enumerate(papers, start=crawled_index):
+            for i, paper in enumerate(papers):
                 # Process the paper with retry logic
                 success = await self.retry_with_exponential_backoff(
                     self.process_single_paper, paper, category
@@ -377,7 +328,7 @@ class ArxivBackgroundExplorer:
                     failed_count += 1
 
                 # Save progress after each paper
-                await self.save_crawl_progress(category, crawled_date, i + 1)
+                # await self.save_crawl_progress(category, crawled_date, i + 1)
 
                 # Wait between papers (except for the last one)
                 if i < len(papers) - 1:

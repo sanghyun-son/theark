@@ -79,3 +79,27 @@ class SummaryRepository(BaseRepository[Summary]):
             return True
 
         return False
+
+    def get_by_paper_ids_and_language(
+        self, paper_ids: list[int], language: str
+    ) -> dict[int, Summary]:
+        """Get summaries by multiple paper IDs and language (batch operation).
+
+        Args:
+            paper_ids: List of paper IDs
+            language: Summary language
+
+        Returns:
+            Dictionary mapping paper_id to Summary object
+        """
+        if not paper_ids:
+            return {}
+
+        statement = select(Summary).where(
+            (Summary.paper_id.in_(paper_ids)) & (Summary.language == language)
+        )
+        result = self.db.exec(statement)
+        summaries = list(result.all())
+
+        # Create dictionary mapping paper_id to summary
+        return {summary.paper_id: summary for summary in summaries}

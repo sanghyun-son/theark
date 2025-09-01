@@ -10,7 +10,6 @@ from sqlmodel import Session, select
 from core.extractors.concrete.arxiv_background_explorer import ArxivBackgroundExplorer
 from core.extractors.concrete.arxiv_source_explorer import ArxivSourceExplorer
 from core.models.domain.arxiv import ArxivPaper
-from core.models.rows import ArxivCrawlProgress
 
 
 @pytest.fixture
@@ -87,113 +86,6 @@ def test_parse_arxiv_categories_invalid_case(mock_arxiv_background_explorer) -> 
     """Test parsing invalid case raises ValueError."""
     with pytest.raises(ValueError, match="Invalid ArXiv category format: cs.ai"):
         mock_arxiv_background_explorer.parse_arxiv_categories("cs.AI,cs.ai,cs.LG")
-
-
-@pytest.mark.asyncio
-async def test_load_crawl_progress_no_existing(mock_arxiv_background_explorer) -> None:
-    """Test loading crawl progress when none exists."""
-    result_date, result_index = (
-        await mock_arxiv_background_explorer.load_crawl_progress("cs.AI", "2024-01-15")
-    )
-    assert result_date == "2024-01-15"
-    assert result_index == 0
-
-
-@pytest.mark.asyncio
-async def test_load_crawl_progress_existing_same_day(
-    mock_arxiv_background_explorer,
-) -> None:
-    """Test loading crawl progress for existing category on same day."""
-
-    # Create existing progress
-    with Session(mock_arxiv_background_explorer.engine) as session:
-        progress = ArxivCrawlProgress(
-            category="cs.AI",
-            last_crawled_date="2024-01-15",
-            last_crawled_index=25,
-            is_active=True,
-        )
-        session.add(progress)
-        session.commit()
-
-    result_date, result_index = (
-        await mock_arxiv_background_explorer.load_crawl_progress("cs.AI", "2024-01-15")
-    )
-    assert result_date == "2024-01-15"
-    assert result_index == 25
-
-
-@pytest.mark.asyncio
-async def test_load_crawl_progress_existing_different_day(
-    mock_arxiv_background_explorer,
-) -> None:
-    """Test loading crawl progress for existing category on different day."""
-
-    # Create existing progress for yesterday
-    with Session(mock_arxiv_background_explorer.engine) as session:
-        progress = ArxivCrawlProgress(
-            category="cs.AI",
-            last_crawled_date="2024-01-14",
-            last_crawled_index=30,
-            is_active=True,
-        )
-        session.add(progress)
-        session.commit()
-
-    result_date, result_index = (
-        await mock_arxiv_background_explorer.load_crawl_progress("cs.AI", "2024-01-15")
-    )
-    assert result_date == "2024-01-15"
-    assert result_index == 0
-
-
-@pytest.mark.asyncio
-async def test_save_crawl_progress_new(mock_arxiv_background_explorer) -> None:
-    """Test saving new crawl progress."""
-    await mock_arxiv_background_explorer.save_crawl_progress("cs.AI", "2024-01-15", 10)
-
-    from core.models.rows import ArxivCrawlProgress
-
-    with Session(mock_arxiv_background_explorer.engine) as session:
-        progress = session.exec(
-            select(ArxivCrawlProgress).where(ArxivCrawlProgress.category == "cs.AI")
-        ).first()
-
-    assert progress is not None
-    assert progress.category == "cs.AI"
-    assert progress.last_crawled_date == "2024-01-15"
-    assert progress.last_crawled_index == 10
-    assert progress.is_active is True
-
-
-@pytest.mark.asyncio
-async def test_save_crawl_progress_update_existing(
-    mock_arxiv_background_explorer,
-) -> None:
-    """Test updating existing crawl progress."""
-
-    # Create existing progress
-    with Session(mock_arxiv_background_explorer.engine) as session:
-        progress = ArxivCrawlProgress(
-            category="cs.AI",
-            last_crawled_date="2024-01-15",
-            last_crawled_index=5,
-            is_active=True,
-        )
-        session.add(progress)
-        session.commit()
-
-    # Update progress
-    await mock_arxiv_background_explorer.save_crawl_progress("cs.AI", "2024-01-15", 15)
-
-    with Session(mock_arxiv_background_explorer.engine) as session:
-        updated_progress = session.exec(
-            select(ArxivCrawlProgress).where(ArxivCrawlProgress.category == "cs.AI")
-        ).first()
-
-    assert updated_progress is not None
-    assert updated_progress.last_crawled_date == "2024-01-15"
-    assert updated_progress.last_crawled_index == 15
 
 
 @pytest.mark.asyncio

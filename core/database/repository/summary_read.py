@@ -61,3 +61,22 @@ class SummaryReadRepository(BaseRepository[SummaryRead]):
         statement = select(SummaryRead).where(SummaryRead.user_id == user_id)
         result = self.db.exec(statement)
         return list(result.all())
+
+    def get_read_summary_ids(self, user_id: int, summary_ids: list[int]) -> list[int]:
+        """Get list of summary IDs that are read by user (batch operation).
+
+        Args:
+            user_id: User ID
+            summary_ids: List of summary IDs to check
+
+        Returns:
+            List of summary IDs that are read by the user
+        """
+        if not summary_ids:
+            return []
+
+        statement = select(SummaryRead.summary_id).where(
+            (SummaryRead.user_id == user_id) & (SummaryRead.summary_id.in_(summary_ids))
+        )
+        result = self.db.exec(statement)
+        return list(result.all())
