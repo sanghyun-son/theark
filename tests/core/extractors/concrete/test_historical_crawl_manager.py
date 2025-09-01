@@ -15,18 +15,14 @@ from core.models.rows import CategoryDateProgress, CrawlExecutionState
 def historical_crawl_manager(mock_arxiv_source_explorer) -> HistoricalCrawlManager:
     """Create a HistoricalCrawlManager instance for testing with mock explorer."""
     categories = ["cs.AI", "cs.LG", "cs.CL"]
-    # Mock response 기준: 2025-01-01 (example_arxiv_response.xml의 published 날짜)
-    start_date = "2025-01-01"
     return HistoricalCrawlManager(
         categories=categories,
-        start_date=start_date,
     )
 
 
 def test_initialization(historical_crawl_manager: HistoricalCrawlManager) -> None:
     """Test HistoricalCrawlManager initialization."""
     assert historical_crawl_manager.categories == ["cs.AI", "cs.LG", "cs.CL"]
-    assert historical_crawl_manager.start_date == "2025-01-01"
     assert historical_crawl_manager.end_date == "2015-01-01"
     assert historical_crawl_manager.rate_limit_delay == 10
     assert historical_crawl_manager.batch_size == 100
@@ -118,15 +114,13 @@ def test_advance_to_next_date(historical_crawl_manager: HistoricalCrawlManager) 
 def test_initialization_with_explorer(mock_arxiv_source_explorer) -> None:
     """Test HistoricalCrawlManager initialization with explorer injection."""
     categories = ["cs.AI", "cs.LG"]
-    start_date = "2025-01-01"
 
     manager = HistoricalCrawlManager(
         categories=categories,
-        start_date=start_date,
     )
 
     assert manager.categories == ["cs.AI", "cs.LG"]
-    assert manager.start_date == "2025-01-01"
+    assert manager.end_date == "2015-01-01"
 
 
 @pytest.mark.asyncio

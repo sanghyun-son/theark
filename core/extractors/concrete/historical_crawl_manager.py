@@ -14,12 +14,9 @@ from core.log import get_logger
 from core.models.api.responses import CrawlCycleResult, CrawlExecutionStateResponse
 from core.models.rows import CategoryDateProgress, CrawlExecutionState
 from core.utils import (
-    format_date_range,
     get_current_timestamp,
-    get_default_start_date,
     get_previous_date,
     is_date_before_end,
-    is_date_before_start,
     parse_categories_string,
 )
 
@@ -32,7 +29,6 @@ class HistoricalCrawlManager:
     def __init__(
         self,
         categories: Sequence[str],
-        start_date: str | None = None,
         rate_limit_delay: float = 10.0,
         batch_size: int = 100,
     ) -> None:
@@ -40,13 +36,11 @@ class HistoricalCrawlManager:
 
         Args:
             categories: List of ArXiv categories to crawl (e.g., ['cs.AI', 'cs.LG'])
-            start_date: Start date in YYYY-MM-DD format (defaults to yesterday)
             rate_limit_delay: Delay between requests in seconds (default: 10.0)
             batch_size: Number of papers per request (default: 100)
         """
         self.categories = list(categories)
         self.categories_str = ",".join(categories)
-        self.start_date = start_date or get_default_start_date()
         self.end_date = "2015-01-01"  # Hard limit as specified
         self.rate_limit_delay = rate_limit_delay
         self.batch_size = batch_size
@@ -56,7 +50,7 @@ class HistoricalCrawlManager:
         logger.info(
             f"Historical crawl manager initialized with categories: {categories}"
         )
-        logger.info(format_date_range(self.start_date, self.end_date))
+        logger.info(f"Will crawl from yesterday back to {self.end_date}")
 
     def get_next_date_category(
         self, state: CrawlExecutionState
@@ -65,9 +59,7 @@ class HistoricalCrawlManager:
         # Always start from yesterday if current_date is not set or is in the past
         yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
 
-        if not state.current_date or is_date_before_start(
-            state.current_date, yesterday
-        ):
+        if not state.current_date or is_date_before_end(state.current_date, yesterday):
             logger.info(f"Starting from recent date: {yesterday}")
             state.current_date = yesterday
             state.current_category_index = 0
@@ -199,7 +191,7 @@ class HistoricalCrawlManager:
         if not state:
             # Create new state
             state = CrawlExecutionState(
-                current_date=self.start_date,
+                current_date=get_previous_date(datetime.now().strftime("%Y-%m-%d")),
                 current_category_index=0,
                 categories=self.categories_str,
                 is_active=True,
@@ -209,12 +201,14 @@ class HistoricalCrawlManager:
             db_session.add(state)
             db_session.commit()
             db_session.refresh(state)
-            logger.info(f"Created new crawl state starting from {self.start_date}")
+            logger.info(f"Created new crawl state starting from {state.current_date}")
         else:
             # Update existing state if needed
             if state.categories != self.categories_str:
                 state.categories = self.categories_str
-                state.current_date = self.start_date
+                state.current_date = get_previous_date(
+                    datetime.now().strftime("%Y-%m-%d")
+                )
                 state.current_category_index = 0
                 state.total_papers_found = 0
                 state.total_papers_stored = 0
@@ -364,7 +358,7 @@ class HistoricalCrawlManager:
 
         return CrawlExecutionStateResponse.from_crawl_state(
             crawl_state=state,
-            start_date=self.start_date,
+            start_date=get_previous_date(datetime.now().strftime("%Y-%m-%d")),
             end_date=self.end_date,
             completed_count=len(completed_count),
             failed_count=len(failed_count),

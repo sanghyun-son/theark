@@ -63,9 +63,8 @@ async def integration_client(
     # Setup historical crawl manager
     historical_crawl_manager = HistoricalCrawlManager(
         categories=["cs.AI", "cs.LG"],
-        start_date="2025-01-01",
         rate_limit_delay=0.1,
-        batch_size=5,
+        batch_size=10,
     )
     app.state.historical_crawl_manager = historical_crawl_manager
 
