@@ -1,5 +1,7 @@
 """Paper repository using SQLModel with dependency injection."""
 
+from typing import Any
+
 from sqlmodel import Session, desc, func, select
 
 from core.database.repository.base import BaseRepository
@@ -7,7 +9,7 @@ from core.database.repository.summary import SummaryRepository
 from core.database.repository.summary_read import SummaryReadRepository
 from core.database.repository.user import UserStarRepository
 from core.log import get_logger
-from core.models.api.responses import PaperOverviewData
+from core.models.api.responses import PaperListItemResponse
 from core.models.rows import Paper, Summary, SummaryRead, UserStar
 from core.types import PaperSummaryStatus
 
@@ -70,7 +72,7 @@ class PaperRepository(BaseRepository[Paper]):
         skip: int = 0,
         limit: int = 100,
         language: str | None = None,
-    ) -> list[PaperOverviewData]:
+    ) -> list[PaperListItemResponse]:
         """Get papers with overview only, optimized with batch queries to avoid N+1 queries.
 
         Args:
@@ -100,7 +102,8 @@ class PaperRepository(BaseRepository[Paper]):
             if language:
                 # Get summaries for specific language
                 summary_statement = select(Summary).where(
-                    (Summary.paper_id.in_(paper_ids)) & (Summary.language == language)
+                    (Summary.paper_id.in_(paper_ids))  # type: ignore
+                    & (Summary.language == language)
                 )
                 summary_results = self.db.exec(summary_statement).all()
                 summaries = {s.paper_id: s for s in summary_results}
@@ -108,7 +111,7 @@ class PaperRepository(BaseRepository[Paper]):
                 # If no summaries found and language is not English, try English fallback
                 if not summaries and language != "English":
                     fallback_statement = select(Summary).where(
-                        (Summary.paper_id.in_(paper_ids))
+                        (Summary.paper_id.in_(paper_ids))  # type: ignore
                         & (Summary.language == "English")
                     )
                     fallback_results = self.db.exec(fallback_statement).all()
@@ -116,7 +119,7 @@ class PaperRepository(BaseRepository[Paper]):
             else:
                 # Get all summaries
                 summary_statement = select(Summary).where(
-                    Summary.paper_id.in_(paper_ids)
+                    Summary.paper_id.in_(paper_ids)  # type: ignore
                 )
                 summary_results = self.db.exec(summary_statement).all()
                 summaries = {s.paper_id: s for s in summary_results}
@@ -130,7 +133,7 @@ class PaperRepository(BaseRepository[Paper]):
             has_summary = summary is not None
 
             paper_overview_data.append(
-                PaperOverviewData(
+                PaperListItemResponse.from_paper_with_overview(
                     paper=paper,
                     overview=overview,
                     has_summary=has_summary,
@@ -145,7 +148,7 @@ class PaperRepository(BaseRepository[Paper]):
         skip: int = 0,
         limit: int = 100,
         language: str | None = None,
-    ) -> list[PaperOverviewData]:
+    ) -> list[PaperListItemResponse]:
         """Get papers with summaries using SQL JOIN for maximum efficiency.
 
         This method uses SQLModel's JOIN functionality to fetch papers and summaries
@@ -157,13 +160,13 @@ class PaperRepository(BaseRepository[Paper]):
             language: Filter by summary language
 
         Returns:
-            List of PaperOverviewData with papers and their summaries
+            List of PaperListItemResponse with papers and their summaries
         """
         if language:
             # Use LEFT JOIN to get all papers and their summaries for specific language
             statement = (
                 select(Paper, Summary)
-                .outerjoin(Summary, Summary.paper_id == Paper.paper_id)
+                .join(Summary, isouter=True)
                 .where(Summary.language == language)
                 .order_by(desc(Paper.updated_at))
                 .offset(skip)
@@ -173,7 +176,7 @@ class PaperRepository(BaseRepository[Paper]):
             # Get all papers with their summaries (no language filter)
             statement = (
                 select(Paper, Summary)
-                .outerjoin(Summary, Summary.paper_id == Paper.paper_id)
+                .join(Summary, isouter=True)
                 .order_by(desc(Paper.updated_at))
                 .offset(skip)
                 .limit(limit)
@@ -182,55 +185,13 @@ class PaperRepository(BaseRepository[Paper]):
         result = self.db.exec(statement)
         rows = list(result.all())
 
-        # Process results - group by paper
-        paper_summaries = {}
+        # Process results using from_paper_summary_row
+        paper_responses = []
         for row in rows:
-            paper = row[0]  # Paper object
-            summary = row[1]  # Summary object (can be None for LEFT JOIN)
+            paper_response = PaperListItemResponse.from_paper_summary_row(row)
+            paper_responses.append(paper_response)
 
-            if paper.paper_id not in paper_summaries:
-                paper_summaries[paper.paper_id] = {"paper": paper, "summaries": []}
-
-            if summary:
-                paper_summaries[paper.paper_id]["summaries"].append(summary)
-
-        # Create PaperOverviewData objects
-        paper_overview_data = []
-        for paper_data in paper_summaries.values():
-            paper = paper_data["paper"]
-            summaries = paper_data["summaries"]
-
-            # Find the best summary (prefer specified language, fallback to English)
-            best_summary = None
-            if summaries:
-                if language:
-                    # Try to find summary in specified language
-                    best_summary = next(
-                        (s for s in summaries if s.language == language), None
-                    )
-                    # Fallback to English if not found
-                    if not best_summary and language != "English":
-                        best_summary = next(
-                            (s for s in summaries if s.language == "English"), None
-                        )
-                else:
-                    # No language filter, use the first summary
-                    best_summary = summaries[0]
-
-            overview = best_summary.overview if best_summary else None
-            relevance = best_summary.relevance if best_summary else None
-            has_summary = best_summary is not None
-
-            paper_overview_data.append(
-                PaperOverviewData(
-                    paper=paper,
-                    overview=overview,
-                    has_summary=has_summary,
-                    relevance=relevance,
-                )
-            )
-
-        return paper_overview_data
+        return paper_responses
 
     def get_papers_with_user_status_join(
         self,
@@ -238,7 +199,7 @@ class PaperRepository(BaseRepository[Paper]):
         skip: int = 0,
         limit: int = 100,
         language: str | None = None,
-    ) -> list[PaperOverviewData]:
+    ) -> list[PaperListItemResponse]:
         """Get papers with summaries and user status using multiple JOINs.
 
         This method uses multiple JOINs to fetch papers, summaries, and user status
@@ -251,23 +212,15 @@ class PaperRepository(BaseRepository[Paper]):
             language: Filter by summary language
 
         Returns:
-            List of PaperOverviewData with papers, summaries, and user status
+            List of PaperListItemResponse with papers, summaries, and user status
         """
         # Build the base query with multiple JOINs
         if language:
             statement = (
                 select(Paper, Summary, UserStar, SummaryRead)
-                .outerjoin(Summary, Summary.paper_id == Paper.paper_id)
-                .outerjoin(
-                    UserStar,
-                    (UserStar.paper_id == Paper.paper_id)
-                    & (UserStar.user_id == user_id),
-                )
-                .outerjoin(
-                    SummaryRead,
-                    (SummaryRead.summary_id == Summary.summary_id)
-                    & (SummaryRead.user_id == user_id),
-                )
+                .join(Summary, isouter=True)
+                .join(UserStar, isouter=True)
+                .join(SummaryRead, isouter=True)
                 .where(Summary.language == language)
                 .order_by(desc(Paper.updated_at))
                 .offset(skip)
@@ -276,17 +229,9 @@ class PaperRepository(BaseRepository[Paper]):
         else:
             statement = (
                 select(Paper, Summary, UserStar, SummaryRead)
-                .outerjoin(Summary, Summary.paper_id == Paper.paper_id)
-                .outerjoin(
-                    UserStar,
-                    (UserStar.paper_id == Paper.paper_id)
-                    & (UserStar.user_id == user_id),
-                )
-                .outerjoin(
-                    SummaryRead,
-                    (SummaryRead.summary_id == Summary.summary_id)
-                    & (SummaryRead.user_id == user_id),
-                )
+                .join(Summary, isouter=True)
+                .join(UserStar, isouter=True)
+                .join(SummaryRead, isouter=True)
                 .order_by(desc(Paper.updated_at))
                 .offset(skip)
                 .limit(limit)
@@ -295,62 +240,13 @@ class PaperRepository(BaseRepository[Paper]):
         result = self.db.exec(statement)
         rows = list(result.all())
 
-        # Process results - group by paper
-        paper_data = {}
+        # Process results using from_full_joined_row
+        paper_responses = []
         for row in rows:
-            paper = row[0]  # Paper object
-            summary = row[1]  # Summary object
-            user_star = row[2]  # UserStar object
-            summary_read = row[3]  # SummaryRead object
+            paper_response = PaperListItemResponse.from_full_joined_row(row)
+            paper_responses.append(paper_response)
 
-            if paper.paper_id not in paper_data:
-                paper_data[paper.paper_id] = {
-                    "paper": paper,
-                    "summaries": [],
-                    "is_starred": user_star is not None,
-                    "is_read": False,
-                }
-
-            if summary:
-                paper_data[paper.paper_id]["summaries"].append(summary)
-                # Update read status if any summary is read
-                if summary_read:
-                    paper_data[paper.paper_id]["is_read"] = True
-
-        # Create PaperOverviewData objects
-        paper_overview_data = []
-        for data in paper_data.values():
-            paper = data["paper"]
-            summaries = data["summaries"]
-
-            # Find the best summary
-            best_summary = None
-            if summaries:
-                if language:
-                    best_summary = next(
-                        (s for s in summaries if s.language == language), None
-                    )
-                    if not best_summary and language != "English":
-                        best_summary = next(
-                            (s for s in summaries if s.language == "English"), None
-                        )
-                else:
-                    best_summary = summaries[0]
-
-            overview = best_summary.overview if best_summary else None
-            relevance = best_summary.relevance if best_summary else None
-            has_summary = best_summary is not None
-
-            paper_overview_data.append(
-                PaperOverviewData(
-                    paper=paper,
-                    overview=overview,
-                    has_summary=has_summary,
-                    relevance=relevance,
-                )
-            )
-
-        return paper_overview_data
+        return paper_responses
 
     def get_papers_with_relationships(
         self,
@@ -358,7 +254,7 @@ class PaperRepository(BaseRepository[Paper]):
         limit: int = 100,
         language: str | None = None,
         user_id: int | None = None,
-    ) -> list[PaperOverviewData]:
+    ) -> list[PaperListItemResponse]:
         """Get papers with relationships using SQLModel's relationship attributes.
 
         This method leverages SQLModel's relationship attributes for efficient
@@ -371,7 +267,7 @@ class PaperRepository(BaseRepository[Paper]):
             user_id: User ID for filtering user-specific data
 
         Returns:
-            List of PaperOverviewData with papers and their relationships
+            List of PaperListItemResponse with papers and their relationships
         """
         # Build base query with relationships
         statement = (
@@ -415,7 +311,7 @@ class PaperRepository(BaseRepository[Paper]):
             has_summary = best_summary is not None
 
             paper_overview_data.append(
-                PaperOverviewData(
+                PaperListItemResponse.from_paper_with_overview(
                     paper=paper,
                     overview=overview,
                     has_summary=has_summary,
@@ -431,7 +327,7 @@ class PaperRepository(BaseRepository[Paper]):
         skip: int = 0,
         limit: int = 100,
         language: str | None = None,
-    ) -> list[PaperOverviewData]:
+    ) -> list[PaperListItemResponse]:
         """Get papers with user status using efficient batch queries.
 
         This method combines the best of both worlds: efficient batch queries
@@ -444,7 +340,7 @@ class PaperRepository(BaseRepository[Paper]):
             language: Filter by summary language
 
         Returns:
-            List of PaperOverviewData with papers, summaries, and user status
+            List of PaperListItemResponse with papers, summaries, and user status
         """
         # Get papers with summaries using batch optimization
         paper_overview_data = self.get_papers_with_overview_optimized(
@@ -455,9 +351,7 @@ class PaperRepository(BaseRepository[Paper]):
             return []
 
         # Get all paper IDs for batch user status queries
-        paper_ids = [
-            data.paper.paper_id for data in paper_overview_data if data.paper.paper_id
-        ]
+        paper_ids = [data.paper_id for data in paper_overview_data if data.paper_id]
 
         # Batch fetch all user status in parallel
         star_repo = UserStarRepository(self.db)
@@ -469,9 +363,9 @@ class PaperRepository(BaseRepository[Paper]):
 
         # Get summaries for papers that have them
         summary_paper_ids = [
-            data.paper.paper_id
+            data.paper_id
             for data in paper_overview_data
-            if data.paper.paper_id and data.has_summary
+            if data.paper_id and data.has_summary
         ]
 
         summaries = {}
@@ -490,7 +384,7 @@ class PaperRepository(BaseRepository[Paper]):
 
         # Update paper overview data with user status
         for overview_data in paper_overview_data:
-            paper_id = overview_data.paper.paper_id
+            paper_id = overview_data.paper_id
             if paper_id:
                 # Add user status to the overview data
                 overview_data.is_starred = paper_id in starred_paper_ids
@@ -511,7 +405,7 @@ class PaperRepository(BaseRepository[Paper]):
         skip: int = 0,
         limit: int = 100,
         language: str | None = None,
-    ) -> list[PaperOverviewData]:
+    ) -> list[PaperListItemResponse]:
         """Get papers with overview only, not full summaries.
 
         Args:
@@ -584,7 +478,7 @@ class PaperRepository(BaseRepository[Paper]):
         stmt = select(func.count()).select_from(Paper)
         return self.db.exec(stmt).one()
 
-    def create_from_arxiv_paper(self, arxiv_paper) -> Paper:
+    def create_from_arxiv_paper(self, arxiv_paper: Any) -> Paper:
         """Create a Paper from an ArxivPaper object.
 
         Args:

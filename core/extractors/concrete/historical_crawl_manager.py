@@ -1,13 +1,15 @@
 """Historical ArXiv crawling manager for backward crawling from yesterday."""
 
 import asyncio
+from collections.abc import Sequence
 from datetime import datetime, timedelta
-from typing import Any, Sequence
+from typing import Any
 
-from sqlmodel import Session, select
 from sqlalchemy.engine import Engine
+from sqlmodel import Session, select
 
-from core.extractors.concrete.arxiv_background_explorer import ArxivBackgroundExplorer
+from core.extractors.concrete.arxiv_crawl_manager import ArxivCrawlManager
+from core.extractors.concrete.arxiv_source_explorer import ArxivSourceExplorer
 from core.log import get_logger
 from core.models.rows import CategoryDateProgress, CrawlExecutionState
 from core.utils import get_current_timestamp
@@ -19,24 +21,26 @@ class HistoricalCrawlManager:
     """Manages historical ArXiv crawling from yesterday backwards."""
 
     def __init__(
-        self, categories: Sequence[str], start_date: str | None = None
+        self,
+        categories: Sequence[str],
+        explorer: ArxivSourceExplorer,
+        start_date: str | None = None,
     ) -> None:
         """Initialize the historical crawl manager.
 
         Args:
             categories: List of ArXiv categories to crawl (e.g., ['cs.AI', 'cs.LG'])
+            explorer: ArxivSourceExplorer instance (required for dependency injection)
             start_date: Start date in YYYY-MM-DD format (defaults to yesterday)
         """
         self.categories = list(categories)
+        self.explorer = explorer
         self.start_date = start_date or (datetime.now() - timedelta(days=1)).strftime(
             "%Y-%m-%d"
         )
         self.end_date = "2015-01-01"  # Hard limit as specified
         self.rate_limit_delay = 10  # 10 seconds between requests
         self.batch_size = 100  # Papers per request
-
-        # Initialize background explorer (engine will be passed to methods)
-        self.background_explorer = None
 
         logger.info(
             f"Historical crawl manager initialized with categories: {categories}"
@@ -51,7 +55,7 @@ class HistoricalCrawlManager:
         end_date = datetime.strptime(self.end_date, "%Y-%m-%d")
 
         # Check if we've reached the end date
-        if current_date < end_date:
+        if current_date <= end_date:
             return None
 
         category = state.categories[state.current_category_index]
@@ -110,29 +114,28 @@ class HistoricalCrawlManager:
         papers_stored = 0
 
         try:
-            # Create a temporary background explorer with the engine
-            temp_explorer = ArxivBackgroundExplorer(
-                engine=engine, categories=[category]
+            # Create crawl manager for this operation
+            crawl_manager = ArxivCrawlManager(
+                engine=engine,
+                categories=self.categories,
+                delay_seconds=2.0,
+                max_results_per_request=self.batch_size,
             )
 
-            # Use background explorer to crawl papers
-            papers = await temp_explorer.explore_papers_by_category_and_date(
-                category=category, date=date, start_index=0, limit=self.batch_size
+            # Use crawl manager to crawl and store papers with injected explorer
+            papers_found, papers_stored = await crawl_manager.crawl_and_store_papers(
+                explorer=self.explorer,
+                category=category,
+                date=date,
+                start_index=0,
+                limit=self.batch_size,
             )
 
-            papers_found = len(papers)
-            logger.info(f"Found {papers_found} papers for {category} on {date}")
+            logger.info(
+                f"Found {papers_found} papers, stored {papers_stored} papers for {category} on {date}"
+            )
 
-            # Store papers
-            for paper in papers:
-                try:
-                    stored_paper = await temp_explorer.store_paper_metadata(paper)
-                    if stored_paper:
-                        papers_stored += 1
-                except Exception as e:
-                    logger.warning(f"Failed to store paper {paper.arxiv_id}: {e}")
-
-            # Rate limiting
+            # Rate limiting is handled by the crawl manager
             await asyncio.sleep(self.rate_limit_delay)
 
         except Exception as e:
@@ -156,7 +159,7 @@ class HistoricalCrawlManager:
 
             # Check if we've reached the end date
             end_date = datetime.strptime(self.end_date, "%Y-%m-%d")
-            if previous_date < end_date:
+            if previous_date <= end_date:
                 logger.info(f"Reached end date {self.end_date}, crawling complete")
                 state.is_active = False
                 return False
@@ -216,17 +219,19 @@ class HistoricalCrawlManager:
             date, category = next_item
 
             # Check if this date-category is already completed
-            statement = select(CategoryDateProgress).where(
+            progress_statement = select(CategoryDateProgress).where(
                 CategoryDateProgress.category == category,
                 CategoryDateProgress.date == date,
                 CategoryDateProgress.is_completed,
             )
-            result = db_session.exec(statement)
-            if result.first():
+            progress_result = db_session.exec(progress_statement)
+            if progress_result.first():
                 logger.info(
                     f"Date-category {category}-{date} already completed, skipping"
                 )
                 self.advance_to_next(state)
+                db_session.add(state)
+                db_session.commit()
                 return
 
             # Crawl the date-category
@@ -301,7 +306,9 @@ class HistoricalCrawlManager:
             "is_active": state.is_active if state else False,
             "current_date": state.current_date if state else None,
             "current_category": (
-                state.categories[state.current_category_index] if state else None
+                state.categories[state.current_category_index]
+                if state and state.current_category_index < len(state.categories)
+                else None
             ),
             "categories": self.categories,
             "completed_date_categories": len(completed_count),

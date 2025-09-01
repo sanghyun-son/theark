@@ -26,8 +26,10 @@ from core.database.repository import (
 )
 from core.extractors.concrete.arxiv_extractor import ArxivExtractor
 from core.extractors.concrete.arxiv_source_explorer import ArxivSourceExplorer
+from core.extractors.concrete.arxiv_crawl_manager import ArxivCrawlManager
 from core.llm.openai_client import UnifiedOpenAIClient
 from core.models.rows import Paper, Summary, User
+from core.models.domain.arxiv import ArxivPaper
 from core.services.summarization_service import PaperSummarizationService
 from core.types import PaperSummaryStatus
 from tests.shared_test_data import ARXIV_RESPONSES, OPENAI_RESPONSES
@@ -490,6 +492,34 @@ def mock_background_manager() -> BackgroundBatchManager:
         batch_fetch_interval=600,
         batch_max_items=1000,
         language="English",
+    )
+
+
+@pytest.fixture
+def sample_arxiv_paper() -> ArxivPaper:
+    """Create a sample ArxivPaper for testing based on mock response."""
+    return ArxivPaper(
+        arxiv_id="2501.00961v3",
+        title="Uncovering Memorization Effect in the Presence of Spurious Correlations",
+        abstract="Machine learning models often rely on simple spurious features -- patterns in training data that correlate with targets but are not causally related to them, like image backgrounds in foreground classification. This reliance typically leads to imbalanced test performance across minority and majority groups.",
+        primary_category="cs.LG",
+        categories=["cs.LG", "cs.AI", "cs.CV", "eess.IV"],
+        authors=[
+            "Chenyu You",
+            "Haocheng Dai",
+            "Yifei Min",
+            "Jasjeet S. Sekhon",
+            "Sarang Joshi",
+            "James S. Duncan",
+        ],
+        url_abs="https://arxiv.org/abs/2501.00961v3",
+        url_pdf="https://arxiv.org/pdf/2501.00961v3",
+        published_date="2025-01-01T21:45:00Z",
+        updated_date="2025-01-01T21:45:00Z",
+        doi=None,
+        journal=None,
+        volume=None,
+        pages=None,
     )
 
 

@@ -3,7 +3,7 @@
 from pydantic import BaseModel, Field
 
 from core.log import get_logger
-from core.models.rows import Paper, PaperBase, Summary
+from core.models.rows import Paper, PaperBase, Summary, SummaryRead, UserStar
 
 logger = get_logger(__name__)
 
@@ -67,21 +67,72 @@ class PaperListItemResponse(PaperBase, table=False):
             **paper_data,
         )
 
+    @classmethod
+    def from_paper_summary_row(
+        cls,
+        row: tuple[Paper, Summary | None],
+    ) -> "PaperListItemResponse":
+        """Create PaperListItemResponse from paper-summary joined query row.
+
+        Args:
+            row: Tuple containing (Paper, Summary)
+
+        Returns:
+            PaperListItemResponse with data from joined row
+        """
+        paper, summary = row
+
+        # Extract data with type safety
+        overview = summary.overview if summary else None
+        relevance = summary.relevance if summary else None
+        has_summary = summary is not None
+
+        return cls.from_paper_with_overview(
+            paper=paper,
+            overview=overview,
+            has_summary=has_summary,
+            relevance=relevance,
+            is_starred=False,
+            is_read=False,
+        )
+
+    @classmethod
+    def from_full_joined_row(
+        cls,
+        row: tuple[Paper, Summary | None, UserStar | None, SummaryRead | None],
+    ) -> "PaperListItemResponse":
+        """Create PaperListItemResponse from full joined query row with user status.
+
+        Args:
+            row: Tuple containing (Paper, Summary, UserStar, SummaryRead)
+
+        Returns:
+            PaperListItemResponse with data from joined row including user status
+        """
+        paper, summary, user_star, summary_read = row
+
+        # Extract data with type safety
+        overview = summary.overview if summary else None
+        relevance = summary.relevance if summary else None
+        has_summary = summary is not None
+        is_starred = user_star is not None
+        is_read = summary_read is not None
+
+        return cls.from_paper_with_overview(
+            paper=paper,
+            overview=overview,
+            has_summary=has_summary,
+            relevance=relevance,
+            is_starred=is_starred,
+            is_read=is_read,
+        )
+
 
 class SummaryDetailResponse(BaseModel):
     """Response model for full summary details."""
 
     summary: Summary
     is_read: bool = False
-
-
-class PaperOverviewData(BaseModel):
-    """Model for paper overview data returned by repository."""
-
-    paper: Paper
-    overview: str | None = None
-    has_summary: bool = False
-    relevance: int | None = None
 
 
 class PaperListResponse(BaseModel):

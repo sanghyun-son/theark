@@ -241,7 +241,8 @@ class UserStarRepository(BaseRepository[UserStar]):
             return []
 
         statement = select(UserStar.paper_id).where(
-            (UserStar.user_id == user_id) & (UserStar.paper_id.in_(paper_ids))
+            (UserStar.user_id == user_id)
+            & (UserStar.paper_id.in_(paper_ids))  # type: ignore
         )
         result = self.db.exec(statement)
         return list(result.all())

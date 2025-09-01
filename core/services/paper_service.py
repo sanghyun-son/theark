@@ -21,7 +21,6 @@ from core.models import (
     SummaryReadResponse,
 )
 from core.models.api.responses import (
-    PaperListItemResponse,
     PaperListLightweightResponse,
     PaperListResponse,
     SummaryDetailResponse,
@@ -258,22 +257,14 @@ class PaperService:
             # Create responses with user status
             paper_responses = []
             for overview_data in paper_overview_data:
-                paper_response = PaperListItemResponse.from_paper_with_overview(
-                    paper=overview_data.paper,
-                    overview=overview_data.overview,
-                    has_summary=overview_data.has_summary,
-                    relevance=overview_data.relevance,
-                    is_starred=False,  # Will be handled by separate batch query
-                    is_read=False,  # Will be handled by separate batch query
-                )
-                paper_responses.append(paper_response)
+                overview_data.is_starred = False
+                overview_data.is_read = False
+                paper_responses.append(overview_data)
 
             # Batch fetch user status for better performance
             if paper_responses:
                 paper_ids = [
-                    data.paper.paper_id
-                    for data in paper_overview_data
-                    if data.paper.paper_id
+                    data.paper_id for data in paper_overview_data if data.paper_id
                 ]
 
                 # Batch fetch star status
@@ -287,9 +278,9 @@ class PaperService:
                 summary_repo = SummaryRepository(db_session)
 
                 summary_paper_ids = [
-                    data.paper.paper_id
+                    data.paper_id
                     for data in paper_overview_data
-                    if data.paper.paper_id and data.has_summary
+                    if data.paper_id and data.has_summary
                 ]
 
                 summaries = {}
@@ -307,7 +298,7 @@ class PaperService:
 
                 # Update user status
                 for i, overview_data in enumerate(paper_overview_data):
-                    paper_id = overview_data.paper.paper_id
+                    paper_id = overview_data.paper_id
                     is_starred = paper_id in starred_paper_ids if paper_id else False
 
                     is_read = False
@@ -327,15 +318,10 @@ class PaperService:
             # Create responses without user-specific data
             paper_responses = []
             for overview_data in paper_overview_data:
-                paper_response = PaperListItemResponse.from_paper_with_overview(
-                    paper=overview_data.paper,
-                    overview=overview_data.overview,
-                    has_summary=overview_data.has_summary,
-                    relevance=overview_data.relevance,
-                    is_starred=False,
-                    is_read=False,
-                )
-                paper_responses.append(paper_response)
+                # overview_data is already a PaperListItemResponse, just set user status
+                overview_data.is_starred = False
+                overview_data.is_read = False
+                paper_responses.append(overview_data)
 
         # Get total count for pagination
         total_count = paper_repo.get_total_count()

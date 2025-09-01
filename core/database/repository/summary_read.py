@@ -76,7 +76,8 @@ class SummaryReadRepository(BaseRepository[SummaryRead]):
             return []
 
         statement = select(SummaryRead.summary_id).where(
-            (SummaryRead.user_id == user_id) & (SummaryRead.summary_id.in_(summary_ids))
+            (SummaryRead.user_id == user_id)
+            & (SummaryRead.summary_id.in_(summary_ids))  # type: ignore
         )
         result = self.db.exec(statement)
         return list(result.all())

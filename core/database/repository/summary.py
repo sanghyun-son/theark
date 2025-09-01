@@ -96,10 +96,15 @@ class SummaryRepository(BaseRepository[Summary]):
             return {}
 
         statement = select(Summary).where(
-            (Summary.paper_id.in_(paper_ids)) & (Summary.language == language)
+            (Summary.paper_id.in_(paper_ids))  # type: ignore
+            & (Summary.language == language)
         )
         result = self.db.exec(statement)
         summaries = list(result.all())
 
         # Create dictionary mapping paper_id to summary
-        return {summary.paper_id: summary for summary in summaries}
+        return {
+            summary.paper_id: summary
+            for summary in summaries
+            if summary.paper_id is not None
+        }

@@ -4,7 +4,8 @@ import asyncio
 from datetime import datetime, timedelta
 from typing import Sequence
 
-from core.explorers.historical_crawl_manager import HistoricalCrawlManager
+from core.extractors.concrete.historical_crawl_manager import HistoricalCrawlManager
+from core.extractors.concrete.arxiv_source_explorer import ArxivSourceExplorer
 from core.database.engine import create_database_engine, create_database_tables
 from core.types import Environment
 from sqlalchemy.engine import Engine
@@ -22,19 +23,24 @@ async def main() -> None:
     # Define categories to crawl
     categories: Sequence[str] = ["cs.AI", "cs.LG", "cs.CL"]
 
-    # Start from yesterday
-    yesterday: str = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
+    # Start from a recent date with known papers
+    start_date: str = "2025-01-01"  # Mock response 기준 날짜
 
     print(f"📊 Categories: {categories}")
-    print(f"📅 Start date: {yesterday}")
+    print(f"📅 Start date: {start_date}")
     print(f"🎯 End date: 2015-01-01")
     print(f"⏱️  Rate limit: 10 seconds between requests")
     print(f"📦 Batch size: 100 papers per request")
     print()
 
+    # Create ArXiv source explorer
+    source_explorer = ArxivSourceExplorer(
+        delay_seconds=1.0, max_results_per_request=100  # 더 빠르게
+    )
+
     # Create historical crawl manager
     crawl_manager: HistoricalCrawlManager = HistoricalCrawlManager(
-        categories=categories, start_date=yesterday
+        categories=categories, explorer=source_explorer, start_date=start_date
     )
 
     # Run a few cycles to demonstrate
