@@ -26,10 +26,9 @@ from core.database.repository import (
 )
 from core.extractors.concrete.arxiv_extractor import ArxivExtractor
 from core.extractors.concrete.arxiv_source_explorer import ArxivSourceExplorer
-from core.extractors.concrete.arxiv_crawl_manager import ArxivCrawlManager
 from core.llm.openai_client import UnifiedOpenAIClient
-from core.models.rows import Paper, Summary, User
 from core.models.domain.arxiv import ArxivPaper
+from core.models.rows import Paper, Summary, User
 from core.services.summarization_service import PaperSummarizationService
 from core.types import PaperSummaryStatus
 from tests.shared_test_data import ARXIV_RESPONSES, OPENAI_RESPONSES
@@ -246,7 +245,7 @@ def mock_arxiv_server(httpserver: HTTPServer) -> HTTPServer:
         if "cat:cs.AI" in search_query and "submittedDate:" in search_query:
             # Return the example XML response for any cs.AI category search
             example_path = Path("tests", "assets", "example_arxiv_response.xml")
-            with open(example_path, "r", encoding="utf-8") as f:
+            with open(example_path, encoding="utf-8") as f:
                 response_data = f.read()
             return Response(
                 response_data,

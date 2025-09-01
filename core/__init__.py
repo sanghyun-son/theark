@@ -9,7 +9,6 @@ from .log import (
 )
 from .services import (
     PaperService,
-    PaperSummarizationService,
     StarService,
     StreamService,
 )
@@ -24,7 +23,6 @@ __all__ = [
     "setup_production_logging",
     "setup_test_logging",
     "PaperService",
-    "PaperSummarizationService",
     "StarService",
     "StreamService",
 ]

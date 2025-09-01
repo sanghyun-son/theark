@@ -58,6 +58,30 @@ class Settings(BaseModel):
     arxiv_api_base_url: str = Field(
         default="https://export.arxiv.org/api/query", description="ArXiv API full URL"
     )
+    arxiv_delay_seconds: float = Field(
+        default=2.0, description="Delay between ArXiv API requests in seconds"
+    )
+    arxiv_max_results_per_request: int = Field(
+        default=100, description="Maximum results per ArXiv API request"
+    )
+
+    # Historical Crawl Settings
+    historical_crawl_enabled: bool = Field(
+        default=False, description="Whether historical crawling is enabled"
+    )
+    historical_crawl_categories: list[str] = Field(
+        default=["cs.AI", "cs.LG", "cs.CL"],
+        description="Default categories for historical crawling",
+    )
+    historical_crawl_start_date: str | None = Field(
+        default=None, description="Start date for historical crawling (YYYY-MM-DD)"
+    )
+    historical_crawl_rate_limit_delay: float = Field(
+        default=10.0, description="Delay between historical crawl requests in seconds"
+    )
+    historical_crawl_batch_size: int = Field(
+        default=100, description="Number of papers per historical crawl request"
+    )
 
     # LLM Settings
     llm_model: str = Field(

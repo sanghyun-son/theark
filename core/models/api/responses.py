@@ -3,7 +3,15 @@
 from pydantic import BaseModel, Field
 
 from core.log import get_logger
-from core.models.rows import Paper, PaperBase, Summary, SummaryRead, UserStar
+from core.models.rows import (
+    CategoryDateProgress,
+    CrawlExecutionState,
+    Paper,
+    PaperBase,
+    Summary,
+    SummaryRead,
+    UserStar,
+)
 
 logger = get_logger(__name__)
 
@@ -216,3 +224,123 @@ class AuthError(BaseModel):
     detail: str = Field(..., description="Error detail")
     error: str = Field(..., description="Error type")
     environment: str = Field(..., description="Environment")
+
+
+# Crawling response models
+class CrawlCycleResult(BaseModel):
+    """Result of a single crawl cycle."""
+
+    papers_found: int = Field(description="Number of papers found")
+    papers_stored: int = Field(description="Number of papers stored")
+    category: str = Field(description="Category that was crawled")
+    date: str = Field(description="Date that was crawled")
+
+
+class CrawlExecutionStateResponse(BaseModel):
+    """Response model for crawl execution state with additional fields."""
+
+    # Core state fields
+    state_id: int | None = Field(description="Unique state identifier")
+    current_date: str = Field(description="Current crawling date (YYYY-MM-DD)")
+    current_category_index: int = Field(
+        description="Current category index being processed"
+    )
+    categories: str = Field(description="Comma-separated list of categories to crawl")
+    is_active: bool = Field(description="Whether crawling is active")
+    total_papers_found: int = Field(
+        description="Total papers found across all categories"
+    )
+    total_papers_stored: int = Field(description="Total papers successfully stored")
+    created_at: str | None = Field(description="When the state was created")
+    updated_at: str | None = Field(description="When the state was last updated")
+    last_activity_at: str | None = Field(description="When the state was last active")
+
+    # Additional response fields
+    start_date: str = Field(description="Start date for crawling")
+    end_date: str = Field(description="End date for crawling")
+    completed_date_categories: int = Field(
+        description="Number of completed date-category combinations"
+    )
+    failed_date_categories: int = Field(
+        description="Number of failed date-category combinations"
+    )
+
+    @classmethod
+    def from_crawl_state(
+        cls,
+        crawl_state: CrawlExecutionState | None,
+        start_date: str,
+        end_date: str,
+        completed_count: int,
+        failed_count: int,
+    ) -> "CrawlExecutionStateResponse":
+        """Create response from crawl state with additional information."""
+        if crawl_state is None:
+            # Return default state if no crawl state exists
+            return cls(
+                state_id=None,
+                current_date=start_date,
+                current_category_index=0,
+                categories="",
+                is_active=False,
+                total_papers_found=0,
+                total_papers_stored=0,
+                created_at=None,
+                updated_at=None,
+                last_activity_at=None,
+                start_date=start_date,
+                end_date=end_date,
+                completed_date_categories=completed_count,
+                failed_date_categories=failed_count,
+            )
+
+        return cls(
+            state_id=crawl_state.state_id,
+            current_date=crawl_state.current_date,
+            current_category_index=crawl_state.current_category_index,
+            categories=crawl_state.categories,
+            is_active=crawl_state.is_active,
+            total_papers_found=crawl_state.total_papers_found,
+            total_papers_stored=crawl_state.total_papers_stored,
+            created_at=crawl_state.created_at,
+            updated_at=crawl_state.updated_at,
+            last_activity_at=crawl_state.last_activity_at,
+            start_date=start_date,
+            end_date=end_date,
+            completed_date_categories=completed_count,
+            failed_date_categories=failed_count,
+        )
+
+
+class CategoryDateProgressResponse(CategoryDateProgress, table=False):
+    """Response model for category-date progress with additional computed fields."""
+
+    # Additional computed fields can be added here if needed
+    pass
+
+
+class CrawlerResponse(BaseModel):
+    """Response model for crawler operations."""
+
+    status: str
+    message: str
+    was_already_running: bool = False
+
+
+class CrawlerStatusResponse(BaseModel):
+    """Response model for crawler status."""
+
+    is_running: bool
+    is_active: bool
+    current_date: str
+    current_category_index: int
+    categories: str
+
+
+class CrawlerProgressResponse(BaseModel):
+    """Response model for crawler progress."""
+
+    total_papers_found: int
+    total_papers_stored: int
+    completed_date_categories: int
+    failed_date_categories: int

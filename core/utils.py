@@ -2,7 +2,7 @@
 
 import json
 import xml.etree.ElementTree as ElementTree
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from core import get_logger
@@ -13,24 +13,6 @@ logger = get_logger(__name__)
 def get_current_timestamp() -> str:
     """Get current timestamp in ISO8601 format."""
     return datetime.now(UTC).isoformat()
-
-
-def parse_iso_date(date_string: str | None) -> datetime | None:
-    """Parse ISO date string to datetime object.
-
-    Args:
-        date_string: ISO format date string or None
-
-    Returns:
-        Parsed datetime object or None if parsing fails or input is None
-    """
-    if not date_string:
-        return None
-
-    try:
-        return datetime.fromisoformat(date_string.replace("Z", "+00:00"))
-    except ValueError:
-        return None
 
 
 def parse_datetime(date_str: str | None) -> datetime | None:
@@ -169,3 +151,84 @@ def extract_xml_date(
             logger.warning(f"Could not parse date: {date_text}")
             return ""
     return ""
+
+
+# Crawling utility functions
+def parse_categories_string(categories_str: str) -> list[str]:
+    """Parse comma-separated categories string into list.
+
+    Args:
+        categories_str: Comma-separated categories string
+
+    Returns:
+        List of category strings
+    """
+    if not categories_str:
+        return []
+    return [cat.strip() for cat in categories_str.split(",") if cat.strip()]
+
+
+def format_date_range(start_date: str, end_date: str) -> str:
+    """Format date range for logging.
+
+    Args:
+        start_date: Start date in YYYY-MM-DD format
+        end_date: End date in YYYY-MM-DD format
+
+    Returns:
+        Formatted date range string
+    """
+    return f"Start date: {start_date}, End date: {end_date}"
+
+
+def get_default_start_date() -> str:
+    """Get default start date (yesterday).
+
+    Returns:
+        Yesterday's date in YYYY-MM-DD format
+    """
+    return (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
+
+
+def is_date_before_end(current_date: str, end_date: str) -> bool:
+    """Check if current date is before or equal to end date.
+
+    Args:
+        current_date: Current date in YYYY-MM-DD format
+        end_date: End date in YYYY-MM-DD format
+
+    Returns:
+        True if current date is before or equal to end date
+    """
+    current = datetime.strptime(current_date, "%Y-%m-%d")
+    end = datetime.strptime(end_date, "%Y-%m-%d")
+    return current <= end
+
+
+def get_previous_date(current_date: str) -> str:
+    """Get previous date.
+
+    Args:
+        current_date: Current date in YYYY-MM-DD format
+
+    Returns:
+        Previous date in YYYY-MM-DD format
+    """
+    current = datetime.strptime(current_date, "%Y-%m-%d")
+    previous = current - timedelta(days=1)
+    return previous.strftime("%Y-%m-%d")
+
+
+def is_date_before_start(current_date: str, start_date: str) -> bool:
+    """Check if current date is before start date (exclusive).
+
+    Args:
+        current_date: Current date in YYYY-MM-DD format
+        start_date: Start date in YYYY-MM-DD format
+
+    Returns:
+        True if current date is before start date
+    """
+    current = datetime.strptime(current_date, "%Y-%m-%d")
+    start = datetime.strptime(start_date, "%Y-%m-%d")
+    return current < start

@@ -16,9 +16,11 @@ from core.database.repository import (
     UserRepository,
     UserStarRepository,
 )
+from core.extractors.concrete.arxiv_source_explorer import ArxivSourceExplorer
 from core.llm.openai_client import UnifiedOpenAIClient
 from core.log import get_logger
 from core.models.rows import User
+from core.services.crawl_service import CrawlService
 
 logger = get_logger(__name__)
 
@@ -116,3 +118,16 @@ def get_summary_generator(request: Request) -> UnifiedOpenAIClient:
     """Get summary generator client."""
     client: UnifiedOpenAIClient = request.app.state.summary_client
     return client
+
+
+# Crawler dependencies
+def get_crawl_service(request: Request) -> CrawlService:
+    """Get crawl service from app state."""
+    service: CrawlService = request.app.state.crawl_service
+    return service
+
+
+def get_arxiv_explorer(request: Request) -> ArxivSourceExplorer:
+    """Get ArXiv explorer from app state."""
+    explorer: ArxivSourceExplorer = request.app.state.arxiv_explorer
+    return explorer

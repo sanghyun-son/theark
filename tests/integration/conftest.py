@@ -13,8 +13,11 @@ from core.batch.background_manager import BackgroundBatchManager
 from core.config import load_settings
 from core.database.engine import create_database_tables
 from core.extractors import extractor_factory
+from core.extractors.concrete.arxiv_source_explorer import ArxivSourceExplorer
+from core.extractors.concrete.historical_crawl_manager import HistoricalCrawlManager
 from core.llm.openai_client import UnifiedOpenAIClient
 from core.log import get_logger
+from core.services.crawl_service import CrawlService
 from core.services.summarization_service import PaperSummarizationService
 
 logger = get_logger(__name__)
@@ -48,5 +51,26 @@ async def integration_client(
         "arxiv",
         mock_arxiv_extractor,
     )
+
+    # Setup ArXiv source explorer with mock server
+    arxiv_explorer = ArxivSourceExplorer(
+        api_base_url=mock_arxiv_extractor.base_url,
+        delay_seconds=0.1,
+        max_results_per_request=10,
+    )
+    app.state.arxiv_explorer = arxiv_explorer
+
+    # Setup historical crawl manager
+    historical_crawl_manager = HistoricalCrawlManager(
+        categories=["cs.AI", "cs.LG"],
+        start_date="2025-01-01",
+        rate_limit_delay=0.1,
+        batch_size=5,
+    )
+    app.state.historical_crawl_manager = historical_crawl_manager
+
+    # Setup CrawlService
+    crawl_service = CrawlService(historical_crawl_manager)
+    app.state.crawl_service = crawl_service
 
     yield TestClient(app)

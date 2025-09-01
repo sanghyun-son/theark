@@ -12,6 +12,7 @@ from api.routers import (
     batch_router,
     common_router,
     config_router,
+    crawler_router,
     main_router,
     papers_router,
 )
@@ -48,6 +49,45 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     # Setup extractors
     extractor_factory.register_extractor("arxiv", ArxivExtractor())
+
+    # Setup ArXiv source explorer
+    from core.extractors.concrete.arxiv_source_explorer import ArxivSourceExplorer
+
+    arxiv_explorer = ArxivSourceExplorer(
+        api_base_url=settings.arxiv_api_base_url,
+        delay_seconds=settings.arxiv_delay_seconds,
+        max_results_per_request=settings.arxiv_max_results_per_request,
+    )
+    app.state.arxiv_explorer = arxiv_explorer
+
+    # Setup historical crawl manager (if enabled)
+    if settings.historical_crawl_enabled:
+        from core.extractors.concrete.historical_crawl_manager import (
+            HistoricalCrawlManager,
+        )
+
+        historical_crawl_manager = HistoricalCrawlManager(
+            categories=settings.historical_crawl_categories,
+            start_date=settings.historical_crawl_start_date,
+            rate_limit_delay=settings.historical_crawl_rate_limit_delay,
+            batch_size=settings.historical_crawl_batch_size,
+        )
+        app.state.historical_crawl_manager = historical_crawl_manager
+
+        # Start the historical crawl manager with the explorer and engine
+        try:
+            await historical_crawl_manager.start(arxiv_explorer, engine)
+            logger.info("Historical crawl manager started")
+        except Exception as e:
+            logger.error(f"Failed to start historical crawl manager: {e}")
+    else:
+        logger.info("Historical crawl manager disabled")
+
+    # Setup CrawlService for API endpoints
+    from core.services.crawl_service import CrawlService
+
+    crawl_service = CrawlService(historical_crawl_manager)
+    app.state.crawl_service = crawl_service
 
     fake_key = "*"
     openai_api_key = os.getenv("OPENAI_API_KEY", fake_key)
@@ -95,6 +135,13 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         except Exception as e:
             logger.error(f"Error stopping background batch manager: {e}")
 
+    # Stop historical crawl manager
+    if hasattr(app.state, "historical_crawl_manager"):
+        try:
+            await app.state.historical_crawl_manager.stop()
+        except Exception as e:
+            logger.error(f"Error stopping historical crawl manager: {e}")
+
     logger.info("TheArk API server shutting down")
 
 
@@ -123,6 +170,7 @@ def create_app() -> FastAPI:
     app.include_router(config_router)
     app.include_router(papers_router)
     app.include_router(batch_router)
+    app.include_router(crawler_router)
     return app
 
 

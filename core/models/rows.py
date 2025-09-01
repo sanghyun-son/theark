@@ -296,10 +296,9 @@ class CrawlExecutionState(SQLModel, table=True):
     current_category_index: int = Field(
         default=0, description="Current category index being processed"
     )
-    categories: list[str] = Field(
-        default_factory=list,
-        sa_column=Column(JSON),
-        description="List of categories to crawl",
+    categories: str = Field(
+        default="",
+        description="Comma-separated list of categories to crawl",
     )
     is_active: bool = Field(default=True, description="Whether crawling is active")
     total_papers_found: int = Field(
