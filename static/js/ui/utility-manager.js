@@ -1,6 +1,6 @@
 // Utility functions module for TheArk
 
-class UtilityManager {
+export class UtilityManager {
     constructor() {
         // Bind methods to maintain context
         this.showSuccess = this.showSuccess.bind(this);
@@ -67,5 +67,3 @@ class UtilityManager {
     }
 }
 
-// Export for use in other modules
-window.UtilityManager = UtilityManager;

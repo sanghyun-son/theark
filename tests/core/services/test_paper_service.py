@@ -1,13 +1,21 @@
-"""Tests for PaperService star functionality."""
+"""Tests for PaperService."""
+
 
 import pytest
-from unittest.mock import Mock
+from sqlmodel import Session
 
+from core.database.repository import (
+    PaperRepository,
+)
+from core.extractors import extractor_factory
+from core.extractors.concrete import ArxivExtractor
+from core.llm.openai_client import UnifiedOpenAIClient
+from core.models import PaperCreateRequest
+from core.models.api.responses import (
+    PaperResponse,
+)
+from core.models.rows import Paper
 from core.services.paper_service import PaperService
-from core.models.database.entities import PaperEntity, UserEntity
-from core.models.domain.user import User
-from core.models.api.responses import StarResponse, StarredPapersResponse
-from core.database.repository import PaperRepository, UserRepository
 
 
 @pytest.fixture
@@ -16,204 +24,188 @@ def paper_service() -> PaperService:
     return PaperService()
 
 
-@pytest.fixture
-def sample_paper() -> PaperEntity:
-    """Create sample paper entity."""
-    return PaperEntity(
-        paper_id=1,
-        arxiv_id="2101.00001",
-        latest_version=1,
-        title="Test Paper",
-        abstract="Test abstract",
-        primary_category="cs.CL",
-        categories="cs.CL, cs.AI",
-        authors="John Doe, Jane Smith",
-        url_abs="https://arxiv.org/abs/2101.00001",
-        url_pdf="https://arxiv.org/pdf/2101.00001",
-        published_at="2021-01-01",
-        updated_at="2021-01-01",
-    )
+# =============================================================================
+# Paper Creation Tests
+# =============================================================================
 
 
-@pytest.fixture
-def sample_user() -> User:
-    """Create sample user from domain model."""
-    return User(
-        user_id=1,
-        email="default@theark.local",
-        display_name="Default User",
-    )
+def test_extract_arxiv_id_from_request(paper_service: PaperService):
+    """Test extracting arXiv ID from request."""
+    extractor_factory.register_extractor("arxiv", ArxivExtractor())
+
+    paper_data = PaperCreateRequest(url="https://arxiv.org/abs/2508.01234")
+    arxiv_id = paper_service._extract_arxiv_id(paper_data)
+    assert arxiv_id == "2508.01234"
+
+
+def test_extract_arxiv_id_error_no_identifier(paper_service: PaperService):
+    """Test error when no identifier is provided."""
+    # Create a PaperCreate with empty URL to test the error case
+    paper_data = PaperCreateRequest(url="")
+    with pytest.raises(ValueError, match="No URL provided"):
+        paper_service._extract_arxiv_id(paper_data)
 
 
 @pytest.mark.asyncio
-async def test_add_star_success(
+async def test_create_paper_new_paper(
     paper_service: PaperService,
-    sample_paper: PaperEntity,
-    sample_user: User,
-    mock_db_manager,
+    mock_db_session: Session,
+    paper_repo: PaperRepository,
+    mock_arxiv_extractor: ArxivExtractor,
+    mock_openai_client: UnifiedOpenAIClient,
 ) -> None:
-    """Test successful star addition."""
-    # Save user to database first
-    user_repo = UserRepository(mock_db_manager)
-    user_entity = UserEntity(
-        user_id=sample_user.user_id,
-        email=sample_user.email,
-        display_name=sample_user.display_name,
-    )
-    user_id = await user_repo.create_user(user_entity)
+    """Test creating a new paper."""
+    # Setup extractor for test
+    extractor_factory.register_extractor("arxiv", mock_arxiv_extractor)
 
-    # Save paper to database
-    paper_repo = PaperRepository(mock_db_manager)
-    paper_id = await paper_repo.create(sample_paper)
-    sample_paper.paper_id = paper_id
+    paper_data = PaperCreateRequest(
+        url="https://arxiv.org/abs/1706.03762"
+    )  # Use predefined paper ID
 
-    # Test
-    result = await paper_service.add_star(
-        paper_id, mock_db_manager, sample_user, note="Interesting paper"
+    # Act
+    result = await paper_service.create_paper(
+        paper_data, paper_repo, mock_openai_client
     )
 
-    # Assertions
-    assert isinstance(result, StarResponse)
-    assert result.success is True
-    assert result.paper_id == paper_id
-    assert result.is_starred is True
-    assert result.note == "Interesting paper"
-    assert "starred successfully" in result.message
+    # Assert
+    assert isinstance(result, PaperResponse)
+    assert result.arxiv_id == "1706.03762"
+    assert result.title == "Attention Is All You Need"  # Expected title from mock data
+
+    # Verify paper was saved to database
+    saved_paper = paper_repo.get_by_arxiv_id("1706.03762")
+    assert saved_paper is not None
+    assert saved_paper.arxiv_id == "1706.03762"
 
 
 @pytest.mark.asyncio
-async def test_add_star_paper_not_found(
+async def test_create_paper_existing_paper(
     paper_service: PaperService,
-    sample_user: User,
-    mock_db_manager,
+    saved_paper: Paper,
+    mock_db_session: Session,
+    mock_arxiv_extractor: ArxivExtractor,
+    mock_openai_client: UnifiedOpenAIClient,
 ) -> None:
-    """Test star addition with non-existent paper."""
-    with pytest.raises(ValueError, match="Paper 999 not found"):
-        await paper_service.add_star(999, mock_db_manager, sample_user)
+    """Test creating paper when it already exists."""
+    extractor_factory.register_extractor("arxiv", mock_arxiv_extractor)
+
+    paper_data = PaperCreateRequest(url=f"https://arxiv.org/abs/{saved_paper.arxiv_id}")
+
+    # Create paper repository from session
+    paper_repo = PaperRepository(mock_db_session)
+
+    result = await paper_service.create_paper(
+        paper_data, paper_repo, mock_openai_client
+    )
+
+    assert isinstance(result, PaperResponse)
+    assert result.arxiv_id == saved_paper.arxiv_id
+    assert result.paper_id == saved_paper.paper_id
+
+
+# =============================================================================
+# Paper Retrieval Tests
+# =============================================================================
 
 
 @pytest.mark.asyncio
-async def test_remove_star_success(
+async def test_get_paper_by_identifier_arxiv_id(
     paper_service: PaperService,
-    sample_paper: PaperEntity,
-    sample_user: User,
-    mock_db_manager,
+    saved_paper: Paper,
+    mock_db_session: Session,
 ) -> None:
-    """Test successful star removal."""
-    # Save user to database first
-    user_repo = UserRepository(mock_db_manager)
-    user_entity = UserEntity(
-        user_id=sample_user.user_id,
-        email=sample_user.email,
-        display_name=sample_user.display_name,
+    """Test getting paper by arXiv ID."""
+    result = await paper_service.get_paper(saved_paper.arxiv_id, mock_db_session)
+
+    assert result is not None
+    assert result.arxiv_id == saved_paper.arxiv_id
+    assert result.paper_id == saved_paper.paper_id
+
+
+@pytest.mark.asyncio
+async def test_get_paper_by_identifier_paper_id(
+    paper_service: PaperService,
+    saved_paper: Paper,
+    mock_db_session: Session,
+) -> None:
+    """Test getting paper by paper ID."""
+    # Act
+    result = await paper_service.get_paper(str(saved_paper.paper_id), mock_db_session)
+
+    # Assert
+    assert result is not None
+    assert result.paper_id == saved_paper.paper_id
+    assert result.arxiv_id == saved_paper.arxiv_id
+
+
+@pytest.mark.asyncio
+async def test_get_paper_by_identifier_not_found(
+    paper_service: PaperService,
+    mock_db_session: Session,
+) -> None:
+    """Test getting paper by identifier when not found."""
+    # Act & Assert
+    with pytest.raises(ValueError, match="Paper not found"):
+        await paper_service.get_paper("nonexistent", mock_db_session)
+
+
+# =============================================================================
+# CRUD Operations Tests
+# =============================================================================
+
+
+@pytest.mark.asyncio
+async def test_create_paper_success(
+    paper_service: PaperService,
+    mock_db_session: Session,
+    mock_openai_client: UnifiedOpenAIClient,
+    mock_arxiv_extractor: ArxivExtractor,
+) -> None:
+    """Test successful paper creation."""
+    # Register the mock extractor
+    extractor_factory.register_extractor("arxiv", mock_arxiv_extractor)
+    paper_data = PaperCreateRequest(
+        url="https://arxiv.org/abs/1706.03762",
+        skip_auto_summarization=True,
+        summary_language="English",
     )
-    user_id = await user_repo.create_user(user_entity)
 
-    # Save paper to database
-    paper_repo = PaperRepository(mock_db_manager)
-    paper_id = await paper_repo.create(sample_paper)
-    sample_paper.paper_id = paper_id
-
-    # Add a star first, then remove it
-    await paper_service.add_star(
-        paper_id, mock_db_manager, sample_user, note="Test note"
+    paper_repo = PaperRepository(mock_db_session)
+    result = await paper_service.create_paper(
+        paper_data,
+        paper_repo,
+        mock_openai_client,
+        skip_auto_summarization=True,
     )
 
-    # Test removal
-    result = await paper_service.remove_star(paper_id, mock_db_manager, sample_user)
-
-    # Assertions
-    assert isinstance(result, StarResponse)
-    assert result.success is True
-    assert result.paper_id == paper_id
     assert result.is_starred is False
-    assert result.note is None
-    assert "removed" in result.message
+    assert result.is_read is False
+    assert result.summary is None
 
 
 @pytest.mark.asyncio
-async def test_remove_star_paper_not_found(
+async def test_get_papers_lightweight(
     paper_service: PaperService,
-    sample_user: User,
-    mock_db_manager,
+    saved_paper,
+    saved_summary,
+    mock_db_session: Session,
 ) -> None:
-    """Test star removal with non-existent paper."""
-    with pytest.raises(ValueError, match="Paper 999 not found"):
-        await paper_service.remove_star(999, mock_db_manager, sample_user)
-
-
-@pytest.mark.asyncio
-async def test_is_paper_starred_true(
-    paper_service: PaperService,
-    sample_paper: PaperEntity,
-    sample_user: User,
-    mock_db_manager,
-) -> None:
-    """Test checking if a paper is starred (when it is)."""
-    # Save user to database first
-    user_repo = UserRepository(mock_db_manager)
-    user_entity = UserEntity(
-        user_id=sample_user.user_id,
-        email=sample_user.email,
-        display_name=sample_user.display_name,
-    )
-    user_id = await user_repo.create_user(user_entity)
-
-    # Save paper to database
-    paper_repo = PaperRepository(mock_db_manager)
-    paper_id = await paper_repo.create(sample_paper)
-    sample_paper.paper_id = paper_id
-
-    # Add a star first
-    await paper_service.add_star(
-        paper_id, mock_db_manager, sample_user, note="Test note"
+    """Test getting papers with overview only."""
+    # Execute
+    result = await paper_service.get_papers_lightweight(
+        mock_db_session, user_id=1, skip=0, limit=10, language="Korean"
     )
 
-    # Test checking star status
-    result = await paper_service.is_paper_starred(
-        paper_id, mock_db_manager, sample_user
-    )
+    # Assert
+    assert len(result.papers) > 0
+    assert result.total_count > 0
+    assert result.has_more is not None
 
-    # Assertions
-    assert isinstance(result, StarResponse)
-    assert result.success is True
-    assert result.paper_id == paper_id
-    assert result.is_starred is True
-    assert result.note == "Test note"
-    assert "is starred" in result.message
-
-
-@pytest.mark.asyncio
-async def test_is_paper_starred_false(
-    paper_service: PaperService,
-    sample_paper: PaperEntity,
-    sample_user: User,
-    mock_db_manager,
-) -> None:
-    """Test checking if a paper is starred (when it is not)."""
-    # Save user to database first
-    user_repo = UserRepository(mock_db_manager)
-    user_entity = UserEntity(
-        user_id=sample_user.user_id,
-        email=sample_user.email,
-        display_name=sample_user.display_name,
-    )
-    user_id = await user_repo.create_user(user_entity)
-
-    # Save paper to database
-    paper_repo = PaperRepository(mock_db_manager)
-    paper_id = await paper_repo.create(sample_paper)
-    sample_paper.paper_id = paper_id
-
-    # Test checking star status (without adding a star)
-    result = await paper_service.is_paper_starred(
-        paper_id, mock_db_manager, sample_user
-    )
-
-    # Assertions
-    assert isinstance(result, StarResponse)
-    assert result.success is True
-    assert result.paper_id == paper_id
-    assert result.is_starred is False
-    assert result.note is None
-    assert "is not starred" in result.message
+    # Check that papers have overview but not full summary
+    for paper in result.papers:
+        assert hasattr(paper, "overview")
+        assert hasattr(paper, "has_summary")
+        assert hasattr(paper, "is_starred")
+        assert hasattr(paper, "is_read")
+        # Should not have full summary object
+        assert not hasattr(paper, "summary")

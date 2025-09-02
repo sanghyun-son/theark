@@ -1,0 +1,452 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <link href="http://arxiv.org/api/query?search_query%3DsubmittedDate%3A%5B202501010000%20TO%20202501020000%5D%20AND%20cat%3Acs.AI%26id_list%3D%26start%3D0%26max_results%3D10" rel="self" type="application/atom+xml"/>
+  <title type="html">ArXiv Query: search_query=submittedDate:[202501010000 TO 202501020000] AND cat:cs.AI&amp;id_list=&amp;start=0&amp;max_results=10</title>
+  <id>http://arxiv.org/api/fZjHF6eNraEt1oHc7nUbDghibFA</id>
+  <updated>2025-08-31T00:00:00-04:00</updated>
+  <opensearch:totalResults xmlns:opensearch="http://a9.com/-/spec/opensearch/1.1/">42</opensearch:totalResults>
+  <opensearch:startIndex xmlns:opensearch="http://a9.com/-/spec/opensearch/1.1/">0</opensearch:startIndex>
+  <opensearch:itemsPerPage xmlns:opensearch="http://a9.com/-/spec/opensearch/1.1/">10</opensearch:itemsPerPage>
+  <entry>
+    <id>http://arxiv.org/abs/2501.00961v3</id>
+    <updated>2025-06-05T00:06:59Z</updated>
+    <published>2025-01-01T21:45:00Z</published>
+    <title>Uncovering Memorization Effect in the Presence of Spurious Correlations</title>
+    <summary>  Machine learning models often rely on simple spurious features -- patterns in
+training data that correlate with targets but are not causally related to them,
+like image backgrounds in foreground classification. This reliance typically
+leads to imbalanced test performance across minority and majority groups. In
+this work, we take a closer look at the fundamental cause of such imbalanced
+performance through the lens of memorization, which refers to the ability to
+predict accurately on atypical examples (minority groups) in the training set
+but failing in achieving the same accuracy in the testing set. This paper
+systematically shows the ubiquitous existence of spurious features in a small
+set of neurons within the network, providing the first-ever evidence that
+memorization may contribute to imbalanced group performance. Through three
+experimental sources of converging empirical evidence, we find the property of
+a small subset of neurons or channels in memorizing minority group information.
+Inspired by these findings, we hypothesize that spurious memorization,
+concentrated within a small subset of neurons, plays a key role in driving
+imbalanced group performance. To further substantiate this hypothesis, we show
+that eliminating these unnecessary spurious memorization patterns via a novel
+framework during training can significantly affect the model performance on
+minority groups. Our experimental results across various architectures and
+benchmarks offer new insights on how neural networks encode core and spurious
+knowledge, laying the groundwork for future research in demystifying robustness
+to spurious correlation.
+</summary>
+    <author>
+      <name>Chenyu You</name>
+    </author>
+    <author>
+      <name>Haocheng Dai</name>
+    </author>
+    <author>
+      <name>Yifei Min</name>
+    </author>
+    <author>
+      <name>Jasjeet S. Sekhon</name>
+    </author>
+    <author>
+      <name>Sarang Joshi</name>
+    </author>
+    <author>
+      <name>James S. Duncan</name>
+    </author>
+    <arxiv:comment xmlns:arxiv="http://arxiv.org/schemas/atom">Accepted by Nature Communications</arxiv:comment>
+    <link href="http://arxiv.org/abs/2501.00961v3" rel="alternate" type="text/html"/>
+    <link title="pdf" href="http://arxiv.org/pdf/2501.00961v3" rel="related" type="application/pdf"/>
+    <arxiv:primary_category xmlns:arxiv="http://arxiv.org/schemas/atom" term="cs.LG" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.LG" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.AI" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.CV" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="eess.IV" scheme="http://arxiv.org/schemas/atom"/>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2501.00954v1</id>
+    <updated>2025-01-01T21:00:58Z</updated>
+    <published>2025-01-01T21:00:58Z</published>
+    <title>Enhancing Early Diabetic Retinopathy Detection through Synthetic DR1
+  Image Generation: A StyleGAN3 Approach</title>
+    <summary>  Diabetic Retinopathy (DR) is a leading cause of preventable blindness. Early
+detection at the DR1 stage is critical but is hindered by a scarcity of
+high-quality fundus images. This study uses StyleGAN3 to generate synthetic DR1
+images characterized by microaneurysms with high fidelity and diversity. The
+aim is to address data scarcity and enhance the performance of supervised
+classifiers. A dataset of 2,602 DR1 images was used to train the model,
+followed by a comprehensive evaluation using quantitative metrics, including
+Frechet Inception Distance (FID), Kernel Inception Distance (KID), and
+Equivariance with respect to translation (EQ-T) and rotation (EQ-R).
+Qualitative assessments included Human Turing tests, where trained
+ophthalmologists evaluated the realism of synthetic images. Spectral analysis
+further validated image quality. The model achieved a final FID score of 17.29,
+outperforming the mean FID of 21.18 (95 percent confidence interval - 20.83 to
+21.56) derived from bootstrap resampling. Human Turing tests demonstrated the
+model's ability to produce highly realistic images, though minor artifacts near
+the borders were noted. These findings suggest that StyleGAN3-generated
+synthetic DR1 images hold significant promise for augmenting training datasets,
+enabling more accurate early detection of Diabetic Retinopathy. This
+methodology highlights the potential of synthetic data in advancing medical
+imaging and AI-driven diagnostics.
+</summary>
+    <author>
+      <name>Sagarnil Das</name>
+    </author>
+    <author>
+      <name>Pradeep Walia</name>
+    </author>
+    <arxiv:comment xmlns:arxiv="http://arxiv.org/schemas/atom">13 pages, 11 figures</arxiv:comment>
+    <link href="http://arxiv.org/abs/2501.00954v1" rel="alternate" type="text/html"/>
+    <link title="pdf" href="http://arxiv.org/pdf/2501.00954v1" rel="related" type="application/pdf"/>
+    <arxiv:primary_category xmlns:arxiv="http://arxiv.org/schemas/atom" term="eess.IV" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="eess.IV" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.AI" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.CV" scheme="http://arxiv.org/schemas/atom"/>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2501.00953v2</id>
+    <updated>2025-04-02T14:24:00Z</updated>
+    <published>2025-01-01T20:58:03Z</published>
+    <title>Prior Lessons of Incremental Dialogue and Robot Action Management for
+  the Age of Language Models</title>
+    <summary>  Efforts towards endowing robots with the ability to speak have benefited from
+recent advancements in natural language processing, in particular large
+language models. However, current language models are not fully incremental, as
+their processing is inherently monotonic and thus lack the ability to revise
+their interpretations or output in light of newer observations. This
+monotonicity has important implications for the development of dialogue systems
+for human--robot interaction. In this paper, we review the literature on
+interactive systems that operate incrementally (i.e., at the word level or
+below it). We motivate the need for incremental systems, survey incremental
+modeling of important aspects of dialogue like speech recognition and language
+generation. Primary focus is on the part of the system that makes decisions,
+known as the dialogue manager. We find that there is very little research on
+incremental dialogue management, offer some requirements for practical
+incremental dialogue management, and the implications of incremental dialogue
+for embodied, robotic platforms in the age of large language models.
+</summary>
+    <author>
+      <name>Casey Kennington</name>
+    </author>
+    <author>
+      <name>Pierre Lison</name>
+    </author>
+    <author>
+      <name>David Schlangen</name>
+    </author>
+    <arxiv:comment xmlns:arxiv="http://arxiv.org/schemas/atom">20 pages</arxiv:comment>
+    <link href="http://arxiv.org/abs/2501.00953v2" rel="alternate" type="text/html"/>
+    <link title="pdf" href="http://arxiv.org/pdf/2501.00953v2" rel="related" type="application/pdf"/>
+    <arxiv:primary_category xmlns:arxiv="http://arxiv.org/schemas/atom" term="cs.CL" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.CL" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.AI" scheme="http://arxiv.org/schemas/atom"/>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2501.09761v1</id>
+    <updated>2025-01-01T19:12:03Z</updated>
+    <published>2025-01-01T19:12:03Z</published>
+    <title>VERITAS: Verifying the Performance of AI-native Transceiver Actions in
+  Base-Stations</title>
+    <summary>  Artificial Intelligence (AI)-native receivers prove significant performance
+improvement in high noise regimes and can potentially reduce communication
+overhead compared to the traditional receiver. However, their performance
+highly depends on the representativeness of the training dataset. A major issue
+is the uncertainty of whether the training dataset covers all test environments
+and waveform configurations, and thus, whether the trained model is robust in
+practical deployment conditions. To this end, we propose a joint
+measurement-recovery framework for AI-native transceivers post deployment,
+called VERITAS, that continuously looks for distribution shifts in the received
+signals and triggers finite re-training spurts. VERITAS monitors the wireless
+channel using 5G pilots fed to an auxiliary neural network that detects
+out-of-distribution channel profile, transmitter speed, and delay spread. As
+soon as such a change is detected, a traditional (reference) receiver is
+activated, which runs for a period of time in parallel to the AI-native
+receiver. Finally, VERTIAS compares the bit probabilities of the AI-native and
+the reference receivers for the same received data inputs, and decides whether
+or not a retraining process needs to be initiated. Our evaluations reveal that
+VERITAS can detect changes in the channel profile, transmitter speed, and delay
+spread with 99%, 97%, and 69% accuracies, respectively, followed by timely
+initiation of retraining for 86%, 93.3%, and 94.8% of inputs in channel
+profile, transmitter speed, and delay spread test sets, respectively.
+</summary>
+    <author>
+      <name>Nasim Soltani</name>
+    </author>
+    <author>
+      <name>Michael Loehning</name>
+    </author>
+    <author>
+      <name>Kaushik Chowdhury</name>
+    </author>
+    <arxiv:comment xmlns:arxiv="http://arxiv.org/schemas/atom">This work has been submitted to the IEEE for possible publication</arxiv:comment>
+    <link href="http://arxiv.org/abs/2501.09761v1" rel="alternate" type="text/html"/>
+    <link title="pdf" href="http://arxiv.org/pdf/2501.09761v1" rel="related" type="application/pdf"/>
+    <arxiv:primary_category xmlns:arxiv="http://arxiv.org/schemas/atom" term="eess.SP" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="eess.SP" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.AI" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.LG" scheme="http://arxiv.org/schemas/atom"/>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2501.00913v1</id>
+    <updated>2025-01-01T18:12:18Z</updated>
+    <published>2025-01-01T18:12:18Z</published>
+    <title>$β$-DQN: Improving Deep Q-Learning By Evolving the Behavior</title>
+    <summary>  While many sophisticated exploration methods have been proposed, their lack
+of generality and high computational cost often lead researchers to favor
+simpler methods like $\epsilon$-greedy. Motivated by this, we introduce
+$\beta$-DQN, a simple and efficient exploration method that augments the
+standard DQN with a behavior function $\beta$. This function estimates the
+probability that each action has been taken at each state. By leveraging
+$\beta$, we generate a population of diverse policies that balance exploration
+between state-action coverage and overestimation bias correction. An adaptive
+meta-controller is designed to select an effective policy for each episode,
+enabling flexible and explainable exploration. $\beta$-DQN is straightforward
+to implement and adds minimal computational overhead to the standard DQN.
+Experiments on both simple and challenging exploration domains show that
+$\beta$-DQN outperforms existing baseline methods across a wide range of tasks,
+providing an effective solution for improving exploration in deep reinforcement
+learning.
+</summary>
+    <author>
+      <name>Hongming Zhang</name>
+    </author>
+    <author>
+      <name>Fengshuo Bai</name>
+    </author>
+    <author>
+      <name>Chenjun Xiao</name>
+    </author>
+    <author>
+      <name>Chao Gao</name>
+    </author>
+    <author>
+      <name>Bo Xu</name>
+    </author>
+    <author>
+      <name>Martin Müller</name>
+    </author>
+    <link href="http://arxiv.org/abs/2501.00913v1" rel="alternate" type="text/html"/>
+    <link title="pdf" href="http://arxiv.org/pdf/2501.00913v1" rel="related" type="application/pdf"/>
+    <arxiv:primary_category xmlns:arxiv="http://arxiv.org/schemas/atom" term="cs.LG" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.LG" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.AI" scheme="http://arxiv.org/schemas/atom"/>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2501.00910v1</id>
+    <updated>2025-01-01T17:53:43Z</updated>
+    <published>2025-01-01T17:53:43Z</published>
+    <title>Population Aware Diffusion for Time Series Generation</title>
+    <summary>  Diffusion models have shown promising ability in generating high-quality time
+series (TS) data. Despite the initial success, existing works mostly focus on
+the authenticity of data at the individual level, but pay less attention to
+preserving the population-level properties on the entire dataset. Such
+population-level properties include value distributions for each dimension and
+distributions of certain functional dependencies (e.g., cross-correlation, CC)
+between different dimensions. For instance, when generating house energy
+consumption TS data, the value distributions of the outside temperature and the
+kitchen temperature should be preserved, as well as the distribution of CC
+between them. Preserving such TS population-level properties is critical in
+maintaining the statistical insights of the datasets, mitigating model bias,
+and augmenting downstream tasks like TS prediction. Yet, it is often overlooked
+by existing models. Hence, data generated by existing models often bear
+distribution shifts from the original data. We propose Population-aware
+Diffusion for Time Series (PaD-TS), a new TS generation model that better
+preserves the population-level properties. The key novelties of PaD-TS include
+1) a new training method explicitly incorporating TS population-level property
+preservation, and 2) a new dual-channel encoder model architecture that better
+captures the TS data structure. Empirical results in major benchmark datasets
+show that PaD-TS can improve the average CC distribution shift score between
+real and synthetic data by 5.9x while maintaining a performance comparable to
+state-of-the-art models on individual-level authenticity.
+</summary>
+    <author>
+      <name>Yang Li</name>
+    </author>
+    <author>
+      <name>Han Meng</name>
+    </author>
+    <author>
+      <name>Zhenyu Bi</name>
+    </author>
+    <author>
+      <name>Ingolv T. Urnes</name>
+    </author>
+    <author>
+      <name>Haipeng Chen</name>
+    </author>
+    <arxiv:doi xmlns:arxiv="http://arxiv.org/schemas/atom">10.1609/aaai.v39i17.34038</arxiv:doi>
+    <link title="doi" href="http://dx.doi.org/10.1609/aaai.v39i17.34038" rel="related"/>
+    <arxiv:comment xmlns:arxiv="http://arxiv.org/schemas/atom">Accepted for publication at AAAI-2025, 8 pages</arxiv:comment>
+    <link href="http://arxiv.org/abs/2501.00910v1" rel="alternate" type="text/html"/>
+    <link title="pdf" href="http://arxiv.org/pdf/2501.00910v1" rel="related" type="application/pdf"/>
+    <arxiv:primary_category xmlns:arxiv="http://arxiv.org/schemas/atom" term="cs.LG" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.LG" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.AI" scheme="http://arxiv.org/schemas/atom"/>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2501.00906v2</id>
+    <updated>2025-01-03T07:47:36Z</updated>
+    <published>2025-01-01T17:38:40Z</published>
+    <title>Large Language Model Based Multi-Agent System Augmented Complex Event
+  Processing Pipeline for Internet of Multimedia Things</title>
+    <summary>  This paper presents the development and evaluation of a Large Language Model
+(LLM), also known as foundation models, based multi-agent system framework for
+complex event processing (CEP) with a focus on video query processing use
+cases. The primary goal is to create a proof-of-concept (POC) that integrates
+state-of-the-art LLM orchestration frameworks with publish/subscribe (pub/sub)
+tools to address the integration of LLMs with current CEP systems. Utilizing
+the Autogen framework in conjunction with Kafka message brokers, the system
+demonstrates an autonomous CEP pipeline capable of handling complex workflows.
+Extensive experiments evaluate the system's performance across varying
+configurations, complexities, and video resolutions, revealing the trade-offs
+between functionality and latency. The results show that while higher agent
+count and video complexities increase latency, the system maintains high
+consistency in narrative coherence. This research builds upon and contributes
+to, existing novel approaches to distributed AI systems, offering detailed
+insights into integrating such systems into existing infrastructures.
+</summary>
+    <author>
+      <name>Talha Zeeshan</name>
+    </author>
+    <author>
+      <name>Abhishek Kumar</name>
+    </author>
+    <author>
+      <name>Susanna Pirttikangas</name>
+    </author>
+    <author>
+      <name>Sasu Tarkoma</name>
+    </author>
+    <link href="http://arxiv.org/abs/2501.00906v2" rel="alternate" type="text/html"/>
+    <link title="pdf" href="http://arxiv.org/pdf/2501.00906v2" rel="related" type="application/pdf"/>
+    <arxiv:primary_category xmlns:arxiv="http://arxiv.org/schemas/atom" term="cs.MA" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.MA" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.AI" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.MM" scheme="http://arxiv.org/schemas/atom"/>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2501.14778v1</id>
+    <updated>2025-01-01T17:34:57Z</updated>
+    <published>2025-01-01T17:34:57Z</published>
+    <title>Advancing Trustworthy AI for Sustainable Development: Recommendations
+  for Standardising AI Incident Reporting</title>
+    <summary>  The increasing use of AI technologies has led to increasing AI incidents,
+posing risks and causing harm to individuals, organizations, and society. This
+study recognizes and addresses the lack of standardized protocols for reliably
+and comprehensively gathering such incident data crucial for preventing future
+incidents and developing mitigating strategies. Specifically, this study
+analyses existing open-access AI-incident databases through a systematic
+methodology and identifies nine gaps in current AI incident reporting
+practices. Further, it proposes nine actionable recommendations to enhance
+standardization efforts to address these gaps. Ensuring the trustworthiness of
+enabling technologies such as AI is necessary for sustainable digital
+transformation. Our research promotes the development of standards to prevent
+future AI incidents and promote trustworthy AI, thus facilitating achieving the
+UN sustainable development goals. Through international cooperation,
+stakeholders can unlock the transformative potential of AI, enabling a
+sustainable and inclusive future for all.
+</summary>
+    <author>
+      <name>Avinash Agarwal</name>
+    </author>
+    <author>
+      <name>Manisha J Nene</name>
+    </author>
+    <arxiv:doi xmlns:arxiv="http://arxiv.org/schemas/atom">10.23919/ITUK62727.2024.10772925</arxiv:doi>
+    <link title="doi" href="http://dx.doi.org/10.23919/ITUK62727.2024.10772925" rel="related"/>
+    <arxiv:comment xmlns:arxiv="http://arxiv.org/schemas/atom">8 pages, 10 tables, and 1 figure. Accepted at the International
+  Telecommunication Union (ITU) Kaleidoscope 2024</arxiv:comment>
+    <arxiv:journal_ref xmlns:arxiv="http://arxiv.org/schemas/atom">2024 ITU Kaleidoscope: Innovation and Digital Transformation for a
+  Sustainable World (ITU K), New Delhi, India, 2024, pp. 1-8</arxiv:journal_ref>
+    <link href="http://arxiv.org/abs/2501.14778v1" rel="alternate" type="text/html"/>
+    <link title="pdf" href="http://arxiv.org/pdf/2501.14778v1" rel="related" type="application/pdf"/>
+    <arxiv:primary_category xmlns:arxiv="http://arxiv.org/schemas/atom" term="cs.CY" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.CY" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.AI" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.HC" scheme="http://arxiv.org/schemas/atom"/>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2501.00891v1</id>
+    <updated>2025-01-01T16:38:29Z</updated>
+    <published>2025-01-01T16:38:29Z</published>
+    <title>Demystifying Online Clustering of Bandits: Enhanced Exploration Under
+  Stochastic and Smoothed Adversarial Contexts</title>
+    <summary>  The contextual multi-armed bandit (MAB) problem is crucial in sequential
+decision-making. A line of research, known as online clustering of bandits,
+extends contextual MAB by grouping similar users into clusters, utilizing
+shared features to improve learning efficiency. However, existing algorithms,
+which rely on the upper confidence bound (UCB) strategy, struggle to gather
+adequate statistical information to accurately identify unknown user clusters.
+As a result, their theoretical analyses require several strong assumptions
+about the "diversity" of contexts generated by the environment, leading to
+impractical settings, complicated analyses, and poor practical performance.
+Removing these assumptions has been a long-standing open problem in the
+clustering of bandits literature. In this paper, we provide two solutions to
+this open problem. First, following the i.i.d. context generation setting in
+existing studies, we propose two novel algorithms, UniCLUB and PhaseUniCLUB,
+which incorporate enhanced exploration mechanisms to accelerate cluster
+identification. Remarkably, our algorithms require substantially weaker
+assumptions while achieving regret bounds comparable to prior work. Second,
+inspired by the smoothed analysis framework, we propose a more practical
+setting that eliminates the requirement for i.i.d. context generation used in
+previous studies, thus enhancing the performance of existing algorithms for
+online clustering of bandits. Our technique can be applied to both graph-based
+and set-based clustering of bandits frameworks. Extensive evaluations on both
+synthetic and real-world datasets demonstrate that our proposed algorithms
+consistently outperform existing approaches.
+</summary>
+    <author>
+      <name>Zhuohua Li</name>
+    </author>
+    <author>
+      <name>Maoli Liu</name>
+    </author>
+    <author>
+      <name>Xiangxiang Dai</name>
+    </author>
+    <author>
+      <name>John C. S. Lui</name>
+    </author>
+    <link href="http://arxiv.org/abs/2501.00891v1" rel="alternate" type="text/html"/>
+    <link title="pdf" href="http://arxiv.org/pdf/2501.00891v1" rel="related" type="application/pdf"/>
+    <arxiv:primary_category xmlns:arxiv="http://arxiv.org/schemas/atom" term="cs.LG" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.LG" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.AI" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="stat.ML" scheme="http://arxiv.org/schemas/atom"/>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2501.00885v1</id>
+    <updated>2025-01-01T16:19:48Z</updated>
+    <published>2025-01-01T16:19:48Z</published>
+    <title>Representation in large language models</title>
+    <summary>  The extraordinary success of recent Large Language Models (LLMs) on a diverse
+array of tasks has led to an explosion of scientific and philosophical
+theorizing aimed at explaining how they do what they do. Unfortunately,
+disagreement over fundamental theoretical issues has led to stalemate, with
+entrenched camps of LLM optimists and pessimists often committed to very
+different views of how these systems work. Overcoming stalemate requires
+agreement on fundamental questions, and the goal of this paper is to address
+one such question, namely: is LLM behavior driven partly by
+representation-based information processing of the sort implicated in
+biological cognition, or is it driven entirely by processes of memorization and
+stochastic table look-up? This is a question about what kind of algorithm LLMs
+implement, and the answer carries serious implications for higher level
+questions about whether these systems have beliefs, intentions, concepts,
+knowledge, and understanding. I argue that LLM behavior is partially driven by
+representation-based information processing, and then I describe and defend a
+series of practical techniques for investigating these representations and
+developing explanations on their basis. The resulting account provides a
+groundwork for future theorizing about language models and their successors.
+</summary>
+    <author>
+      <name>Cameron C. Yetman</name>
+    </author>
+    <arxiv:comment xmlns:arxiv="http://arxiv.org/schemas/atom">Draft of paper under review. 27 pages, 2 figures</arxiv:comment>
+    <link href="http://arxiv.org/abs/2501.00885v1" rel="alternate" type="text/html"/>
+    <link title="pdf" href="http://arxiv.org/pdf/2501.00885v1" rel="related" type="application/pdf"/>
+    <arxiv:primary_category xmlns:arxiv="http://arxiv.org/schemas/atom" term="cs.CL" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.CL" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.AI" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.LG" scheme="http://arxiv.org/schemas/atom"/>
+  </entry>
+</feed>

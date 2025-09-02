@@ -6,20 +6,20 @@ from fastapi import HTTPException
 from api.utils.error_handler import handle_api_operation, handle_async_api_operation
 
 
-def test_handle_api_operation_success():
-    """Test successful API operation."""
+def test_handle_api_operation_returns_success_result() -> None:
+    """Test successful API operation returns expected result."""
 
-    def success_operation():
+    def success_operation() -> str:
         return "success"
 
     result = handle_api_operation(success_operation)
     assert result == "success"
 
 
-def test_handle_api_operation_value_error():
-    """Test API operation that raises ValueError."""
+def test_handle_api_operation_raises_400_for_value_error() -> None:
+    """Test API operation raises HTTP 400 for ValueError."""
 
-    def value_error_operation():
+    def value_error_operation() -> None:
         raise ValueError("Validation error")
 
     with pytest.raises(HTTPException) as exc_info:
@@ -29,10 +29,10 @@ def test_handle_api_operation_value_error():
     assert "Validation error" in str(exc_info.value.detail)
 
 
-def test_handle_api_operation_value_error_with_not_found():
-    """Test API operation that raises ValueError with not found message."""
+def test_handle_api_operation_raises_404_for_not_found_value_error() -> None:
+    """Test API operation raises HTTP 404 for ValueError with not found message."""
 
-    def not_found_operation():
+    def not_found_operation() -> None:
         raise ValueError("Not found")
 
     with pytest.raises(HTTPException) as exc_info:
@@ -44,10 +44,10 @@ def test_handle_api_operation_value_error_with_not_found():
     assert "Not found" in str(exc_info.value.detail)
 
 
-def test_handle_api_operation_unexpected_error():
-    """Test API operation that raises unexpected error."""
+def test_handle_api_operation_raises_500_for_unexpected_error() -> None:
+    """Test API operation raises HTTP 500 for unexpected errors."""
 
-    def unexpected_error_operation():
+    def unexpected_error_operation() -> None:
         raise Exception("Unexpected error")
 
     with pytest.raises(HTTPException) as exc_info:
@@ -59,10 +59,10 @@ def test_handle_api_operation_unexpected_error():
 
 
 @pytest.mark.asyncio
-async def test_handle_async_api_operation_success():
-    """Test successful async API operation."""
+async def test_handle_async_api_operation_returns_success_result() -> None:
+    """Test successful async API operation returns expected result."""
 
-    async def success_operation():
+    async def success_operation() -> str:
         return "success"
 
     result = await handle_async_api_operation(success_operation)
@@ -70,10 +70,10 @@ async def test_handle_async_api_operation_success():
 
 
 @pytest.mark.asyncio
-async def test_handle_async_api_operation_value_error():
-    """Test async API operation that raises ValueError."""
+async def test_handle_async_api_operation_raises_400_for_value_error() -> None:
+    """Test async API operation raises HTTP 400 for ValueError."""
 
-    async def value_error_operation():
+    async def value_error_operation() -> None:
         raise ValueError("Validation error")
 
     with pytest.raises(HTTPException) as exc_info:
@@ -84,10 +84,12 @@ async def test_handle_async_api_operation_value_error():
 
 
 @pytest.mark.asyncio
-async def test_handle_async_api_operation_value_error_with_not_found():
-    """Test async API operation that raises ValueError with not found message."""
+async def test_handle_async_api_operation_raises_404_for_not_found_value_error() -> (
+    None
+):
+    """Test async API operation raises HTTP 404 for ValueError with not found message."""
 
-    async def not_found_operation():
+    async def not_found_operation() -> None:
         raise ValueError("Not found")
 
     with pytest.raises(HTTPException) as exc_info:
@@ -100,10 +102,10 @@ async def test_handle_async_api_operation_value_error_with_not_found():
 
 
 @pytest.mark.asyncio
-async def test_handle_async_api_operation_unexpected_error():
-    """Test async API operation that raises unexpected error."""
+async def test_handle_async_api_operation_raises_500_for_unexpected_error() -> None:
+    """Test async API operation raises HTTP 500 for unexpected errors."""
 
-    async def unexpected_error_operation():
+    async def unexpected_error_operation() -> None:
         raise Exception("Unexpected error")
 
     with pytest.raises(HTTPException) as exc_info:

@@ -1,6 +1,6 @@
 // Loading indicators module for TheArk
 
-class LoadingIndicators {
+export class LoadingIndicators {
     constructor() {
         // Bind methods to maintain context
         this.showLoadingIndicator = this.showLoadingIndicator.bind(this);
@@ -68,7 +68,11 @@ class LoadingIndicators {
         wrapper.style.cursor = "pointer";
         wrapper.style.userSelect = "none";        // 텍스트 드래그 방지 (선택적)
 
-        wrapper.onclick = () => window.paperManager.loadPapers();
+        wrapper.onclick = () => {
+            if (window.paperManager) {
+                window.paperManager.loadPapers();
+            }
+        };
 
         const leftIcon = document.createElement("span");
         leftIcon.textContent = "🔄";
@@ -122,5 +126,3 @@ class LoadingIndicators {
     }
 }
 
-// Export for use in other modules
-window.LoadingIndicators = LoadingIndicators;

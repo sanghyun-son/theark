@@ -1,6 +1,6 @@
 // Infinite scroll module for TheArk
 
-class InfiniteScrollService {
+export class InfiniteScrollService {
     constructor(apiService, uiService) {
         this.apiService = apiService;
         this.uiService = uiService;
@@ -112,5 +112,3 @@ class InfiniteScrollService {
     }
 }
 
-// Export for use in other modules
-window.InfiniteScrollService = InfiniteScrollService;

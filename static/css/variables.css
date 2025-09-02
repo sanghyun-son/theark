@@ -1,0 +1,63 @@
+/* static/css/variables.css */
+:root {
+    /* Colors */
+    --primary-text-color: #333;
+    --secondary-text-color: #495057;
+    --light-text-color: #6c757d;
+    --link-color: #007bff;
+    --link-hover-color: #0056b3;
+    --accent-color-1: #667eea;
+    --accent-color-2: #764ba2;
+    --accent-gradient: linear-gradient(135deg, var(--accent-color-1) 0%, var(--accent-color-2) 100%);
+    --secondary-color: #6c757d;
+    --secondary-hover-color: #5a6268;
+    --background-color: #f8f9fa;
+    --container-background-color: white;
+    --border-color: #e1e5e9;
+    --border-color-dark: #495057;
+    --unread-background-color: #fef3c7;
+    --unread-border-color: #d4a574;
+    --star-color: #ffd700;
+    --star-inactive-color: #ccc;
+    --error-background-color: #f8d7da;
+    --error-text-color: #721c24;
+    --error-border-color: #f5c6cb;
+    --success-background-color: #d4edda;
+    --success-text-color: #155724;
+    --success-border-color: #c3e6cb;
+
+    /* Relevance Score Colors */
+    --score-10: #28a745;
+    --score-9: #40c057;
+    --score-8: #69db7c;
+    --score-7: #94d82d;
+    --score-6: #fcc419;
+    --score-5: #ffd43b;
+    --score-4: #ffa94d;
+    --score-3: #ff922b;
+    --score-2: #ff6b6b;
+    --score-1: #e03131;
+    --score-0: #6c757d;
+
+    /* Typography */
+    --font-family-monospace: 'Consolas', 'Monaco', 'Courier New', monospace;
+    --font-family-korean: 'Consolas', 'Malgun Gothic', '맑은 고딕', 'Monaco', 'Courier New', monospace;
+    --font-family-relevance: Arial, sans-serif;
+
+    /* Spacing */
+    --spacing-xs: 0.25rem;
+    --spacing-sm: 0.5rem;
+    --spacing-md: 1rem;
+    --spacing-lg: 1.5rem;
+    --spacing-xl: 2rem;
+
+    /* Borders */
+    --border-radius-sm: 4px;
+    --border-radius-md: 6px;
+    --border-radius-lg: 8px;
+
+    /* Shadows */
+    --box-shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.1);
+    --box-shadow-md: 0 4px 8px rgba(0, 0, 0, 0.15);
+    --box-shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.2);
+}

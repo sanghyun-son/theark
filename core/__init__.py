@@ -7,13 +7,10 @@ from .log import (
     setup_production_logging,
     setup_test_logging,
 )
-from .models.domain.task import TaskManagerStatus, TaskStats
 from .services import (
-    PaperCreationService,
-    PaperOrchestrationService,
     PaperService,
-    PaperSummarizationService,
-    UniversalPaperService,
+    StarService,
+    StreamService,
 )
 from .types import Environment
 
@@ -25,11 +22,7 @@ __all__ = [
     "setup_logging",
     "setup_production_logging",
     "setup_test_logging",
-    "TaskStats",
-    "TaskManagerStatus",
-    "PaperCreationService",
-    "PaperOrchestrationService",
     "PaperService",
-    "PaperSummarizationService",
-    "UniversalPaperService",
+    "StarService",
+    "StreamService",
 ]

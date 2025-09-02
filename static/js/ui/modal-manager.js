@@ -1,8 +1,10 @@
 // Modal management module for TheArk
+import { StarManager } from './star-manager.js';
 
-class ModalManager {
-    constructor(paper) {
+export class ModalManager {
+    constructor(paper, starManager) {
         this.paper = paper;
+        this.starManager = starManager;
         this.modal = null;
         this.overlay = null;
         
@@ -94,8 +96,8 @@ class ModalManager {
 
     createModalStarButton() {
         // Use the centralized star manager to create the star button
-        if (window.starManager) {
-            const starButton = window.starManager.createStarButton(this.paper, 'modal');
+        if (this.starManager) {
+            const starButton = this.starManager.createStarButton(this.paper, 'modal');
             
             // Add modal-specific class for styling
             starButton.classList.add('modal-star-button');
@@ -140,28 +142,28 @@ class ModalManager {
         
         try {
             // Use the centralized star manager for API calls
-            if (window.starManager) {
+            if (this.starManager) {
                 console.log('🎭 Using star manager for API call');
                 if (newStarredState) {
-                    await window.starManager.addStar(this.paper.paper_id);
+                    await this.starManager.addStar(this.paper.paper_id);
                 } else {
-                    await window.starManager.removeStar(this.paper.paper_id);
+                    await this.starManager.removeStar(this.paper.paper_id);
                 }
                 
                 // Update the specific button that was clicked
-                window.starManager.updateStarButton(starButton, newStarredState);
+                this.starManager.updateStarButton(starButton, newStarredState);
                 
                 // Update all other star buttons for this paper
                 console.log('🎭 Calling updateAllStarButtons');
-                window.starManager.updateAllStarButtons(this.paper.paper_id, newStarredState);
+                this.starManager.updateAllStarButtons(this.paper.paper_id, newStarredState);
             } else {
                 console.error('🎭 Star manager not available!');
             }
         } catch (error) {
             console.error('Failed to toggle star in modal:', error);
             // Revert to original state on error
-            if (window.starManager) {
-                window.starManager.updateStarButton(starButton, isCurrentlyStarred);
+            if (this.starManager) {
+                this.starManager.updateStarButton(starButton, isCurrentlyStarred);
             }
         }
     }
@@ -373,5 +375,3 @@ class ModalManager {
     }
 }
 
-// Export for use in other modules
-window.ModalManager = ModalManager;

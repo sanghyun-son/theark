@@ -1,13 +1,7 @@
 """Integration tests for authentication functionality."""
 
-import os
-from unittest.mock import patch
 
-import pytest
 from fastapi.testclient import TestClient
-
-from api.app import create_app
-from core.config import settings
 
 
 def test_development_mode_no_auth_required(integration_client: TestClient) -> None:

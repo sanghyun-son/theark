@@ -1,130 +1,44 @@
-"""Repository for user operations."""
+"""User repository using SQLModel with dependency injection."""
 
-from core.database.interfaces import DatabaseManager
-from core.models.database.entities import (
-    UserEntity,
-    UserInterestEntity,
-    UserStarEntity,
-)
-from core.types import RepositoryRowType
+from sqlmodel import Session, func, select
+
+from core.database.repository.base import BaseRepository
+from core.log import get_logger
+from core.models.rows import Paper, User, UserInterest, UserStar
+
+logger = get_logger(__name__)
 
 
-class UserRepository:
-    """Repository for user operations."""
+class UserRepository(BaseRepository[User]):
+    """User repository using SQLModel with dependency injection."""
 
-    def __init__(self, db_manager: DatabaseManager) -> None:
-        """Initialize repository with database manager."""
-        self.db = db_manager
+    def __init__(self, db: Session) -> None:
+        """Initialize user repository."""
+        super().__init__(User, db)
 
-    def _row_to_user(self, row: RepositoryRowType) -> UserEntity:
-        """Convert database row to AppUser model.
-
-        Args:
-            row: Database row tuple or dict
-
-        Returns:
-            AppUser model instance
-        """
-        if isinstance(row, dict):
-            return UserEntity.model_validate(row)
-
-        return UserEntity.from_tuple(row)
-
-    def _row_to_interest(self, row: RepositoryRowType) -> UserInterestEntity:
-        """Convert database row to UserInterest model.
-
-        Args:
-            row: Database row tuple or dict
-
-        Returns:
-            UserInterest model instance
-        """
-        if isinstance(row, dict):
-            return UserInterestEntity.model_validate(row)
-
-        return UserInterestEntity.from_tuple(row)
-
-    def _row_to_star(self, row: RepositoryRowType) -> UserStarEntity:
-        """Convert database row to UserStar model.
-
-        Args:
-            row: Database row tuple or dict
-
-        Returns:
-            UserStar model instance
-        """
-        if isinstance(row, dict):
-            return UserStarEntity.model_validate(row)
-
-        return UserStarEntity.from_tuple(row)
-
-    async def create_user(self, user: UserEntity) -> int:
-        """Create a new user.
-
-        Args:
-            user: User model instance
-
-        Returns:
-            Created user ID
-        """
-        query = "INSERT INTO app_user (email, display_name) VALUES (?, ?)"
-        params = (user.email, user.display_name)
-
-        cursor = await self.db.execute(query, params)
-        return cursor.lastrowid  # type: ignore
-
-    async def get_user_by_email(self, email: str) -> UserEntity | None:
+    def get_by_email(self, email: str) -> User | None:
         """Get user by email.
 
         Args:
             email: User email
 
         Returns:
-            User model or None if not found
+            User if found, None otherwise
         """
-        query = "SELECT * FROM app_user WHERE email = ?"
-        row = await self.db.fetch_one(query, (email,))
+        statement = select(User).where(User.email == email)
+        result = self.db.exec(statement)
+        return result.first()
 
-        if row:
-            return self._row_to_user(row)
-        return None
 
-    async def get_user_by_id(self, user_id: int) -> UserEntity | None:
-        """Get user by ID.
+class UserInterestRepository(BaseRepository[UserInterest]):
+    """User interest repository using SQLModel with dependency injection."""
 
-        Args:
-            user_id: User ID
+    def __init__(self, db: Session) -> None:
+        """Initialize user interest repository."""
+        super().__init__(UserInterest, db)
 
-        Returns:
-            User model or None if not found
-        """
-        query = "SELECT * FROM app_user WHERE user_id = ?"
-        row = await self.db.fetch_one(query, (user_id,))
-
-        if row:
-            return self._row_to_user(row)
-        return None
-
-    async def add_interest(self, interest: UserInterestEntity) -> None:
-        """Add or update user interest.
-
-        Args:
-            interest: User interest model
-        """
-        query = """
-        INSERT OR REPLACE INTO user_interest (user_id, kind, value, weight)
-        VALUES (?, ?, ?, ?)
-        """
-        params = (
-            interest.user_id,
-            interest.kind,
-            interest.value,
-            interest.weight,
-        )
-        await self.db.execute(query, params)
-
-    async def get_user_interests(self, user_id: int) -> list[UserInterestEntity]:
-        """Get all interests for a user.
+    def get_user_interests(self, user_id: int) -> list[UserInterest]:
+        """Get user interests.
 
         Args:
             user_id: User ID
@@ -132,65 +46,203 @@ class UserRepository:
         Returns:
             List of user interests
         """
-        query = "SELECT * FROM user_interest WHERE user_id = ?"
-        rows = await self.db.fetch_all(query, (user_id,))
+        statement = select(UserInterest).where(UserInterest.user_id == user_id)
+        result = self.db.exec(statement)
+        return list(result.all())
 
-        interests = []
-        for row in rows:
-            interests.append(self._row_to_interest(row))
-
-        return interests
-
-    async def add_star(self, star: UserStarEntity) -> None:
-        """Add a star/bookmark for a user.
+    def add_user_interest(
+        self, user_id: int, category: str, weight: int
+    ) -> UserInterest:
+        """Add user interest.
 
         Args:
-            star: User star model
-        """
-        query = """
-        INSERT OR REPLACE INTO user_star (user_id, paper_id, note)
-        VALUES (?, ?, ?)
-        """
-        params = (star.user_id, star.paper_id, star.note)
-        await self.db.execute(query, params)
+            user_id: User ID
+            category: Interest category
+            weight: Interest weight (1-10)
 
-    async def remove_star(self, user_id: int, paper_id: int) -> bool:
-        """Remove a star/bookmark for a user.
+        Returns:
+            Created user interest
+        """
+        interest = UserInterest(user_id=user_id, category=category, weight=weight)
+        return self.create(interest)
+
+    def remove_user_interest(self, user_id: int, category: str) -> bool:
+        """Remove user interest.
+
+        Args:
+            user_id: User ID
+            category: Interest category to remove
+
+        Returns:
+            True if removed, False if not found
+        """
+        statement = select(UserInterest).where(
+            (UserInterest.user_id == user_id) & (UserInterest.category == category)
+        )
+        result = self.db.exec(statement)
+        interest = result.first()
+
+        if interest:
+            self.db.delete(interest)
+            self.db.commit()
+            return True
+
+        return False
+
+
+class UserStarRepository(BaseRepository[UserStar]):
+    """User star repository using SQLModel with dependency injection."""
+
+    def __init__(self, db: Session) -> None:
+        """Initialize user star repository."""
+        super().__init__(UserStar, db)
+
+    def get_user_stars(
+        self, user_id: int, skip: int = 0, limit: int = 100
+    ) -> list[UserStar]:
+        """Get user starred papers.
+
+        Args:
+            user_id: User ID
+            skip: Number of records to skip
+            limit: Maximum number of records to return
+
+        Returns:
+            List of user stars
+        """
+        statement = (
+            select(UserStar)
+            .where(UserStar.user_id == user_id)
+            .offset(skip)
+            .limit(limit)
+        )
+
+        result = self.db.exec(statement)
+        return list(result.all())
+
+    def add_user_star(
+        self, user_id: int, paper_id: int, note: str | None = None
+    ) -> UserStar:
+        """Add user star.
+
+        Args:
+            user_id: User ID
+            paper_id: Paper ID to star
+            note: Optional note for the star
+
+        Returns:
+            Created user star
+        """
+        star = UserStar(user_id=user_id, paper_id=paper_id, note=note)
+        return self.create(star)
+
+    def remove_user_star(self, user_id: int, paper_id: int) -> bool:
+        """Remove user star.
+
+        Args:
+            user_id: User ID
+            paper_id: Paper ID to unstar
+
+        Returns:
+            True if removed, False if not found
+        """
+        statement = select(UserStar).where(
+            (UserStar.user_id == user_id) & (UserStar.paper_id == paper_id)
+        )
+        result = self.db.exec(statement)
+        star = result.first()
+
+        if star:
+            self.db.delete(star)
+            self.db.commit()
+            return True
+
+        return False
+
+    def is_paper_starred(self, user_id: int, paper_id: int) -> bool:
+        """Check if paper is starred by user.
 
         Args:
             user_id: User ID
             paper_id: Paper ID
 
         Returns:
-            True if removed, False if not found
+            True if starred, False otherwise
         """
-        query = "DELETE FROM user_star WHERE user_id = ? AND paper_id = ?"
-        cursor = await self.db.execute(query, (user_id, paper_id))
-        return bool(cursor.rowcount > 0)
+        statement = select(UserStar).where(
+            (UserStar.user_id == user_id) & (UserStar.paper_id == paper_id)
+        )
+        result = self.db.exec(statement)
+        return result.first() is not None
 
-    async def get_user_stars(
-        self, user_id: int, limit: int = 100
-    ) -> list[UserStarEntity]:
-        """Get all stars for a user.
+    def get_user_star(self, user_id: int, paper_id: int) -> UserStar | None:
+        """Get user star with note information.
 
         Args:
             user_id: User ID
-            limit: Maximum number of results
+            paper_id: Paper ID
 
         Returns:
-            List of user stars
+            UserStar object if found, None otherwise
         """
-        query = """
-        SELECT * FROM user_star
-        WHERE user_id = ?
-        ORDER BY created_at DESC
-        LIMIT ?
+        statement = select(UserStar).where(
+            (UserStar.user_id == user_id) & (UserStar.paper_id == paper_id)
+        )
+        result = self.db.exec(statement)
+        return result.first()
+
+    def get_starred_papers_count(self, user_id: int) -> int:
+        stmt = (
+            select(func.count())
+            .select_from(UserStar)
+            .where(UserStar.user_id == user_id)
+        )
+        return self.db.exec(stmt).one()
+
+    def get_starred_papers(
+        self, user_id: int, skip: int = 0, limit: int = 100
+    ) -> list[Paper]:
+        """Get papers starred by user.
+
+        Args:
+            user_id: User ID
+            skip: Number of records to skip
+            limit: Maximum number of records to return
+
+        Returns:
+            List of starred papers
         """
+        # This would need to be implemented with a join query
+        # For now, we'll get the star records and then fetch papers
+        stars = self.get_user_stars(user_id, skip, limit)
 
-        rows = await self.db.fetch_all(query, (user_id, limit))
-        stars = []
+        papers = []
+        for star in stars:
+            # Fetch the paper for each star
+            paper_statement = select(Paper).where(Paper.paper_id == star.paper_id)
+            paper_result = self.db.exec(paper_statement)
+            paper = paper_result.first()
+            if paper:
+                papers.append(paper)
 
-        for row in rows:
-            stars.append(self._row_to_star(row))
+        return papers
 
-        return stars
+    def get_starred_paper_ids(self, user_id: int, paper_ids: list[int]) -> list[int]:
+        """Get list of paper IDs that are starred by user (batch operation).
+
+        Args:
+            user_id: User ID
+            paper_ids: List of paper IDs to check
+
+        Returns:
+            List of paper IDs that are starred by the user
+        """
+        if not paper_ids:
+            return []
+
+        statement = select(UserStar.paper_id).where(
+            (UserStar.user_id == user_id)
+            & (UserStar.paper_id.in_(paper_ids))  # type: ignore
+        )
+        result = self.db.exec(statement)
+        return list(result.all())

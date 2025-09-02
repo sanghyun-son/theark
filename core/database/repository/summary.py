@@ -1,94 +1,23 @@
-"""Repository for summary operations."""
+"""Summary repository using SQLModel with dependency injection."""
 
-from core import get_logger
-from core.database.interfaces import DatabaseManager
-from core.models.database.entities import SummaryEntity
-from core.types import RepositoryRowType
+from sqlmodel import Session, select
+
+from core.database.repository.base import BaseRepository
+from core.log import get_logger
+from core.models.rows import Summary
 
 logger = get_logger(__name__)
 
 
-class SummaryRepository:
-    """Repository for summary operations."""
+class SummaryRepository(BaseRepository[Summary]):
+    """Summary repository using SQLModel with dependency injection."""
 
-    def __init__(self, db_manager: DatabaseManager) -> None:
-        """Initialize repository with database manager."""
-        self.db = db_manager
+    def __init__(self, db: Session) -> None:
+        """Initialize summary repository."""
+        super().__init__(Summary, db)
 
-    def _row_to_summary(self, row: RepositoryRowType) -> SummaryEntity:
-        """Convert database row to Summary model.
-
-        Args:
-            row: Database row as dict or tuple
-
-        Returns:
-            Summary model instance
-        """
-        if isinstance(row, dict):
-            return SummaryEntity.model_validate(row)
-
-        return SummaryEntity.from_tuple(row)
-
-    async def create(self, summary: SummaryEntity) -> int:
-        """Create a new summary record.
-
-        Args:
-            summary: Summary model instance
-
-        Returns:
-            Created summary ID
-        """
-        query = """
-        INSERT INTO summary (
-            paper_id, version, overview, motivation, method, result,
-            conclusion, language, interests, relevance, model, is_read
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """
-        params = (
-            summary.paper_id,
-            summary.version,
-            summary.overview,
-            summary.motivation,
-            summary.method,
-            summary.result,
-            summary.conclusion,
-            summary.language,
-            summary.interests,
-            summary.relevance,
-            summary.model,
-            summary.is_read,
-        )
-
-        cursor = await self.db.execute(query, params)
-        return cursor.lastrowid  # type: ignore
-
-    async def get_by_paper_and_language(
-        self, paper_id: int, language: str
-    ) -> SummaryEntity | None:
-        """Get summary by paper ID and language.
-
-        Args:
-            paper_id: Paper ID
-            language: Summary language
-
-        Returns:
-            Summary model or None if not found
-        """
-        query = """
-        SELECT * FROM summary
-        WHERE paper_id = ? AND language = ?
-        ORDER BY version DESC
-        LIMIT 1
-        """
-
-        row = await self.db.fetch_one(query, (paper_id, language))
-
-        if row:
-            return self._row_to_summary(row)
-        return None
-
-    async def get_by_paper_id(self, paper_id: int) -> list[SummaryEntity]:
-        """Get all summaries for a paper.
+    async def get_by_paper_id(self, paper_id: int) -> list[Summary]:
+        """Get summaries by paper ID.
 
         Args:
             paper_id: Paper ID
@@ -96,76 +25,86 @@ class SummaryRepository:
         Returns:
             List of summaries for the paper
         """
-        query = "SELECT * FROM summary WHERE paper_id = ? ORDER BY version DESC"
-        rows = await self.db.fetch_all(query, (paper_id,))
-        summaries = []
+        statement = select(Summary).where(Summary.paper_id == paper_id)
+        result = self.db.exec(statement)
+        return list(result.all())
 
-        for row in rows:
-            summaries.append(self._row_to_summary(row))
+    def get_by_paper_id_and_language(
+        self, paper_id: int, language: str
+    ) -> Summary | None:
+        """Get summary by paper ID and language.
 
-        return summaries
+        Args:
+            paper_id: Paper ID
+            language: Summary language
 
-    async def get_by_id(self, summary_id: int) -> SummaryEntity | None:
-        """Get summary by ID.
+        Returns:
+            Summary if found, None otherwise
+        """
+        statement = select(Summary).where(
+            (Summary.paper_id == paper_id) & (Summary.language == language)
+        )
+        result = self.db.exec(statement)
+        return result.first()
+
+    def get_by_paper_and_language(self, paper_id: int, language: str) -> Summary | None:
+        """Get summary by paper ID and language (alias for compatibility).
+
+        Args:
+            paper_id: Paper ID
+            language: Summary language
+
+        Returns:
+            Summary if found, None otherwise
+        """
+        return self.get_by_paper_id_and_language(paper_id, language)
+
+    def mark_as_read(self, summary_id: int) -> bool:
+        """Mark a summary as read.
 
         Args:
             summary_id: Summary ID
 
         Returns:
-            Summary model or None if not found
-        """
-        query = "SELECT * FROM summary WHERE summary_id = ?"
-        row = await self.db.fetch_one(query, (summary_id,))
-
-        if row:
-            return self._row_to_summary(row)
-        return None
-
-    async def update(self, summary: SummaryEntity) -> bool:
-        """Update a summary.
-
-        Args:
-            summary: Summary model with updated data
-
-        Returns:
             True if updated, False if not found
         """
-        if not summary.summary_id:
-            return False
+        statement = select(Summary).where(Summary.summary_id == summary_id)
+        result = self.db.exec(statement)
+        summary = result.first()
 
-        query = """
-        UPDATE summary SET
-            overview = ?, motivation = ?, method = ?, result = ?,
-            conclusion = ?, language = ?, interests = ?, relevance = ?,
-            model = ?, is_read = ?
-        WHERE summary_id = ?
-        """
-        params = (
-            summary.overview,
-            summary.motivation,
-            summary.method,
-            summary.result,
-            summary.conclusion,
-            summary.language,
-            summary.interests,
-            summary.relevance,
-            summary.model,
-            summary.is_read,
-            summary.summary_id,
-        )
+        if summary:
+            summary.is_read = True
+            self.db.commit()
+            self.db.refresh(summary)
+            return True
 
-        cursor = await self.db.execute(query, params)
-        return bool(cursor.rowcount > 0)
+        return False
 
-    async def delete(self, summary_id: int) -> bool:
-        """Delete a summary by ID.
+    def get_by_paper_ids_and_language(
+        self, paper_ids: list[int], language: str
+    ) -> dict[int, Summary]:
+        """Get summaries by multiple paper IDs and language (batch operation).
 
         Args:
-            summary_id: Summary ID to delete
+            paper_ids: List of paper IDs
+            language: Summary language
 
         Returns:
-            True if deleted, False if not found
+            Dictionary mapping paper_id to Summary object
         """
-        query = "DELETE FROM summary WHERE summary_id = ?"
-        cursor = await self.db.execute(query, (summary_id,))
-        return bool(cursor.rowcount > 0)
+        if not paper_ids:
+            return {}
+
+        statement = select(Summary).where(
+            (Summary.paper_id.in_(paper_ids))  # type: ignore
+            & (Summary.language == language)
+        )
+        result = self.db.exec(statement)
+        summaries = list(result.all())
+
+        # Create dictionary mapping paper_id to summary
+        return {
+            summary.paper_id: summary
+            for summary in summaries
+            if summary.paper_id is not None
+        }

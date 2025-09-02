@@ -1,6 +1,6 @@
 // Star management module for TheArk
 
-class StarManager {
+export class StarManager {
     constructor() {
         // Bind methods to maintain context
         this.createStarButton = this.createStarButton.bind(this);
@@ -145,5 +145,3 @@ class StarManager {
     }
 }
 
-// Export for use in other modules
-window.StarManager = StarManager;

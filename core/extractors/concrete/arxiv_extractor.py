@@ -1,7 +1,6 @@
 """ArXiv-specific paper extractor."""
 
 import re
-from datetime import datetime
 from urllib.parse import urljoin
 from xml.etree import ElementTree
 
@@ -16,6 +15,12 @@ from core.extractors.exceptions import (
 )
 from core.log import get_logger
 from core.models.domain.paper_extraction import PaperMetadata
+from core.utils import (
+    extract_xml_authors,
+    extract_xml_categories,
+    extract_xml_date,
+    extract_xml_text,
+)
 
 logger = get_logger(__name__)
 
@@ -67,9 +72,10 @@ class ArxivExtractor(BaseExtractor):
         Raises:
             InvalidIdentifierError: If URL format is invalid
         """
-        # Direct arXiv ID
-        if re.match(r"^\d{4}\.\d{4,5}$", url):
-            return url
+        # Direct arXiv ID (with or without version)
+        if re.match(r"^\d{4}\.\d{4,5}(v\d+)?$", url):
+            # Remove version suffix if present
+            return re.sub(r"v\d+$", "", url)
 
         # Abstract URL
         abs_match = re.search(r"arxiv\.org/abs/(\d{4}\.\d{4,5})", url)
@@ -178,18 +184,18 @@ class ArxivExtractor(BaseExtractor):
             Paper metadata
         """
         # Extract basic metadata
-        title = self._extract_text(entry, "atom:title")
-        abstract = self._extract_text(entry, "atom:summary")
+        title = extract_xml_text(entry, "atom:title", self.namespace)
+        abstract = extract_xml_text(entry, "atom:summary", self.namespace)
 
         # Extract authors
-        authors = self._extract_authors(entry)
+        authors = extract_xml_authors(entry, self.namespace)
 
         # Extract categories
-        categories = self._extract_categories(entry)
+        categories = extract_xml_categories(entry, self.namespace)
 
         # Extract dates
-        published_date = self._extract_date(entry, "atom:published")
-        updated_date = self._extract_date(entry, "atom:updated")
+        published_date = extract_xml_date(entry, "atom:published", self.namespace)
+        updated_date = extract_xml_date(entry, "atom:updated", self.namespace)
 
         # Extract URLs
         url_abs = urljoin(self.abs_base_url, f"abs/{identifier}")
@@ -211,77 +217,3 @@ class ArxivExtractor(BaseExtractor):
             pages=None,
             raw_metadata={"arxiv_id": identifier},
         )
-
-    def _extract_text(self, entry: ElementTree.Element, tag: str) -> str:
-        """Extract text content from XML element.
-
-        Args:
-            entry: XML entry element
-            tag: Tag name with namespace
-
-        Returns:
-            Extracted text
-        """
-        element = entry.find(tag, self.namespace)
-        if element is not None and element.text:
-            return element.text.strip()
-        return ""
-
-    def _extract_authors(self, entry: ElementTree.Element) -> list[str]:
-        """Extract authors from XML entry.
-
-        Args:
-            entry: XML entry element
-
-        Returns:
-            List of author names
-        """
-        authors = []
-        for author in entry.findall("atom:author", self.namespace):
-            name_elem = author.find("atom:name", self.namespace)
-            if name_elem is not None and name_elem.text:
-                authors.append(name_elem.text.strip())
-        return authors
-
-    def _extract_categories(self, entry: ElementTree.Element) -> list[str]:
-        """Extract categories from XML entry.
-
-        Args:
-            entry: XML entry element
-
-        Returns:
-            List of categories
-        """
-        categories = []
-        for category in entry.findall("arxiv:primary_category", self.namespace):
-            term = category.get("term")
-            if term:
-                categories.append(term)
-
-        for category in entry.findall("arxiv:category", self.namespace):
-            term = category.get("term")
-            if term and term not in categories:
-                categories.append(term)
-
-        return categories
-
-    def _extract_date(self, entry: ElementTree.Element, tag: str) -> str:
-        """Extract date from XML entry.
-
-        Args:
-            entry: XML entry element
-            tag: Date tag name
-
-        Returns:
-            Date string in ISO format
-        """
-        date_elem = entry.find(tag, self.namespace)
-        if date_elem is not None and date_elem.text:
-            try:
-                # Parse ISO 8601 date format
-                dt = datetime.fromisoformat(date_elem.text.replace("Z", "+00:00"))
-                return dt.isoformat()
-            except ValueError:
-                # Fallback to original text
-                return date_elem.text.strip()
-        return ""

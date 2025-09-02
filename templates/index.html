@@ -4,14 +4,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TheArk - Paper Management</title>
-    <!-- Modular CSS files -->
-    <link rel="stylesheet" href="/static/css/base.css">
-    <link rel="stylesheet" href="/static/css/components.css">
-    <link rel="stylesheet" href="/static/css/papers.css">
-    <link rel="stylesheet" href="/static/css/star-button.css">
-    <link rel="stylesheet" href="/static/css/modal.css">
-    <link rel="stylesheet" href="/static/css/responsive.css">
+    <title>Automatic Paper Summarizer</title>
+    <!-- Refactored CSS -->
+    <link rel="stylesheet" href="/static/css/variables.css">
+    <link rel="stylesheet" href="/static/css/main.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="icon" href="/static/favicon.ico" type="image/x-icon">
 </head>
 
@@ -63,20 +60,26 @@
 
     <!-- Independent Footer -->
     <footer class="footer">
-        <p>&copy; 2025 Sanghyun Son.</p>
+        <div class="footer-content">
+            <!-- Statistics Display (Left) -->
+            <div class="statistics-display">
+                <span class="stat-text">📊 <span id="total-papers">-</span> papers</span>
+                <span class="stat-text">📝 <span id="papers-with-summary">-</span> summaries (<span id="summary-coverage">-</span>%)</span>
+                <span class="stat-text">⏰ <span id="last-updated">-</span></span>
+            </div>
+            
+            <!-- Copyright and GitHub (Right) -->
+            <div class="footer-right">
+                <p>&copy; 2025 Sanghyun Son.</p>
+                <a href="https://github.com/sanghyun-son/theark" target="_blank" rel="noopener noreferrer" class="github-link">
+                    <i class="fab fa-github"></i>
+                </a>
+            </div>
+        </div>
     </footer>
 
-    <!-- JavaScript Modules -->
-    <script src="/static/js/api.js"></script>
-    <script src="/static/js/ui/star-manager.js"></script>
-    <script src="/static/js/ui/loading-indicators.js"></script>
-    <script src="/static/js/ui/modal-manager.js"></script>
-    <script src="/static/js/ui/paper-list-manager.js"></script>
-    <script src="/static/js/ui/utility-manager.js"></script>
-    <script src="/static/js/ui.js"></script>
-    <script src="/static/js/infinite-scroll.js"></script>
-    <script src="/static/js/paper-manager.js"></script>
-    <script src="/static/js/main.js"></script>
+    <!-- Modern JavaScript entry point -->
+    <script type="module" src="/static/js/main.js"></script>
 </body>
 
 </html>

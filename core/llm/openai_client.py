@@ -6,8 +6,8 @@ from pathlib import Path
 from typing import Any
 
 from openai import AsyncOpenAI
+from sqlmodel import Session
 
-from core.database.interfaces import DatabaseManager
 from core.log import get_logger
 from core.models.external.openai import (
     BatchEndpoint,
@@ -53,6 +53,7 @@ class UnifiedOpenAIClient:
         timeout: float = 60.0,
         model: str = "gpt-4o-mini",
         use_tools: bool = True,
+        max_retries: int = 3,
     ) -> None:
         """Initialize the unified OpenAI client.
 
@@ -62,6 +63,7 @@ class UnifiedOpenAIClient:
             timeout: Request timeout in seconds
             model: Default model to use
             use_tools: Whether to use tools/function calling by default
+            max_retries: Maximum number of retries for failed requests
         """
         self._api_key = api_key
         self._base_url = base_url.rstrip("/")
@@ -69,15 +71,19 @@ class UnifiedOpenAIClient:
         self._model = model
         self._use_tools = use_tools
 
-        # Initialize official OpenAI client
+        # Initialize official OpenAI client with retry configuration
         # Use the base URL as provided (tests already include /v1 if needed)
         self._client = AsyncOpenAI(
             api_key=api_key,
             base_url=self._base_url,
             timeout=timeout,
+            max_retries=max_retries,
         )
 
-        logger.info(f"Initialized {self.__class__.__name__} with {base_url=}, {model=}")
+        logger.info(
+            f"Initialized {self.__class__.__name__} "
+            f"with {base_url=}, {model=}, {max_retries=}"
+        )
 
     @property
     def model(self) -> str:
@@ -95,7 +101,7 @@ class UnifiedOpenAIClient:
         messages: list[OpenAIMessage],
         model: str | None = None,
         use_tools: bool | None = None,
-        db_manager: DatabaseManager | None = None,
+        db_session: Session | None = None,
         custom_id: str | None = None,
     ) -> ChatCompletionResponse:
         """Create a chat completion request with robust error handling.
@@ -104,7 +110,7 @@ class UnifiedOpenAIClient:
             messages: List of messages for the conversation
             model: Model to use (defaults to client model)
             use_tools: Whether to use tools (defaults to client setting)
-            db_manager: Database manager for tracking (optional)
+            db_session: Database manager for tracking (optional)
             custom_id: Custom identifier for tracking (optional)
 
         Returns:
@@ -122,7 +128,7 @@ class UnifiedOpenAIClient:
             messages=messages,
         )
 
-        # Note: Tool creation is now handled by SummaryGenerator
+        # Note: Tool creation is now handled by PaperSummarizationService
         # This client only handles the raw OpenAI API calls
 
         # Log request details
@@ -143,7 +149,7 @@ class UnifiedOpenAIClient:
 
         chat_response = ChatCompletionResponse.model_validate(response_dict)
 
-        # Note: Tracking is now handled by SummaryGenerator
+        # Note: Tracking is now handled by PaperSummarizationService
 
         return chat_response
 

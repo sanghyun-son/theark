@@ -1,13 +1,9 @@
 """Tests for OpenAI Batch API client."""
 
-import json
 import tempfile
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
 
-import httpx
 import pytest
-from pytest_httpserver import HTTPServer
 
 from core.llm.openai_client import UnifiedOpenAIClient
 from core.models.external.openai import BatchRequest, BatchResponse
@@ -131,9 +127,6 @@ async def test_monitor_batch_progress(
     assert isinstance(updates[0], BatchResponse)
     assert updates[0].id == "batch_123"
     assert updates[0].status == "completed"
-
-
-
 
 
 @pytest.mark.asyncio

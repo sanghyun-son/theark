@@ -38,8 +38,12 @@ class PaperExtractor(Protocol):
         """Extract unique identifier from URL."""
         ...
 
-    def extract_metadata(self, url: str) -> PaperMetadata:
-        """Extract paper metadata from URL."""
+    async def extract_metadata_async(self, url: str) -> PaperMetadata:
+        """Extract paper metadata from URL asynchronously."""
+        ...
+
+    def get_source_name(self) -> str:
+        """Get the name of the source this extractor handles."""
         ...
 
 

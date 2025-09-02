@@ -4,13 +4,13 @@ import pytest
 from fastapi.testclient import TestClient
 
 from api.literals import (
-    STREAMING_HEADERS,
-    PAPERS_STREAM_SUMMARY_PATH,
     DEFAULT_SUMMARY_LANGUAGE,
+    PAPERS_STREAM_SUMMARY_PATH,
+    STREAMING_HEADERS,
     EventType,
     HTTPStatus,
 )
-from tests.integration.conftest import parse_sse_events
+from core.utils import parse_sse_events
 
 
 @pytest.fixture
@@ -22,7 +22,7 @@ def valid_paper_request() -> dict:
     }
 
 
-def test_stream_paper_creation_successful_response(
+def test_summarize_stream_successful_response(
     integration_client: TestClient,
     valid_paper_request: dict,
 ) -> None:
@@ -37,7 +37,7 @@ def test_stream_paper_creation_successful_response(
     assert response.headers["content-type"] == "text/event-stream; charset=utf-8"
 
 
-def test_stream_paper_creation_events_structure(
+def test_summarize_stream_events_structure(
     integration_client: TestClient,
     valid_paper_request: dict,
 ) -> None:
@@ -65,7 +65,7 @@ def test_stream_paper_creation_events_structure(
     assert len(error_events) == 0, f"Unexpected error events: {error_events}"
 
 
-def test_stream_paper_creation_paper_data_integrity(
+def test_summarize_stream_paper_data_integrity(
     integration_client: TestClient,
     valid_paper_request: dict,
 ) -> None:
@@ -92,7 +92,7 @@ def test_stream_paper_creation_paper_data_integrity(
     assert paper["summary"] is not None, "Paper summary should be generated"
 
 
-def test_stream_paper_creation_no_database_connection_errors(
+def test_summarize_stream_no_database_connection_errors(
     integration_client: TestClient,
     valid_paper_request: dict,
 ) -> None:
@@ -119,7 +119,7 @@ def test_stream_paper_creation_no_database_connection_errors(
     assert len(complete_events) > 0, "No complete event found - streaming failed"
 
 
-def test_stream_paper_creation_with_different_language(
+def test_summarize_stream_with_different_language(
     integration_client: TestClient,
 ) -> None:
     """Test streaming paper creation with Korean language."""
@@ -148,7 +148,7 @@ def test_stream_paper_creation_with_different_language(
     assert paper["summary"] is not None, "Korean summary should be generated"
 
 
-def test_stream_paper_creation_invalid_url(
+def test_summarize_stream_invalid_url(
     integration_client: TestClient,
 ) -> None:
     """Test streaming paper creation with invalid URL."""
@@ -174,7 +174,7 @@ def test_stream_paper_creation_invalid_url(
     assert len(error_events) > 0, "Should have error events for invalid URL"
 
 
-def test_stream_paper_creation_events_sequence(
+def test_summarize_stream_events_sequence(
     integration_client: TestClient,
     valid_paper_request: dict,
 ) -> None:

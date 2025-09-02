@@ -1,33 +1,29 @@
 """Core database functionality."""
 
-from .config import (
-    DatabaseConfig,
-    Environment,
-    get_database_dir,
-    get_database_path,
-    setup_database_environment,
+from .engine import (
+    create_database_engine,
+    create_database_tables,
+    drop_database_tables,
+    reset_database,
 )
-from .interfaces.manager import DatabaseManager
 from .repository import (
-    CrawlEventRepository,
-    FeedRepository,
-    LLMRequestRepository,
+    LLMBatchRepository,
     PaperRepository,
     SummaryRepository,
+    UserInterestRepository,
     UserRepository,
+    UserStarRepository,
 )
 
 __all__ = [
-    "DatabaseManager",
-    "DatabaseConfig",
-    "Environment",
-    "get_database_path",
-    "get_database_dir",
-    "setup_database_environment",
     "PaperRepository",
     "SummaryRepository",
     "UserRepository",
-    "FeedRepository",
-    "CrawlEventRepository",
-    "LLMRequestRepository",
+    "UserInterestRepository",
+    "UserStarRepository",
+    "LLMBatchRepository",
+    "create_database_engine",
+    "create_database_tables",
+    "drop_database_tables",
+    "reset_database",
 ]

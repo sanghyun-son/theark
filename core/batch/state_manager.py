@@ -2,9 +2,13 @@
 
 from typing import Any
 
-from core.database.interfaces import DatabaseManager
+from sqlalchemy.engine import Engine
+from sqlmodel import Session
+
 from core.database.repository.llm_batch import LLMBatchRepository
 from core.log import get_logger
+from core.models.batch import BatchItemCreate
+from core.models.rows import Paper
 
 logger = get_logger(__name__)
 
@@ -14,39 +18,39 @@ class BatchStateManager:
 
     def __init__(self) -> None:
         """Initialize batch state manager."""
-        # Note: db_manager is injected per method call for flexibility
+        # Note: db_session is injected per method call for flexibility
 
-    async def get_pending_summaries(
-        self, db_manager: DatabaseManager
-    ) -> list[dict[str, Any]]:
+    def get_pending_summaries(self, db_engine: Engine) -> list[Paper]:
         """Get papers that need summarization.
 
         Args:
-            db_manager: Database manager instance
+            db_engine: Database engine instance
 
         Returns:
             List of papers that need summarization
         """
-        repository = LLMBatchRepository(db_manager)
-        return await repository.get_pending_summaries()
+        with Session(db_engine) as session:
+            repository = LLMBatchRepository(session)
 
-    async def get_active_batches(
-        self, db_manager: DatabaseManager
-    ) -> list[dict[str, Any]]:
+        return repository.get_pending_summaries()
+
+    def get_active_batches(self, db_engine: Engine) -> list[dict[str, Any]]:
         """Get currently active batch requests.
 
         Args:
-            db_manager: Database manager instance
+            db_engine: Database engine instance
 
         Returns:
             List of active batch requests
         """
-        repository = LLMBatchRepository(db_manager)
-        return await repository.get_active_batches()
+        with Session(db_engine) as session:
+            repository = LLMBatchRepository(session)
 
-    async def create_batch_record(
+        return repository.get_active_batches()
+
+    def create_batch_record(
         self,
-        db_manager: DatabaseManager,
+        db_engine: Engine,
         batch_id: str,
         input_file_id: str,
         completion_window: str = "24h",
@@ -56,102 +60,107 @@ class BatchStateManager:
         """Create a new batch request record.
 
         Args:
-            db_manager: Database manager instance
+            db_engine: Database engine instance
             batch_id: Unique batch identifier
             input_file_id: ID of the input file
             completion_window: Time window for completion
             endpoint: API endpoint
             metadata: Additional metadata
         """
-        repository = LLMBatchRepository(db_manager)
-        await repository.create_batch_record(
-            batch_id, input_file_id, completion_window, endpoint, metadata
+        with Session(db_engine) as session:
+            repository = LLMBatchRepository(session)
+
+        repository.create_batch_record(
+            batch_id,
+            input_file_id,
+            completion_window,
+            endpoint,
+            metadata,
         )
 
-    async def update_batch_status(
+    def update_batch_status(
         self,
-        db_manager: DatabaseManager,
+        db_engine: Engine,
         batch_id: str,
         status: str,
-        output_file_id: str | None = None,
         error_file_id: str | None = None,
-        request_counts: dict[str, int] | None = None,
     ) -> None:
         """Update batch request status.
 
         Args:
-            db_manager: Database manager instance
+            db_engine: Database engine instance
             batch_id: Unique batch identifier
             status: New status
-            output_file_id: ID of the output file (optional)
             error_file_id: ID of the error file (optional)
-            request_counts: Counts of requests by status (optional)
         """
-        repository = LLMBatchRepository(db_manager)
-        await repository.update_batch_status(
-            batch_id, status, output_file_id, error_file_id, request_counts
-        )
+        with Session(db_engine) as session:
+            repository = LLMBatchRepository(session)
 
-    async def add_batch_items(
-        self, db_manager: DatabaseManager, batch_id: str, items: list[dict[str, Any]]
+        repository.update_batch_status(batch_id, status, error_file_id)
+
+    def add_batch_items(
+        self, db_engine: Engine, batch_id: str, items: list[BatchItemCreate]
     ) -> None:
         """Add items to a batch request.
 
         Args:
-            db_manager: Database manager instance
+            db_engine: Database engine instance
             batch_id: Unique batch identifier
-            items: List of items to add, each containing paper_id and input_data
+            items: List of items to add
         """
-        repository = LLMBatchRepository(db_manager)
-        await repository.add_batch_items(batch_id, items)
+        with Session(db_engine) as session:
+            repository = LLMBatchRepository(session)
 
-    async def get_batch_items(
-        self, db_manager: DatabaseManager, batch_id: str
-    ) -> list[dict[str, Any]]:
+        items_dict = [item.model_dump() for item in items]
+        repository.add_batch_items(batch_id, items_dict)
+
+    def get_batch_items(self, db_engine: Engine, batch_id: str) -> list[dict[str, Any]]:
         """Get all items for a batch request.
 
         Args:
-            db_manager: Database manager instance
+            db_engine: Database engine instance
             batch_id: Unique batch identifier
 
         Returns:
             List of batch items
         """
-        repository = LLMBatchRepository(db_manager)
-        return await repository.get_batch_items(batch_id)
+        with Session(db_engine) as session:
+            repository = LLMBatchRepository(session)
 
-    async def update_batch_item_status(
+        result = repository.get_batch_items(batch_id)
+        return result if result else []
+
+    def update_batch_item_status(
         self,
-        db_manager: DatabaseManager,
+        db_engine: Engine,
         batch_id: str,
         paper_id: int,
         status: str,
-        output_data: str | None = None,
         error_message: str | None = None,
     ) -> None:
         """Update status of a specific batch item.
 
         Args:
-            db_manager: Database manager instance
+            db_engine: Database engine instance
             batch_id: Unique batch identifier
             paper_id: Paper identifier
             status: New status
-            output_data: Output data from processing (optional)
             error_message: Error message if failed (optional)
         """
-        repository = LLMBatchRepository(db_manager)
-        await repository.update_batch_item_status(
-            batch_id, paper_id, status, output_data, error_message
-        )
+        with Session(db_engine) as session:
+            repository = LLMBatchRepository(session)
 
-    async def mark_papers_processing(
-        self, db_manager: DatabaseManager, paper_ids: list[int]
-    ) -> None:
+        item_id = f"{batch_id}_{paper_id}"
+        repository.update_batch_item_status(batch_id, item_id, status, error_message)
+
+    def mark_papers_processing(self, db_engine: Engine, paper_ids: list[int]) -> None:
         """Mark papers as being processed.
 
         Args:
-            db_manager: Database manager instance
+            db_session: Database session instance
             paper_ids: List of paper IDs to mark as processing
         """
-        repository = LLMBatchRepository(db_manager)
-        await repository.mark_papers_processing(paper_ids)
+        with Session(db_engine) as session:
+            repository = LLMBatchRepository(session)
+
+        repository.mark_papers_processing(paper_ids)

@@ -6,20 +6,20 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
+from sqlalchemy.engine import Engine
+
 from core.batch.state_manager import BatchStateManager
-from core.config import Settings
-from core.database.interfaces import DatabaseManager
-from core.llm.applications.summary import SummaryGenerator
 from core.llm.batch_builder import UnifiedBatchBuilder
 from core.llm.openai_client import UnifiedOpenAIClient
 from core.log import get_logger
 from core.models.batch import (
-    BatchItem,
+    BatchItemCreate,
     BatchMetadata,
     BatchRequestPayload,
     BatchResult,
-    PaperSummary,
 )
+from core.models.rows import Paper
+from core.services.summarization_service import PaperSummarizationService
 
 logger = get_logger(__name__)
 
@@ -27,36 +27,56 @@ logger = get_logger(__name__)
 class BackgroundBatchManager:
     """Manages background batch processing tasks."""
 
-    def __init__(self, settings: Settings, language: str = "English") -> None:
+    def __init__(
+        self,
+        summary_service: PaperSummarizationService,
+        batch_enabled: bool = True,
+        batch_summary_interval: int = 3600,
+        batch_fetch_interval: int = 600,
+        batch_max_items: int = 1000,
+        language: str = "English",
+        interests: list[str] = ["Machine Learning"],
+    ) -> None:
         """Initialize background batch manager.
 
         Args:
-            settings: Application settings
+            summary_service: Paper summarization service instance
+            batch_enabled: Whether batch processing is enabled
+            batch_summary_interval: Interval in seconds for summary batch processing
+            batch_fetch_interval: Interval in seconds for fetching batch results
+            batch_max_items: Maximum number of items per batch
             language: Language for batch summarization (default: "English")
         """
-        self._settings = settings
+        self._batch_enabled = batch_enabled
+        self._batch_summary_interval = batch_summary_interval
+        self._batch_fetch_interval = batch_fetch_interval
+        self._batch_max_items = batch_max_items
         self._language = language
+
+        self._interests = interests
+
         self._state_manager = BatchStateManager()
+        self._summary_service = summary_service
         self._running = False
         self._summary_task: asyncio.Task[Any] | None = None
         self._fetch_task: asyncio.Task[Any] | None = None
 
     async def start(
         self,
-        db_manager: DatabaseManager,
+        db_engine: Engine,
         openai_client: UnifiedOpenAIClient,
     ) -> None:
         """Start background batch processing.
 
         Args:
-            db_manager: Database manager instance
+            db_session: Database manager instance
             openai_client: OpenAI batch client instance
         """
         if self._running:
             logger.warning("Background batch manager is already running")
             return
 
-        if not self._settings.batch_enabled:
+        if not self._batch_enabled:
             logger.info("Batch processing is disabled in settings")
             return
 
@@ -65,12 +85,12 @@ class BackgroundBatchManager:
 
         # Start summary scheduler (runs every hour)
         self._summary_task = asyncio.create_task(
-            self._summary_scheduler(db_manager, openai_client)
+            self._summary_scheduler(db_engine, openai_client)
         )
 
         # Start fetch scheduler (runs every 10 minutes)
         self._fetch_task = asyncio.create_task(
-            self._fetch_scheduler(db_manager, openai_client)
+            self._fetch_scheduler(db_engine, openai_client)
         )
 
         logger.info("Background batch manager started successfully")
@@ -102,20 +122,20 @@ class BackgroundBatchManager:
         logger.info("Background batch manager stopped successfully")
 
     async def _summary_scheduler(
-        self, db_manager: DatabaseManager, openai_client: UnifiedOpenAIClient
+        self, db_engine: Engine, openai_client: UnifiedOpenAIClient
     ) -> None:
         """Scheduler for creating batch requests for pending summaries.
 
         Args:
-            db_manager: Database manager instance
+            db_session: Database session instance
             openai_client: OpenAI batch client instance
         """
         logger.info("Summary scheduler started")
 
         while self._running:
             try:
-                await self._process_pending_summaries(db_manager, openai_client)
-                await asyncio.sleep(self._settings.batch_summary_interval)
+                await self._process_pending_summaries(db_engine, openai_client)
+                await asyncio.sleep(self._batch_summary_interval)
             except asyncio.CancelledError:
                 logger.info("Summary scheduler cancelled")
                 break
@@ -124,20 +144,20 @@ class BackgroundBatchManager:
                 await asyncio.sleep(60)  # Wait 1 minute before retrying
 
     async def _fetch_scheduler(
-        self, db_manager: DatabaseManager, openai_client: UnifiedOpenAIClient
+        self, db_engine: Engine, openai_client: UnifiedOpenAIClient
     ) -> None:
         """Scheduler for fetching batch results.
 
         Args:
-            db_manager: Database manager instance
+            db_session: Database session instance
             openai_client: OpenAI batch client instance
         """
         logger.info("Fetch scheduler started")
 
         while self._running:
             try:
-                await self._process_active_batches(db_manager, openai_client)
-                await asyncio.sleep(self._settings.batch_fetch_interval)
+                await self._process_active_batches(db_engine, openai_client)
+                await asyncio.sleep(self._batch_fetch_interval)
             except asyncio.CancelledError:
                 logger.info("Fetch scheduler cancelled")
                 break
@@ -146,65 +166,58 @@ class BackgroundBatchManager:
                 await asyncio.sleep(60)  # Wait 1 minute before retrying
 
     async def _process_pending_summaries(
-        self, db_manager: DatabaseManager, openai_client: UnifiedOpenAIClient
+        self, db_engine: Engine, openai_client: UnifiedOpenAIClient
     ) -> None:
         """Process pending summaries and create batch requests.
 
         Args:
-            db_manager: Database manager instance
+            db_session: Database session instance
             openai_client: OpenAI batch client instance
         """
         try:
             # Get pending summaries
-            pending_papers = await self._state_manager.get_pending_summaries(db_manager)
+            pending_papers = self._state_manager.get_pending_summaries(db_engine)
 
             if not pending_papers:
                 logger.debug("No pending summaries to process")
                 return
 
             # Check daily limit
-            if not await self._check_daily_limit(db_manager):
+            if not await self._check_daily_limit(db_engine):
                 logger.warning("Daily batch limit reached, skipping summary processing")
                 return
 
             logger.info(f"Processing {len(pending_papers)} pending summaries")
 
-            # Convert dicts to PaperSummary objects
-            paper_summaries = [
-                PaperSummary(
-                    paper_id=paper["paper_id"],
-                    title=paper["title"],
-                    abstract=paper["abstract"],
-                    arxiv_id=paper["arxiv_id"],
-                    published_at=paper.get("published_at"),
-                )
-                for paper in pending_papers
-            ]
+            # Use Paper objects directly
+            paper_ids = []
 
-            # Mark papers as processing to prevent race conditions
-            paper_ids = [paper["paper_id"] for paper in pending_papers]
-            await self._state_manager.mark_papers_processing(db_manager, paper_ids)
+            for paper in pending_papers:
+                if paper.paper_id is None:  # Skip papers without ID
+                    continue
+                paper_ids.append(paper.paper_id)
+            self._state_manager.mark_papers_processing(db_engine, paper_ids)
 
             # Create batch request
-            await self._create_batch_request(db_manager, paper_summaries, openai_client)
+            await self._create_batch_request(db_engine, pending_papers, openai_client)
 
         except Exception as e:
             logger.error(f"Error processing pending summaries: {e}")
 
     async def _create_batch_request(
         self,
-        db_manager: DatabaseManager,
-        papers: list[PaperSummary],
+        db_engine: Engine,
+        papers: list[Paper],
         openai_client: UnifiedOpenAIClient,
     ) -> None:
         """Create a batch request for paper summarization.
 
         Args:
-            db_manager: Database manager instance
+            db_session: Database manager instance
             papers: List of papers to summarize
         """
         # Limit papers to batch_max_items
-        papers = papers[: self._settings.batch_max_items]
+        papers = papers[: self._batch_max_items]
 
         # Create batch request payload
         batch_payload = self._create_batch_payload(papers, openai_client)
@@ -231,8 +244,8 @@ class BackgroundBatchManager:
         if not batch_response.id:
             raise RuntimeError("Batch response missing ID")
 
-        await self._state_manager.create_batch_record(
-            db_manager,
+        self._state_manager.create_batch_record(
+            db_engine,
             batch_id=batch_response.id,
             input_file_id=file_id,
             completion_window="24h",
@@ -243,7 +256,7 @@ class BackgroundBatchManager:
         # Add batch items to database
         batch_items = []
         for paper in papers:
-            batch_item = BatchItem(
+            batch_item = BatchItemCreate(
                 paper_id=paper.paper_id,
                 input_data=json.dumps(
                     {
@@ -254,18 +267,16 @@ class BackgroundBatchManager:
                     }
                 ),
             )
-            batch_items.append(batch_item.model_dump())
+            batch_items.append(batch_item)
 
-        await self._state_manager.add_batch_items(
-            db_manager, batch_response.id, batch_items
-        )
+        self._state_manager.add_batch_items(db_engine, batch_response.id, batch_items)
 
         logger.info(
             f"Created batch request {batch_response.id} for {len(papers)} papers"
         )
 
     def _create_batch_payload(
-        self, papers: list[PaperSummary], openai_client: UnifiedOpenAIClient
+        self, papers: list[Paper], openai_client: UnifiedOpenAIClient
     ) -> BatchRequestPayload:
         """Create batch request payload using unified prompt structure.
 
@@ -276,14 +287,13 @@ class BackgroundBatchManager:
             Batch request payload
         """
 
-        summary_generator = SummaryGenerator()
         requests = []
 
         for paper in papers:
             # Create messages for this paper
-            messages = summary_generator._create_summarization_messages(
+            messages = self._summary_service._create_summarization_messages(
                 paper.abstract,
-                interest_section="",  # TODO: Get from config or user preferences
+                interests=self._interests,
                 language=self._language,
             )
 
@@ -291,8 +301,10 @@ class BackgroundBatchManager:
             tools = None
             tool_choice = None
             if openai_client.use_tools:
-                tools = [summary_generator._create_paper_analysis_tool(self._language)]
-                tool_choice = summary_generator._create_tool_choice()
+                tools = [
+                    self._summary_service._create_paper_analysis_tool(self._language)
+                ]
+                tool_choice = self._summary_service._create_tool_choice()
 
             # Create request data
             request_data = {
@@ -309,16 +321,16 @@ class BackgroundBatchManager:
         )
 
     async def _process_active_batches(
-        self, db_manager: DatabaseManager, openai_client: UnifiedOpenAIClient
+        self, db_engine: Engine, openai_client: UnifiedOpenAIClient
     ) -> None:
         """Process active batch requests and fetch results.
 
         Args:
-            db_manager: Database manager instance
+            db_session: Database session instance
         """
         try:
             # Get active batches
-            active_batches = await self._state_manager.get_active_batches(db_manager)
+            active_batches = self._state_manager.get_active_batches(db_engine)
 
             if not active_batches:
                 logger.debug("No active batches to process")
@@ -328,21 +340,21 @@ class BackgroundBatchManager:
 
             # Process each active batch
             for batch in active_batches:
-                await self._process_batch_status(db_manager, batch, openai_client)
+                await self._process_batch_status(db_engine, batch, openai_client)
 
         except Exception as e:
             logger.error(f"Error processing active batches: {e}")
 
     async def _process_batch_status(
         self,
-        db_manager: DatabaseManager,
+        db_engine: Engine,
         batch: dict[str, Any],
         openai_client: UnifiedOpenAIClient,
     ) -> None:
         """Process status of a single batch.
 
         Args:
-            db_manager: Database manager instance
+            db_session: Database manager instance
             batch: Batch information from database
         """
         try:
@@ -352,19 +364,17 @@ class BackgroundBatchManager:
             batch_status = await openai_client.get_batch_status(batch_id)
 
             # Update batch status in database
-            await self._state_manager.update_batch_status(
-                db_manager,
+            self._state_manager.update_batch_status(
+                db_engine,
                 batch_id=batch_id,
                 status=batch_status.status,
-                output_file_id=batch_status.output_file_id,
                 error_file_id=batch_status.error_file_id,
-                request_counts=batch_status.request_counts,
             )
 
             # If batch is completed, process results
             if batch_status.status == "completed" and batch_status.output_file_id:
                 await self._process_batch_results(
-                    db_manager, batch_id, batch_status.output_file_id, openai_client
+                    db_engine, batch_id, batch_status.output_file_id, openai_client
                 )
 
             # If batch failed, log error
@@ -372,7 +382,7 @@ class BackgroundBatchManager:
                 logger.error(f"Batch {batch_id} failed")
                 if batch_status.error_file_id:
                     await self._process_batch_errors(
-                        db_manager, batch_id, batch_status.error_file_id, openai_client
+                        db_engine, batch_id, batch_status.error_file_id, openai_client
                     )
 
             logger.debug(f"Updated batch {batch_id} status to {batch_status.status}")
@@ -384,7 +394,7 @@ class BackgroundBatchManager:
 
     async def _process_batch_results(
         self,
-        db_manager: DatabaseManager,
+        db_engine: Engine,
         batch_id: str,
         output_file_id: str,
         openai_client: UnifiedOpenAIClient,
@@ -392,7 +402,7 @@ class BackgroundBatchManager:
         """Process completed batch results.
 
         Args:
-            db_manager: Database manager instance
+            db_session: Database manager instance
             batch_id: ID of the completed batch
             output_file_id: ID of the output file
         """
@@ -406,7 +416,7 @@ class BackgroundBatchManager:
                 for line in f:
                     if line.strip():
                         result = json.loads(line)
-                        await self._process_single_result(db_manager, batch_id, result)
+                        await self._process_single_result(db_engine, batch_id, result)
 
             # Clean up
             Path(output_file_path).unlink(missing_ok=True)
@@ -417,12 +427,12 @@ class BackgroundBatchManager:
             logger.error(f"Error processing batch results for {batch_id}: {e}")
 
     async def _process_single_result(
-        self, db_manager: DatabaseManager, batch_id: str, result: BatchResult
+        self, db_engine: Engine, batch_id: str, result: BatchResult
     ) -> None:
         """Process a single batch result.
 
         Args:
-            db_manager: Database manager instance
+            db_session: Database manager instance
             batch_id: ID of the batch
             result: Single result from batch
         """
@@ -436,20 +446,12 @@ class BackgroundBatchManager:
 
             # Check if result was successful
             if result.status_code == 200:
-                response_body = result.response.get("body", {})
-                summary_text = (
-                    response_body.get("choices", [{}])[0]
-                    .get("message", {})
-                    .get("content", "")
-                )
-
                 # Update batch item status
-                await self._state_manager.update_batch_item_status(
-                    db_manager,
+                self._state_manager.update_batch_item_status(
+                    db_engine,
                     batch_id=batch_id,
                     paper_id=paper_id,
                     status="completed",
-                    output_data=summary_text,
                 )
 
                 logger.debug(f"Processed successful result for paper {paper_id}")
@@ -461,8 +463,8 @@ class BackgroundBatchManager:
                     .get("message", "Unknown error")
                 )
 
-                await self._state_manager.update_batch_item_status(
-                    db_manager,
+                self._state_manager.update_batch_item_status(
+                    db_engine,
                     batch_id=batch_id,
                     paper_id=paper_id,
                     status="failed",
@@ -476,7 +478,7 @@ class BackgroundBatchManager:
 
     async def _process_batch_errors(
         self,
-        db_manager: DatabaseManager,
+        db_engine: Engine,
         batch_id: str,
         error_file_id: str,
         openai_client: UnifiedOpenAIClient,
@@ -484,7 +486,7 @@ class BackgroundBatchManager:
         """Process batch error file.
 
         Args:
-            db_manager: Database manager instance
+            db_session: Database manager instance
             batch_id: ID of the batch
             error_file_id: ID of the error file
         """
@@ -506,11 +508,11 @@ class BackgroundBatchManager:
         except Exception as e:
             logger.error(f"Error processing batch errors for {batch_id}: {e}")
 
-    async def _check_daily_limit(self, db_manager: DatabaseManager) -> bool:
+    async def _check_daily_limit(self, db_engine: Engine) -> bool:
         """Check if daily batch limit has been reached.
 
         Args:
-            db_manager: Database manager instance
+            db_session: Database manager instance
 
         Returns:
             True if under daily limit, False otherwise
@@ -526,13 +528,13 @@ class BackgroundBatchManager:
 
     async def trigger_processing(
         self,
-        db_manager: DatabaseManager,
+        db_engine: Engine,
         openai_client: UnifiedOpenAIClient,
     ) -> None:
         """Manually trigger batch processing.
 
         Args:
-            db_manager: Database manager instance
+            db_session: Database manager instance
             openai_client: OpenAI batch client instance
         """
-        await self._process_pending_summaries(db_manager, openai_client)
+        await self._process_pending_summaries(db_engine, openai_client)

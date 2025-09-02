@@ -1,12 +1,18 @@
 """Paper star operations router."""
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Depends, Query
+from sqlmodel import Session
 
-from api.dependencies import CurrentUser, DBManager
+from api.dependencies import (
+    get_current_user,
+    get_db,
+)
 from api.utils.error_handler import handle_async_api_operation
 from core.models.api.requests import StarRequest
 from core.models.api.responses import StarredPapersResponse, StarResponse
+from core.models.rows import User
 from core.services.paper_service import PaperService
+from core.services.star_service import StarService
 
 router = APIRouter()
 
@@ -15,8 +21,8 @@ router = APIRouter()
 async def add_star(
     paper_id: int,
     star_data: StarRequest,
-    db_manager: DBManager,
-    current_user: CurrentUser,
+    db_session: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> StarResponse:
     """Add a star to a paper.
 
@@ -33,10 +39,9 @@ async def add_star(
     """
 
     async def add_star_operation() -> StarResponse:
-        paper_service = PaperService()
-        return await paper_service.add_star(
-            paper_id, db_manager, current_user, star_data.note
-        )
+        star_service = StarService()
+        user_id = current_user.user_id
+        return star_service.add_star(db_session, user_id, paper_id, star_data.note)
 
     return await handle_async_api_operation(
         add_star_operation,
@@ -47,8 +52,8 @@ async def add_star(
 
 @router.get("/starred/", response_model=StarredPapersResponse)
 async def get_starred_papers(
-    db_manager: DBManager,
-    current_user: CurrentUser,
+    db_session: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
     limit: int = Query(
         default=20, ge=1, le=100, description="Number of papers to return"
     ),
@@ -70,8 +75,14 @@ async def get_starred_papers(
 
     async def get_starred_papers_operation() -> StarredPapersResponse:
         paper_service = PaperService()
+        user_id = current_user.user_id
+        if user_id is None:
+            raise ValueError(f"User not found: {current_user}")
         return await paper_service.get_starred_papers(
-            db_manager, current_user, limit=limit, offset=offset
+            user_id,
+            db_session,
+            skip=offset,
+            limit=limit,
         )
 
     return await handle_async_api_operation(
@@ -82,8 +93,8 @@ async def get_starred_papers(
 @router.delete("/{paper_id}/star", response_model=StarResponse)
 async def remove_star(
     paper_id: int,
-    db_manager: DBManager,
-    current_user: CurrentUser,
+    db_session: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> StarResponse:
     """Remove a star from a paper.
 
@@ -99,8 +110,9 @@ async def remove_star(
     """
 
     async def remove_star_operation() -> StarResponse:
-        paper_service = PaperService()
-        return await paper_service.remove_star(paper_id, db_manager, current_user)
+        star_service = StarService()
+        user_id = current_user.user_id
+        return star_service.remove_star(db_session, user_id, paper_id)
 
     return await handle_async_api_operation(
         remove_star_operation,
@@ -112,8 +124,8 @@ async def remove_star(
 @router.get("/{paper_id}/star", response_model=StarResponse)
 async def get_star_status(
     paper_id: int,
-    db_manager: DBManager,
-    current_user: CurrentUser,
+    db_session: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> StarResponse:
     """Check if a paper is starred by the current user.
 
@@ -129,8 +141,9 @@ async def get_star_status(
     """
 
     async def get_star_status_operation() -> StarResponse:
-        paper_service = PaperService()
-        return await paper_service.is_paper_starred(paper_id, db_manager, current_user)
+        star_service = StarService()
+        user_id = current_user.user_id
+        return star_service.is_paper_starred(db_session, user_id, paper_id)
 
     return await handle_async_api_operation(
         get_star_status_operation,

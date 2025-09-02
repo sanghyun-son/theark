@@ -3,13 +3,15 @@
 import pytest
 from fastapi.testclient import TestClient
 
-from tests.integration.conftest import integration_client
-
 
 @pytest.mark.asyncio
 async def test_get_papers_success(integration_client: TestClient):
     """Test successful paper list retrieval."""
     response = integration_client.get("/v1/papers/")
+
+    if response.status_code != 200:
+        print(f"Response status: {response.status_code}")
+        print(f"Response content: {response.text}")
 
     assert response.status_code == 200
     data = response.json()

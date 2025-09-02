@@ -1,20 +1,26 @@
 // UI rendering module for TheArk
+import { StarManager } from './ui/star-manager.js';
+import { LoadingIndicators } from './ui/loading-indicators.js';
+import { PaperListManager } from './ui/paper-list-manager.js';
+import { UtilityManager } from './ui/utility-manager.js';
+import { ModalManager } from './ui/modal-manager.js';
 
-class UIService {
-    constructor() {
-        this.papers = [];
+export class UIService {
+    constructor(apiService, paperManager) {
+        this.apiService = apiService;
+        this.paperManager = paperManager;
         
         // Initialize specialized managers
-        this.starManager = new window.StarManager();
-        this.loadingIndicators = new window.LoadingIndicators();
-        this.paperListManager = new window.PaperListManager();
-        this.utilityManager = new window.UtilityManager();
-        
-        // Make managers globally available for other modules
-        window.starManager = this.starManager;
-        window.loadingIndicators = this.loadingIndicators;
-        window.paperListManager = this.paperListManager;
-        window.utilityManager = this.utilityManager;
+        this.starManager = new StarManager();
+        this.loadingIndicators = new LoadingIndicators();
+        this.paperListManager = new PaperListManager(this.starManager, this.apiService, this.paperManager);
+        this.utilityManager = new UtilityManager();
+    }
+
+    // Method to create and show a modal
+    showModal(paper) {
+        const modal = new ModalManager(paper, this.starManager);
+        modal.show();
     }
 
     // Delegate to specialized managers
@@ -113,7 +119,9 @@ class UIService {
     createTLDR(summary) {
         return this.paperListManager.createTLDR(summary);
     }
+
+    createOverview(paper) {
+        return this.paperListManager.createOverview(paper);
+    }
 }
 
-// Export for use in other modules
-window.UIService = UIService;

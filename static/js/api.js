@@ -1,16 +1,27 @@
 // API communication module for TheArk
 
-class ApiService {
+export class ApiService {
     constructor() {
         this.apiBaseUrl = '/v1/papers';
         this.configApiUrl = '/v1/config';
     }
 
     async getPapers(limit = 20, offset = 0, language = 'Korean') {
-        const response = await fetch(`${this.apiBaseUrl}/?limit=${limit}&offset=${offset}&language=${language}`);
+        const response = await fetch(`${this.apiBaseUrl}/lightweight?limit=${limit}&offset=${offset}&language=${language}`);
         
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        return await response.json();
+    }
+
+    async getPaperSummary(paperId, language = 'Korean') {
+        const response = await fetch(`${this.apiBaseUrl}/${paperId}/summary?language=${language}`);
+        
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to get paper summary');
         }
         
         return await response.json();
@@ -91,7 +102,15 @@ class ApiService {
 
         return await response.json();
     }
+
+    async getStatistics() {
+        const response = await fetch('/v1/statistics');
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        return await response.json();
+    }
 }
 
-// Export for use in other modules
-window.ApiService = ApiService;

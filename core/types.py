@@ -13,3 +13,12 @@ class Environment(str, Enum):
     DEVELOPMENT = "development"
     PRODUCTION = "production"
     TESTING = "testing"
+
+
+class PaperSummaryStatus(str, Enum):
+    """Paper summary status enum."""
+
+    BATCHED = "batched"
+    PROCESSING = "processing"
+    DONE = "done"
+    ERROR = "error"

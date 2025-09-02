@@ -1,7 +1,5 @@
-"""Main FastAPI application."""
+"""FastAPI application factory."""
 
-import logging
-import os
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
@@ -9,107 +7,64 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from core import get_logger, setup_logging
-from core.config import load_settings
-
-from .routers import (
+from api.routers import (
     batch_router,
     common_router,
     config_router,
+    crawler_router,
     main_router,
     papers_router,
+    statistics_router,
 )
-
-settings = load_settings()
-log_level = getattr(logging, settings.log_level.upper(), logging.INFO)
-setup_logging(level=log_level, use_colors=True)
+from api.services.app_initializer import AppServiceInitializer
+from core import get_logger, setup_logging
+from core.config import load_settings
 
 logger = get_logger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
-    """Application lifespan context manager."""
-    current_settings = load_settings()
-    logger.info(f"TheArk: {current_settings.environment}")
-    logger.info(f"Authentication required: {current_settings.auth_required}")
+    """Application lifespan manager."""
 
-    from core.batch.background_manager import BackgroundBatchManager
-    from core.database.config import get_database_path
-    from core.database.implementations.sqlite import SQLiteManager
-    from core.extractors import extractor_factory
-    from core.extractors.concrete import ArxivExtractor
-    from core.llm.openai_client import UnifiedOpenAIClient
+    # 서비스 초기화
+    settings = load_settings()
+    app.state.settings = settings
 
-    # Create tables on startup (without persistent connections)
-    db_path = get_database_path(current_settings.environment)
-    app.state.db_manager = SQLiteManager(db_path)
-    await app.state.db_manager.connect()
-    await app.state.db_manager.create_tables()
-
-    # Setup extractors
-    extractor_factory.register_extractor("arxiv", ArxivExtractor())
-
-    fake_key = "*"
-    openai_api_key = os.getenv("OPENAI_API_KEY", fake_key)
-    if openai_api_key == fake_key:
-        logger.warning("OPENAI_API_KEY is not set.")
-
-    # Create OpenAI client
-    openai_client = UnifiedOpenAIClient(
-        api_key=openai_api_key,
-        base_url=current_settings.llm_api_base_url,
-        model=current_settings.llm_model,
+    setup_logging(
+        level=settings.log_level,
+        enable_file_logging=True,
     )
-    app.state.summary_client = openai_client
+    logger.info(f"Starting TheArk API server in {settings.environment} mode")
+    logger.info(f"Authentication required: {settings.auth_required}")
 
-    # Initialize background batch manager
-    app.state.background_batch_manager = BackgroundBatchManager(
-        current_settings,
-        language=current_settings.default_summary_language,
-    )
+    initializer = AppServiceInitializer(settings)
+    await initializer.initialize_all_services(app)
 
-    # Start background batch processing if enabled
-    if current_settings.batch_enabled:
-        try:
-            await app.state.background_batch_manager.start(
-                app.state.db_manager,
-                app.state.summary_client,
-            )
-        except Exception as e:
-            logger.error(f"Failed to start background batch manager: {e}")
-    else:
-        logger.info("Background batch processing is disabled")
+    # Start all background services
+    await initializer.start_all_services()
 
-    logger.info("TheArk API server initialized successfully")
-
+    logger.info("TheArk API server initialized and started successfully")
     yield
 
-    # Stop background batch processing
-    if hasattr(app.state, "background_batch_manager"):
-        try:
-            await app.state.background_batch_manager.stop()
-        except Exception as e:
-            logger.error(f"Error stopping background batch manager: {e}")
-
-    await app.state.db_manager.disconnect()
+    await initializer.stop_all_services()
     logger.info("TheArk API server shutting down")
 
 
 def create_app() -> FastAPI:
     """Create FastAPI app with current settings."""
-    current_settings = load_settings()
+    settings = load_settings()
 
     app = FastAPI(
-        title=current_settings.api_title,
+        title=settings.api_title,
         description="Backend API for TheArk paper management system",
-        version=current_settings.api_version,
+        version=settings.api_version,
         lifespan=lifespan,
     )
 
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=current_settings.cors_allow_origins,
+        allow_origins=settings.cors_allow_origins,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
@@ -121,6 +76,8 @@ def create_app() -> FastAPI:
     app.include_router(config_router)
     app.include_router(papers_router)
     app.include_router(batch_router)
+    app.include_router(crawler_router)
+    app.include_router(statistics_router)
     return app
 
 

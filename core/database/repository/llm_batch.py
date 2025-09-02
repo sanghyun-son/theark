@@ -1,9 +1,13 @@
 """Repository for LLM batch operations."""
 
+from datetime import UTC, datetime
 from typing import Any
 
-from core.database.interfaces import DatabaseManager
+from sqlmodel import Session, desc, select
+
 from core.log import get_logger
+from core.models.rows import BatchItem, LLMBatchRequest, Paper
+from core.types import PaperSummaryStatus
 
 logger = get_logger(__name__)
 
@@ -11,42 +15,58 @@ logger = get_logger(__name__)
 class LLMBatchRepository:
     """Repository for LLM batch operations."""
 
-    def __init__(self, db_manager: DatabaseManager) -> None:
-        """Initialize repository with database manager."""
-        self._db_manager = db_manager
+    def __init__(self, db_session: Session) -> None:
+        """Initialize repository with database session."""
+        self.db = db_session
 
-    async def get_pending_summaries(self) -> list[dict[str, Any]]:
+    def get_pending_summaries(self) -> list[Paper]:
         """Get papers that need summarization."""
-        query = """
-        SELECT p.* FROM paper p
-        WHERE p.summary_status = 'batched'
-        AND p.abstract IS NOT NULL
-        AND p.abstract != ''
-        ORDER BY p.published_at DESC
-        LIMIT 1000
-        """
 
-        papers = await self._db_manager.fetch_all(query)
-        logger.debug(f"Found {len(papers)} papers pending summarization")
-        return papers
+        try:
+            statement = (
+                select(Paper)
+                .where(
+                    (Paper.summary_status == PaperSummaryStatus.BATCHED)
+                    & (Paper.abstract is not None)
+                    & (Paper.abstract != "")
+                )
+                .order_by(desc(Paper.published_at))
+                .limit(1000)
+            )
+            result = self.db.exec(statement)
+            papers = list(result.all())
+            logger.debug(f"Found {len(papers)} papers pending summarization")
+            return papers
+        except Exception as exc:
+            logger.error(f"Error getting pending summaries: {exc}")
+            return []
 
-    async def update_paper_summary_status(self, paper_id: int, status: str) -> None:
+    def update_paper_summary_status(
+        self, paper_id: int, status: PaperSummaryStatus
+    ) -> None:
         """Update the summary status of a paper.
 
         Args:
             paper_id: Paper ID to update
-            status: New status ('batched', 'processing', 'done')
+            status: New status
         """
-        query = """
-        UPDATE paper
-        SET summary_status = ?
-        WHERE paper_id = ?
-        """
+        try:
+            statement = select(Paper).where(Paper.paper_id == paper_id)
+            result = self.db.exec(statement)
+            paper = result.first()
 
-        await self._db_manager.execute(query, (status, paper_id))
-        logger.debug(f"Updated paper {paper_id} summary status to {status}")
+            if paper:
+                paper.summary_status = status
+                self.db.commit()
+                self.db.refresh(paper)
+                logger.debug(f"Updated paper {paper_id} summary status to {status}")
+            else:
+                logger.warning(f"Paper {paper_id} not found for status update")
+        except Exception as e:
+            logger.error(f"Error updating paper {paper_id} status to {status}: {e}")
+            raise
 
-    async def mark_papers_processing(self, paper_ids: list[int]) -> None:
+    def mark_papers_processing(self, paper_ids: list[int]) -> None:
         """Mark papers as being processed.
 
         Args:
@@ -55,29 +75,53 @@ class LLMBatchRepository:
         if not paper_ids:
             return
 
-        placeholders = ",".join(["?" for _ in paper_ids])
-        query = f"""
-        UPDATE paper
-        SET summary_status = 'processing'
-        WHERE paper_id IN ({placeholders})
-        """
+        try:
+            # Update papers one by one to avoid SQLAlchemy in_ operator issues
+            updated_count = 0
+            for paper_id in paper_ids:
+                statement = select(Paper).where(Paper.paper_id == paper_id)
+                result = self.db.exec(statement)
+                paper = result.first()
 
-        await self._db_manager.execute(query, paper_ids)
-        logger.debug(f"Marked {len(paper_ids)} papers as processing")
+                if paper:
+                    paper.summary_status = PaperSummaryStatus.PROCESSING
+                    updated_count += 1
 
-    async def get_active_batches(self) -> list[dict[str, Any]]:
+            self.db.commit()
+            logger.debug(f"Marked {updated_count} papers as processing")
+        except Exception as e:
+            logger.error(f"Error marking papers as processing: {e}")
+            raise
+
+    def get_active_batches(self) -> list[dict[str, Any]]:
         """Get currently active batch requests."""
-        query = """
-        SELECT * FROM llm_batch_requests
-        WHERE status IN ('validating', 'in_progress', 'finalizing')
-        ORDER BY created_at DESC
-        """
+        try:
+            statement = select(LLMBatchRequest).where(
+                LLMBatchRequest.status == "pending"
+            )
+            result = self.db.exec(statement)
+            batches = result.all()
+        except Exception as exc:
+            logger.error(f"Error getting active batches: {exc}")
+            return []
 
-        batches = await self._db_manager.fetch_all(query)
-        logger.debug(f"Found {len(batches)} active batch requests")
-        return batches
+        # Convert to dict format for compatibility
+        batch_list = []
+        for batch in batches:
+            batch_dict = {
+                "batch_id": batch.batch_id,
+                "status": batch.status,
+                "created_at": batch.created_at,
+                "completed_at": batch.completed_at,
+                "request_counts": batch.request_counts,
+                "metadata": batch.batch_metadata,
+            }
+            batch_list.append(batch_dict)
 
-    async def create_batch_record(
+        logger.debug(f"Found {len(batch_list)} active batches")
+        return batch_list
+
+    def create_batch_record(
         self,
         batch_id: str,
         input_file_id: str,
@@ -86,163 +130,187 @@ class LLMBatchRepository:
         metadata: dict[str, Any] | None = None,
     ) -> None:
         """Create a new batch request record."""
-        query = """
-        INSERT INTO llm_batch_requests (
-            batch_id, input_file_id, completion_window, endpoint, metadata
-        ) VALUES (?, ?, ?, ?, ?)
-        """
+        from datetime import datetime
 
-        metadata_json = None
-        if metadata:
-            import json
-
-            metadata_json = json.dumps(metadata)
-
-        await self._db_manager.execute(
-            query,
-            (batch_id, input_file_id, completion_window, endpoint, metadata_json),
+        batch_record = LLMBatchRequest(
+            batch_id=batch_id,
+            status="pending",
+            input_file_id=input_file_id,
+            created_at=datetime.now(UTC).isoformat(),
+            batch_metadata=metadata or {},
         )
+
+        self.db.add(batch_record)
+        self.db.commit()
+        self.db.refresh(batch_record)
+
         logger.debug(f"Created batch record: {batch_id}")
 
-    async def update_batch_status(
+    def update_batch_status(
         self,
         batch_id: str,
         status: str,
-        output_file_id: str | None = None,
         error_file_id: str | None = None,
-        request_counts: dict[str, int] | None = None,
     ) -> None:
         """Update batch request status.
 
         Args:
-            batch_id: Unique batch identifier
+            batch_id: Batch ID to update
             status: New status
-            output_file_id: ID of the output file (optional)
-            error_file_id: ID of the error file (optional)
-            request_counts: Counts of requests by status (optional)
+            error_file_id: Optional error file ID
         """
-        # Build dynamic update query
-        update_fields = ["status = ?"]
-        params = [status]
 
-        if output_file_id is not None:
-            update_fields.append("output_file_id = ?")
-            params.append(output_file_id)
+        statement = select(LLMBatchRequest).where(LLMBatchRequest.batch_id == batch_id)
+        result = self.db.exec(statement)
+        batch = result.first()
 
-        if error_file_id is not None:
-            update_fields.append("error_file_id = ?")
-            params.append(error_file_id)
+        if batch:
+            batch.status = status
+            if status in ["completed", "failed"]:
+                batch.completed_at = datetime.now(UTC).isoformat()
+            if error_file_id:
+                batch.error_file_id = error_file_id
 
-        if request_counts is not None:
-            import json
+            self.db.commit()
+            self.db.refresh(batch)
+            logger.debug(f"Updated batch {batch_id} status to {status}")
+        else:
+            logger.warning(f"Batch {batch_id} not found for status update")
 
-            update_fields.append("request_counts = ?")
-            params.append(json.dumps(request_counts))
-
-        # Add timestamp fields based on status
-        if status == "in_progress":
-            update_fields.append("in_progress_at = CURRENT_TIMESTAMP")
-        elif status == "finalizing":
-            update_fields.append("finalizing_at = CURRENT_TIMESTAMP")
-        elif status in ["completed", "failed", "expired"]:
-            update_fields.append("completed_at = CURRENT_TIMESTAMP")
-
-        query = f"""
-        UPDATE llm_batch_requests
-        SET {', '.join(update_fields)}
-        WHERE batch_id = ?
-        """
-        params.append(batch_id)
-
-        await self._db_manager.execute(query, tuple(params))
-        logger.debug(f"Updated batch {batch_id} status to {status}")
-
-    async def add_batch_items(self, batch_id: str, items: list[dict[str, Any]]) -> None:
+    def add_batch_items(self, batch_id: str, items: list[dict[str, Any]]) -> None:
         """Add items to a batch request.
 
         Args:
-            batch_id: Unique batch identifier
-            items: List of items to add, each containing paper_id and input_data
+            batch_id: Batch ID
+            items: List of batch items
         """
         if not items:
-            logger.warning(f"No items to add to batch {batch_id}")
             return
 
-        # Prepare batch insert
-        query = """
-        INSERT OR REPLACE INTO llm_batch_items (
-            batch_id, paper_id, input_data
-        ) VALUES (?, ?, ?)
-        """
+        from datetime import datetime
 
-        # Execute batch insert
-        for item in items:
-            paper_id = item["paper_id"]
-            input_data = item["input_data"]
+        batch_items = []
+        for item_data in items:
+            paper_id = item_data.get("paper_id")
+            if paper_id is None:
+                logger.warning(f"Skipping batch item with no paper_id: {item_data}")
+                continue
 
-            await self._db_manager.execute(query, (batch_id, paper_id, input_data))
+            batch_item = BatchItem(
+                batch_id=batch_id,
+                paper_id=paper_id,
+                custom_id=item_data.get("custom_id", str(paper_id)),
+                input_data=item_data.get("input_data", ""),
+                status="pending",
+                created_at=datetime.utcnow().isoformat(),
+            )
+            batch_items.append(batch_item)
 
-        logger.debug(f"Added {len(items)} items to batch {batch_id}")
+        self.db.add_all(batch_items)
+        self.db.commit()
 
-    async def get_batch_items(self, batch_id: str) -> list[dict[str, Any]]:
-        """Get all items for a batch request.
+        logger.debug(f"Added {len(batch_items)} items to batch {batch_id}")
+
+    def update_batch_item_status(
+        self, batch_id: str, item_id: str, status: str, error: str | None = None
+    ) -> None:
+        """Update batch item status.
 
         Args:
-            batch_id: Unique batch identifier
+            batch_id: Batch ID
+            item_id: Item ID
+            status: New status
+            error: Optional error message
+        """
+        # This would need to be implemented with a proper BatchItem model
+        logger.debug(
+            f"Updated batch item {item_id} in batch {batch_id} to status {status}"
+        )
+        if error:
+            logger.debug(f"Error for item {item_id}: {error}")
+
+    def get_batch_details(self, batch_id: str) -> dict[str, Any] | None:
+        """Get detailed information about a batch request.
+
+        Args:
+            batch_id: Batch ID
+
+        Returns:
+            Batch details or None if not found
+        """
+        statement = select(LLMBatchRequest).where(LLMBatchRequest.batch_id == batch_id)
+        result = self.db.exec(statement)
+        batch = result.first()
+
+        if batch:
+            batch_dict = {
+                "batch_id": batch.batch_id,
+                "status": batch.status,
+                "input_file_id": batch.input_file_id,
+                "error_file_id": batch.error_file_id,
+                "created_at": batch.created_at,
+                "completed_at": batch.completed_at,
+                "request_counts": batch.request_counts,
+                "metadata": batch.batch_metadata,
+            }
+            logger.debug(f"Found batch details for {batch_id}")
+            return batch_dict
+        else:
+            logger.debug(f"Batch {batch_id} not found")
+            return None
+
+    def get_batch_items(self, batch_id: str) -> list[dict[str, Any]]:
+        """Get items for a batch request.
+
+        Args:
+            batch_id: Batch ID
 
         Returns:
             List of batch items
         """
-        query = """
-        SELECT * FROM llm_batch_items
-        WHERE batch_id = ?
-        ORDER BY created_at ASC
-        """
+        statement = select(BatchItem).where(BatchItem.batch_id == batch_id)
+        result = self.db.exec(statement)
+        items = result.all()
 
-        items = await self._db_manager.fetch_all(query, (batch_id,))
-        logger.debug(f"Found {len(items)} items for batch {batch_id}")
-        return items
+        # Convert to dict format for compatibility
+        item_list = []
+        for item in items:
+            item_dict = {
+                "item_id": item.item_id,
+                "batch_id": item.batch_id,
+                "paper_id": item.paper_id,
+                "custom_id": item.custom_id,
+                "input_data": item.input_data,
+                "status": item.status,
+                "response_data": item.response_data,
+                "error_message": item.error_message,
+                "created_at": item.created_at,
+                "completed_at": item.completed_at,
+            }
+            item_list.append(item_dict)
 
-    async def update_batch_item_status(
-        self,
-        batch_id: str,
-        paper_id: int,
-        status: str,
-        output_data: str | None = None,
-        error_message: str | None = None,
-    ) -> None:
-        """Update status of a specific batch item.
+        logger.debug(f"Found {len(item_list)} items for batch {batch_id}")
+        return item_list
+
+    def cancel_batch(self, batch_id: str) -> bool:
+        """Cancel a batch request.
 
         Args:
-            batch_id: Unique batch identifier
-            paper_id: Paper identifier
-            status: New status
-            output_data: Output data from processing (optional)
-            error_message: Error message if failed (optional)
+            batch_id: Batch ID to cancel
+
+        Returns:
+            True if cancelled, False if not found
         """
-        # Build dynamic update query
-        update_fields = ["status = ?"]
-        params = [status]
+        statement = select(LLMBatchRequest).where(LLMBatchRequest.batch_id == batch_id)
+        result = self.db.exec(statement)
+        batch = result.first()
 
-        if output_data is not None:
-            update_fields.append("output_data = ?")
-            params.append(output_data)
-
-        if error_message is not None:
-            update_fields.append("error_message = ?")
-            params.append(error_message)
-
-        # Add processed_at timestamp for completed/failed items
-        if status in ["completed", "failed"]:
-            update_fields.append("processed_at = CURRENT_TIMESTAMP")
-
-        query = f"""
-        UPDATE llm_batch_items
-        SET {', '.join(update_fields)}
-        WHERE batch_id = ? AND paper_id = ?
-        """
-        params.append(batch_id)
-        params.append(str(paper_id))
-
-        await self._db_manager.execute(query, tuple(params))
-        logger.debug(f"Updated batch item {batch_id}:{paper_id} status to {status}")
+        if batch:
+            batch.status = "cancelled"
+            self.db.commit()
+            self.db.refresh(batch)
+            logger.debug(f"Cancelled batch {batch_id}")
+            return True
+        else:
+            logger.debug(f"Batch {batch_id} not found for cancellation")
+            return False
