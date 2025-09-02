@@ -232,7 +232,7 @@ def load_settings() -> Settings:
         arxiv_api_base_url=os.getenv(
             "THEARK_ARXIV_API_BASE_URL", "https://export.arxiv.org/api/query"
         ),
-        llm_api_key=os.getenv("THEARK_LLM_API_KEY", ""),
+        llm_api_key=os.getenv("OPENAI_API_KEY", "*"),
         llm_model=os.getenv("THEARK_LLM_MODEL", "gpt-4o-mini"),
         llm_api_base_url=os.getenv(
             "THEARK_LLM_API_BASE_URL", "https://api.openai.com/v1"

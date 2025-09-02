@@ -9,6 +9,7 @@ PORT="8000"
 RELOAD="--reload"
 LOG_LEVEL="info"
 ENV="development"
+NO_CRAWL=""
 
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -40,6 +41,10 @@ while [[ $# -gt 0 ]]; do
             ENV="development"
             shift
             ;;
+        --no-crawl)
+            NO_CRAWL="--no-crawl"
+            shift
+            ;;
         -h|--help)
             echo "Usage: $0 [OPTIONS]"
             echo ""
@@ -50,12 +55,14 @@ while [[ $# -gt 0 ]]; do
             echo "  --log-level LEVEL  Log level (default: info)"
             echo "  --prod             Production mode (no reload, warning log level)"
             echo "  --dev              Development mode (reload enabled, info log level)"
+            echo "  --no-crawl         Disable historical crawling"
             echo "  -h, --help         Show this help message"
             echo ""
             echo "Examples:"
             echo "  $0                           # Start with default settings"
             echo "  $0 --port 3000              # Start on port 3000"
             echo "  $0 --prod                   # Start in production mode"
+            echo "  $0 --no-crawl               # Start without historical crawling"
             echo "  $0 --host 127.0.0.1 --port 8080 --no-reload"
             exit 0
             ;;
@@ -77,12 +84,18 @@ export PYTHONPATH="${PYTHONPATH:+${PYTHONPATH}:}$(pwd)"
 export THEARK_ENV="$ENV"
 export THEARK_LOG_LEVEL="$LOG_LEVEL"
 
+# Disable historical crawling if --no-crawl is specified
+if [ -n "$NO_CRAWL" ]; then
+    export THEARK_HISTORICAL_CRAWL_ENABLED="false"
+fi
+
 echo "📊 Server Configuration:"
 echo "   Host: $HOST"
 echo "   Port: $PORT"
 echo "   Environment: $ENV"
 echo "   Reload: $([ -n "$RELOAD" ] && echo "enabled" || echo "disabled")"
 echo "   Log Level: $LOG_LEVEL"
+echo "   Historical Crawling: $([ -n "$NO_CRAWL" ] && echo "disabled" || echo "enabled")"
 echo ""
 
 echo "🔥 Launching uvicorn server..."

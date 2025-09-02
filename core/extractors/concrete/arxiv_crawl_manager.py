@@ -57,8 +57,6 @@ class ArxivCrawlManager:
         Returns:
             Tuple of (papers_found, papers_stored)
         """
-        logger.info(f"Starting crawl for {category} on {date}")
-
         try:
             all_papers = []
             current_start = start_index
@@ -66,10 +64,6 @@ class ArxivCrawlManager:
 
             # Fetch all papers using pagination
             while True:
-                logger.info(
-                    f"Fetching batch starting from index {current_start} with limit {batch_size}"
-                )
-
                 batch = await explorer.explore_historical_papers_by_category(
                     category=category,
                     date=date,
@@ -78,19 +72,12 @@ class ArxivCrawlManager:
                 )
 
                 if not batch:
-                    logger.info(f"No more papers found at index {current_start}")
                     break
 
                 all_papers.extend(batch)
-                logger.info(
-                    f"Fetched {len(batch)} papers in this batch, total so far: {len(all_papers)}"
-                )
 
                 # If we got fewer papers than requested, we've reached the end
                 if len(batch) < batch_size:
-                    logger.info(
-                        f"Received {len(batch)} papers (less than {batch_size}), reached end of results"
-                    )
                     break
 
                 # Move to next batch
@@ -104,11 +91,13 @@ class ArxivCrawlManager:
             storage_manager = ArxivStorageManager(self.engine)
             papers_stored = await storage_manager.store_papers_batch(all_papers)
 
-            logger.info(
-                f"Found {len(all_papers)} papers, "
-                f"stored {papers_stored}/{len(all_papers)} "
-                f"papers for {category} on {date}"
-            )
+            # Log final result only
+            if len(all_papers) > 0:
+                logger.info(
+                    f"Found {len(all_papers)} papers, stored {papers_stored}/{len(all_papers)} for {category} on {date}"
+                )
+            else:
+                logger.info(f"No papers found for {category} on {date}")
 
             return len(all_papers), papers_stored
 

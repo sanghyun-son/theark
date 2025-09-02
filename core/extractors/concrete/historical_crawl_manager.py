@@ -83,8 +83,6 @@ class HistoricalCrawlManager:
         self, engine: Engine, explorer: ArxivSourceExplorer, category: str, date: str
     ) -> tuple[int, int]:
         """Crawl papers for a specific date-category combination."""
-        logger.info(f"Starting crawl for {category} on {date}")
-
         try:
             # Create crawl manager for this operation
             crawl_manager = ArxivCrawlManager(
@@ -101,10 +99,6 @@ class HistoricalCrawlManager:
                 date=date,
                 start_index=0,
                 limit=self.batch_size,
-            )
-
-            logger.info(
-                f"Found {papers_found} papers, stored {papers_stored} papers for {category} on {date}"
             )
 
             # Mark as completed
@@ -141,9 +135,6 @@ class HistoricalCrawlManager:
 
             # Check if already completed
             if (category, date) in self._completed_combinations:
-                logger.info(
-                    f"Date-category {category}-{date} already completed, skipping"
-                )
                 self.advance_to_next()
                 continue  # Try next combination instead of returning None
 
@@ -228,11 +219,29 @@ class HistoricalCrawlManager:
                 for record in completed_records:
                     self._completed_combinations.add((record.category, record.date))
 
-                logger.info(
-                    f"Loaded {len(self._completed_combinations)} completed combinations from database"
-                )
         except Exception as e:
-            logger.warning(f"Failed to load completed combinations from database: {e}")
+            logger.warning(f"Failed to load completed logs from DB: {e}")
+
+        # Log completed combinations with smart truncation
+        completed_count = len(self._completed_combinations)
+        if completed_count == 0:
+            logger.info("No completed logs found in DB")
+            return
+
+        completed_list = sorted(self._completed_combinations)
+        if completed_count <= 4:
+            combinations_str = ", ".join(
+                [f"{cat}-{date}" for cat, date in completed_list]
+            )
+            logger.info(f"Loaded {completed_count} completed logs: {combinations_str}")
+            return
+
+        # Show first 2 and last 2 for readability
+        first_two = ", ".join([f"{cat}-{date}" for cat, date in completed_list[:2]])
+        last_two = ", ".join([f"{cat}-{date}" for cat, date in completed_list[-2:]])
+        logger.info(
+            f"Loaded {completed_count} completed logs: {first_two} ... {last_two}"
+        )
 
     def _save_completion_to_db(
         self,
@@ -253,11 +262,12 @@ class HistoricalCrawlManager:
                 )
                 session.add(completion)
                 session.commit()
-                logger.info(
-                    f"Saved completion status for {category}-{date} to database"
-                )
         except Exception as e:
-            logger.error(f"Failed to save completion status to database: {e}")
+            logger.error(f"Failed to save completion status for {category}-{date}: {e}")
+            return
+
+        # Log DB save success (results already logged by arxiv_crawl_manager)
+        logger.debug(f"Saved completion status for {category}-{date} to database")
 
     async def stop(self) -> None:
         """Stop the historical crawl manager."""
@@ -288,17 +298,19 @@ class HistoricalCrawlManager:
                 # Run single crawl cycle
                 result = await self.run_crawl_cycle(engine, explorer)
                 if not result:
-                    logger.info("No more papers to crawl, stopping scheduler")
+                    logger.info(
+                        "Historical crawling completed - no more papers to process"
+                    )
                     break
 
                 # Wait before next cycle
                 await asyncio.sleep(self.rate_limit_delay)
 
             except asyncio.CancelledError:
-                logger.info("Crawl scheduler cancelled")
+                logger.info("Historical crawl scheduler cancelled")
                 break
             except Exception as e:
-                logger.error(f"Error in crawl scheduler: {e}")
+                logger.error(f"Error in historical crawl scheduler: {e}")
                 await asyncio.sleep(self.rate_limit_delay)
 
     @property

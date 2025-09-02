@@ -45,9 +45,7 @@ class ArxivStorageManager:
             ).first()
 
             if existing_paper is not None:
-                logger.warning(
-                    f"Paper with arxiv_id {arxiv_id} already exists, skipping"
-                )
+                logger.warning(f"Skipped: {arxiv_id} (already exists)")
                 return None
 
             # Create new paper record with batched status
@@ -69,9 +67,9 @@ class ArxivStorageManager:
             session.refresh(db_paper)
 
             logger.info(
-                f"Stored paper metadata: {arxiv_id} "
-                f"({paper.title[:50]}...) "
-                f"with categories: {db_paper.categories}"
+                f"Fetched: {arxiv_id} "
+                f"({paper.title[:24]}...) "
+                f"({db_paper.categories})"
             )
 
             return db_paper

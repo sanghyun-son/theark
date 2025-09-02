@@ -236,11 +236,13 @@ class PaperSummarizationService:
             )
 
         # Get summary using OpenAI client's built-in retry
+        logger.info(f"[{paper.arxiv_id}] Summary requested in {language}")
         summary = await self._summarize(
             paper.abstract,
             llm_client,
             language=language,
         )
+        logger.info(f"[{paper.arxiv_id}] Summarized in {language}")
 
         if summary is None:
             if paper.paper_id:
@@ -256,7 +258,6 @@ class PaperSummarizationService:
                 paper.paper_id, PaperSummaryStatus.DONE
             )
 
-        logger.info(f"[{paper.arxiv_id}] Summarized in {language}")
         return summary
 
     def _has_existing_summary(
@@ -284,7 +285,6 @@ class PaperSummarizationService:
         summary.paper_id = paper.paper_id
         logger.debug(f"{summary.model_dump()}")
         summary = summary_repo.create(summary)
-        logger.info(f"Saved summary for paper {paper.arxiv_id} in {summary.language}")
         return summary
 
     async def get_summary(
