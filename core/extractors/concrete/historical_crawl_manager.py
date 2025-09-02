@@ -56,10 +56,10 @@ class HistoricalCrawlManager:
         self, state: CrawlExecutionState
     ) -> tuple[str, str | None] | None:
         """Get the next date-category combination to process."""
-        # Always start from yesterday if current_date is not set or is in the past
+        # Always start from yesterday if current_date is not set or is before yesterday
         yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
 
-        if not state.current_date or is_date_before_end(state.current_date, yesterday):
+        if not state.current_date or state.current_date < yesterday:
             logger.info(f"Starting from recent date: {yesterday}")
             state.current_date = yesterday
             state.current_category_index = 0

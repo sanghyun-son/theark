@@ -1,6 +1,7 @@
 """Demo for simple crawl strategy: always start from yesterday and skip completed dates."""
 
 import asyncio
+import logging
 from pathlib import Path
 from datetime import datetime, timedelta
 
@@ -9,6 +10,10 @@ from core.extractors.concrete.arxiv_source_explorer import ArxivSourceExplorer
 from core.database.engine import create_database_engine, create_database_tables
 from core.types import Environment
 from sqlalchemy.engine import Engine
+
+# Set up logging
+logging.basicConfig(level=logging.DEBUG, format="%(levelname)s:%(name)s:%(message)s")
+logger = logging.getLogger(__name__)
 
 
 async def main() -> None:
