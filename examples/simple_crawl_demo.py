@@ -75,18 +75,11 @@ async def main() -> None:
                 print(f"   Papers found: {result.papers_found}")
                 print(f"   Papers stored: {result.papers_stored}")
             else:
-                # Check if crawling is still active to determine the reason
-                print("📊 Getting progress summary...")
-                summary = crawl_manager.get_progress_summary(engine)
-                if summary.is_active:
-                    print("⏭️  Date-category already completed, skipped")
-                else:
-                    print("🏁 No more date-category combinations to process")
+                print("🏁 No more date-category combinations to process")
 
-            # Get progress summary
-            summary = crawl_manager.get_progress_summary(engine)
+            # Show current progress using properties
             print(
-                f"📈 Current: {summary.current_date} | Category: {summary.current_category_index}"
+                f"📈 Current: {crawl_manager.current_date} | Category: {crawl_manager.current_category_index}"
             )
 
         except Exception as e:
