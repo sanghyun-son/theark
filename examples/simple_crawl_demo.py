@@ -70,7 +70,7 @@ async def main() -> None:
 
     # Wait a bit for initial crawl cycles
     print("⏳ Waiting for initial crawl cycles...")
-    await asyncio.sleep(5)
+    await asyncio.sleep(50)
 
     # Check status
     print(

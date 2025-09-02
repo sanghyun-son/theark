@@ -166,6 +166,12 @@ class AppServiceInitializer:
                 "LLM services must be initialized before starting services"
             )
 
+        # Start historical crawl manager if available
+        if self.historical_crawl_manager and self.arxiv_explorer:
+            logger.info("Starting historical crawl manager...")
+            await self.historical_crawl_manager.start(self.arxiv_explorer, self.engine)
+            logger.info("Historical crawl manager started successfully")
+
         # Start background batch manager if available
         if self.background_batch_manager:
             await self.background_batch_manager.start(
@@ -178,6 +184,12 @@ class AppServiceInitializer:
     async def stop_all_services(self) -> None:
         """Stop all background services."""
         logger.info("Stopping all background services...")
+
+        # Stop historical crawl manager if available
+        if self.historical_crawl_manager:
+            logger.info("Stopping historical crawl manager...")
+            await self.historical_crawl_manager.stop()
+            logger.info("Historical crawl manager stopped successfully")
 
         # Stop background batch manager if available
         if self.background_batch_manager:

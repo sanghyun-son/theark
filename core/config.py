@@ -122,21 +122,9 @@ class Settings(BaseModel):
         default=3, description="Maximum number of retries for failed batches"
     )
     # ArXiv background explorer settings
-    arxiv_categories: str = Field(
-        default="cs.AI,cs.LG,cs.CL",
-        description="Comma-separated ArXiv categories to explore",
-    )
-    arxiv_paper_interval_seconds: int = Field(
-        default=2, description="Interval between processing individual papers (seconds)"
-    )
-    arxiv_fetch_interval_minutes: int = Field(
-        default=10, description="Interval between fetch cycles (minutes)"
-    )
-    arxiv_retry_attempts: int = Field(
-        default=3, description="Number of retry attempts for failed papers"
-    )
-    arxiv_retry_base_delay_seconds: int = Field(
-        default=2, description="Base delay for exponential backoff retries (seconds)"
+    arxiv_categories: list[str] = Field(
+        default=["cs.AI", "cs.CL", "cs.CV", "cs.DC", "cs.IR", "cs.LG", "cs.MA"],
+        description="ArXiv categories to explore (same as preset_categories)",
     )
 
     def __init__(self, **kwargs: Any) -> None:
@@ -211,28 +199,15 @@ def load_settings() -> Settings:
     batch_max_retries = int(os.getenv("THEARK_BATCH_MAX_RETRIES", "3"))
 
     # Parse ArXiv settings
-    arxiv_categories = os.getenv("THEARK_ARXIV_CATEGORIES", "cs.AI,cs.LG,cs.CL")
-    arxiv_paper_interval_seconds = int(
-        os.getenv("THEARK_ARXIV_PAPER_INTERVAL_SECONDS", "2")
-    )
-    arxiv_fetch_interval_minutes = int(
-        os.getenv("THEARK_ARXIV_FETCH_INTERVAL_MINUTES", "10")
-    )
-    arxiv_retry_attempts = int(os.getenv("THEARK_ARXIV_RETRY_ATTEMPTS", "3"))
-    arxiv_retry_base_delay_seconds = int(
-        os.getenv("THEARK_ARXIV_RETRY_BASE_DELAY_SECONDS", "2")
-    )
+    # Use the same categories as preset_categories for consistency
+    arxiv_categories = preset_categories
 
     # Parse Historical Crawl settings
     historical_crawl_enabled = os.getenv(
         "THEARK_HISTORICAL_CRAWL_ENABLED", "false"
     ).lower() in ["true", "1", "yes", "on"]
-    historical_crawl_categories_str = os.getenv(
-        "THEARK_HISTORICAL_CRAWL_CATEGORIES", "cs.AI,cs.LG,cs.CL"
-    )
-    historical_crawl_categories = [
-        cat.strip() for cat in historical_crawl_categories_str.split(",")
-    ]
+    # Use the same categories as preset_categories for consistency
+    historical_crawl_categories = preset_categories
     historical_crawl_start_date = os.getenv("THEARK_HISTORICAL_CRAWL_START_DATE")
     historical_crawl_rate_limit_delay = float(
         os.getenv("THEARK_HISTORICAL_CRAWL_RATE_LIMIT_DELAY", "10.0")
@@ -271,10 +246,6 @@ def load_settings() -> Settings:
         batch_enabled=batch_enabled,
         batch_max_retries=batch_max_retries,
         arxiv_categories=arxiv_categories,
-        arxiv_paper_interval_seconds=arxiv_paper_interval_seconds,
-        arxiv_fetch_interval_minutes=arxiv_fetch_interval_minutes,
-        arxiv_retry_attempts=arxiv_retry_attempts,
-        arxiv_retry_base_delay_seconds=arxiv_retry_base_delay_seconds,
         historical_crawl_enabled=historical_crawl_enabled,
         historical_crawl_categories=historical_crawl_categories,
         historical_crawl_start_date=historical_crawl_start_date,
