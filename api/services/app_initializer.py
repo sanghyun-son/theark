@@ -7,10 +7,10 @@ from sqlalchemy.engine import Engine
 
 from core.config import Settings
 from core.database.engine import create_database_engine, create_database_tables
-from core.extractors import extractor_factory
 from core.extractors.concrete.arxiv_extractor import ArxivExtractor
 from core.extractors.concrete.arxiv_source_explorer import ArxivSourceExplorer
 from core.extractors.concrete.historical_crawl_manager import HistoricalCrawlManager
+from core.extractors.factory import register_extractor
 from core.llm.openai_client import UnifiedOpenAIClient
 from core.log import get_logger
 from core.services.crawl_service import CrawlService
@@ -104,7 +104,7 @@ class AppServiceInitializer:
 
         # Register ArXiv extractor
         arxiv_extractor = ArxivExtractor(api_base_url=base_url)
-        extractor_factory.register_extractor("arxiv", arxiv_extractor)
+        register_extractor("arxiv", arxiv_extractor)
 
         logger.info("Crawler services initialized successfully")
 

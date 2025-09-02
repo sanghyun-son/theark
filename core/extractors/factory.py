@@ -73,27 +73,3 @@ def get_supported_sources() -> list[str]:
         List of supported source names
     """
     return [extractor.get_source_name() for extractor in _extractors.values()]
-
-
-# Legacy compatibility - simple object with methods
-class ExtractorFactory:
-    """Legacy compatibility class for extractor factory."""
-
-    def register_extractor(self, name: str, extractor: BaseExtractor) -> None:
-        register_extractor(name, extractor)
-
-    def get_extractor(self, name: str) -> BaseExtractor:
-        return get_extractor(name)
-
-    def find_extractor_for_url(self, url: str) -> BaseExtractor:
-        return find_extractor_for_url(url)
-
-    def get_all_extractors(self) -> dict[str, BaseExtractor]:
-        return get_all_extractors()
-
-    def get_supported_sources(self) -> list[str]:
-        return get_supported_sources()
-
-
-# Global factory instance for backward compatibility
-extractor_factory = ExtractorFactory()

@@ -10,8 +10,8 @@ from core.database.repository import (
     UserStarRepository,
 )
 from core.database.repository.summary_read import SummaryReadRepository
-from core.extractors import extractor_factory
 from core.extractors.exceptions import ExtractionError
+from core.extractors.factory import find_extractor_for_url
 from core.llm.openai_client import UnifiedOpenAIClient
 from core.models import (
     PaperCreateRequest,
@@ -25,6 +25,7 @@ from core.models.api.responses import (
     PaperListResponse,
     SummaryDetailResponse,
 )
+from core.models.domain.paper_extraction import PaperMetadata
 from core.models.rows import Paper, Summary
 from core.services.summarization_service import PaperSummarizationService
 
@@ -44,7 +45,7 @@ class PaperService:
             raise ValueError("No URL provided")
 
         try:
-            extractor = extractor_factory.find_extractor_for_url(paper_data.url)
+            extractor = find_extractor_for_url(paper_data.url)
             return extractor.extract_identifier(paper_data.url)
         except Exception as e:
             raise ValueError(f"Invalid URL format: {e}")
@@ -78,26 +79,20 @@ class PaperService:
         paper_repo: PaperRepository,
     ) -> Paper:
         """Extract paper metadata using the new extractor system."""
+        # Early Exit: URL 검증
+        if not url:
+            raise ValueError("URL is required for paper extraction")
+
+        # Early Exit: arXiv ID 검증
+        if not arxiv_id:
+            raise ValueError("arXiv ID is required for paper extraction")
+
         try:
-            extractor = extractor_factory.find_extractor_for_url(url)
-            metadata = await extractor.extract_metadata_async(url)
+            # Extractor 찾기 및 메타데이터 추출
+            metadata = await self._extract_paper_metadata(url)
 
-            # Convert PaperMetadata to Paper (SQLModel)
-            paper = Paper(
-                arxiv_id=arxiv_id,
-                title=metadata.title,
-                abstract=metadata.abstract,
-                authors=";".join(metadata.authors),
-                primary_category=(
-                    metadata.categories[0] if metadata.categories else "cs.AI"
-                ),
-                categories=",".join(metadata.categories),
-                url_abs=metadata.url_abs,
-                url_pdf=metadata.url_pdf,
-                published_at=metadata.published_date,
-            )
-
-            # Save to database
+            # Paper 객체 생성 및 저장
+            paper = self._create_paper_from_metadata(arxiv_id, metadata)
             saved_paper = paper_repo.create(paper)
 
             logger.info(f"[{arxiv_id}] Extraction success")
@@ -106,6 +101,29 @@ class PaperService:
         except ExtractionError as e:
             logger.error(f"[{arxiv_id}] Extraction failed: {e}")
             raise ValueError(f"Failed to extract paper {arxiv_id}: {e}")
+
+    async def _extract_paper_metadata(self, url: str) -> PaperMetadata:
+        """Extract paper metadata from URL using appropriate extractor."""
+        extractor = find_extractor_for_url(url)
+        return await extractor.extract_metadata_async(url)
+
+    def _create_paper_from_metadata(
+        self, arxiv_id: str, metadata: PaperMetadata
+    ) -> Paper:
+        """Create Paper object from extracted metadata."""
+        return Paper(
+            arxiv_id=arxiv_id,
+            title=metadata.title,
+            abstract=metadata.abstract,
+            authors=";".join(metadata.authors),
+            primary_category=(
+                metadata.categories[0] if metadata.categories else "cs.AI"
+            ),
+            categories=",".join(metadata.categories),
+            url_abs=metadata.url_abs,
+            url_pdf=metadata.url_pdf,
+            published_at=metadata.published_date,
+        )
 
     def _enrich_paper_response(
         self,

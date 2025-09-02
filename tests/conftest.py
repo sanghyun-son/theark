@@ -33,6 +33,7 @@ from core.models.rows import Paper, Summary, User
 from core.services.summarization_service import PaperSummarizationService
 from core.types import PaperSummaryStatus
 from tests.shared_test_data import ARXIV_RESPONSES, OPENAI_RESPONSES
+from tests.utils.test_helpers import TestDataFactory
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -357,18 +358,7 @@ def llm_batch_repo(mock_db_session: Session) -> LLMBatchRepository:
 @pytest.fixture
 def saved_paper(paper_repo: PaperRepository) -> Paper:
     """Create and save a test paper."""
-    paper = Paper(
-        arxiv_id="2508.01234",
-        title="Test Paper Title",
-        abstract="Test paper abstract",
-        primary_category="cs.AI",
-        categories="cs.AI,cs.LG",
-        authors="Author One;Author Two",
-        url_abs="https://arxiv.org/abs/2508.01234",
-        url_pdf="https://arxiv.org/pdf/2508.01234",
-        published_at="2023-08-01T00:00:00Z",
-        summary_status=PaperSummaryStatus.DONE,
-    )
+    paper = TestDataFactory.create_test_paper()
     return paper_repo.create(paper)
 
 
@@ -381,20 +371,8 @@ def summary_repo(mock_db_session: Session) -> SummaryRepository:
 @pytest.fixture
 def saved_summary(summary_repo: SummaryRepository, saved_paper: Paper) -> Summary:
     """Create and save a test summary."""
-    summary = Summary(
-        summary_id=1,
-        paper_id=saved_paper.paper_id,
-        version="1.0",
-        overview="Test overview",
-        motivation="Test motivation",
-        method="Test method",
-        result="Test result",
-        conclusion="Test conclusion",
-        language="English",
-        interests="AI,ML",
-        relevance=8,
-        model="gpt-4",
-    )
+    assert saved_paper.paper_id is not None
+    summary = TestDataFactory.create_test_summary(saved_paper.paper_id)
     return summary_repo.create(summary)
 
 
