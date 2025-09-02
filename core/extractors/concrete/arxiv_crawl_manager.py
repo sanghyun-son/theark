@@ -100,20 +100,15 @@ class ArxivCrawlManager:
                 if len(batch) == batch_size:  # Only if we expect more
                     await asyncio.sleep(self.delay_seconds)
 
-            papers_found = len(all_papers)
-            logger.info(f"Found {papers_found} papers for {category} on {date}")
-
-            # Step 2: Store papers in database
-            papers_stored = await self.storage_manager.store_papers_batch(all_papers)
+            # Store all papers
+            storage_manager = ArxivStorageManager(self.engine)
+            papers_stored = await storage_manager.store_papers_batch(all_papers)
 
             logger.info(
-                f"Stored {papers_stored}/{papers_found} papers for {category} on {date}"
+                f"Found {len(all_papers)} papers, stored {papers_stored}/{len(all_papers)} papers for {category} on {date}"
             )
 
-            # Final rate limiting
-            await asyncio.sleep(self.delay_seconds)
-
-            return papers_found, papers_stored
+            return len(all_papers), papers_stored
 
         except Exception as e:
             logger.error(f"Error crawling {category} on {date}: {e}")

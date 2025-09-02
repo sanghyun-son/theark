@@ -68,7 +68,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
         historical_crawl_manager = HistoricalCrawlManager(
             categories=settings.historical_crawl_categories,
-            start_date=settings.historical_crawl_start_date,
             rate_limit_delay=settings.historical_crawl_rate_limit_delay,
             batch_size=settings.historical_crawl_batch_size,
         )

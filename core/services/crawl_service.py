@@ -5,7 +5,10 @@ from sqlalchemy.engine import Engine
 from core.extractors.concrete.arxiv_source_explorer import ArxivSourceExplorer
 from core.extractors.concrete.historical_crawl_manager import HistoricalCrawlManager
 from core.log import get_logger
-from core.models.api.responses import CrawlExecutionStateResponse
+from core.models.api.responses import (
+    CrawlerProgressResponse,
+    CrawlerStatusResponse,
+)
 
 logger = get_logger(__name__)
 
@@ -47,10 +50,10 @@ class CrawlService:
             logger.error(f"Failed to stop crawling: {e}")
             return False
 
-    def get_status(self, engine: Engine) -> CrawlExecutionStateResponse:
+    def get_status(self, engine: Engine) -> CrawlerStatusResponse:
         """Get current crawling status."""
         return self.crawl_manager.get_progress_summary(engine)
 
-    def get_progress(self, engine: Engine) -> CrawlExecutionStateResponse:
+    def get_progress(self, engine: Engine) -> CrawlerProgressResponse:
         """Get current crawling progress."""
-        return self.crawl_manager.get_progress_summary(engine)
+        return self.crawl_manager.get_progress_summary_for_progress(engine)

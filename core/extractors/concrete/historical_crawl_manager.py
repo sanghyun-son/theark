@@ -2,7 +2,7 @@
 
 import asyncio
 from collections.abc import Sequence
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from sqlalchemy.engine import Engine
 from sqlmodel import Session, select
@@ -10,11 +10,14 @@ from sqlmodel import Session, select
 from core.extractors.concrete.arxiv_crawl_manager import ArxivCrawlManager
 from core.extractors.concrete.arxiv_source_explorer import ArxivSourceExplorer
 from core.log import get_logger
-from core.models.api.responses import CrawlCycleResult
+from core.models.api.responses import (
+    CrawlCycleResult,
+    CrawlerProgressResponse,
+    CrawlerStatusResponse,
+)
 from core.models.rows import CrawlCompletion
 from core.utils import (
     get_previous_date,
-    is_date_before_end,
 )
 
 logger = get_logger(__name__)
@@ -46,7 +49,7 @@ class HistoricalCrawlManager:
         self._current_category_index = 0
         self._completed_combinations: set[tuple[str, str]] = set()
         self._running = False
-        self._crawl_task: asyncio.Task | None = None
+        self._crawl_task: asyncio.Task[None] | None = None
 
         logger.info(
             f"Historical crawl manager initialized with categories: {categories}"
@@ -106,7 +109,9 @@ class HistoricalCrawlManager:
 
             # Mark as completed
             self._completed_combinations.add((category, date))
-            self._save_completion_to_db(category, date, papers_found, papers_stored)
+            self._save_completion_to_db(
+                engine, category, date, papers_found, papers_stored
+            )
 
             # Rate limiting
             await asyncio.sleep(self.rate_limit_delay)
@@ -117,7 +122,7 @@ class HistoricalCrawlManager:
             logger.error(f"Error crawling {category} on {date}: {e}")
             # Mark as completed even if failed
             self._completed_combinations.add((category, date))
-            self._save_completion_to_db(category, date, 0, 0)
+            self._save_completion_to_db(engine, category, date, 0, 0)
             return 0, 0
 
     async def run_crawl_cycle(
@@ -162,6 +167,27 @@ class HistoricalCrawlManager:
         """Get current category index being processed."""
         return self._current_category_index
 
+    def get_progress_summary(self, engine: Engine) -> CrawlerStatusResponse:
+        """Get current crawling progress summary."""
+        return CrawlerStatusResponse(
+            is_running=self._running,
+            is_active=self._running,
+            current_date=self._current_date,
+            current_category_index=self._current_category_index,
+            categories=",".join(self.categories),
+        )
+
+    def get_progress_summary_for_progress(
+        self, engine: Engine
+    ) -> CrawlerProgressResponse:
+        """Get current crawling progress summary for progress endpoint."""
+        return CrawlerProgressResponse(
+            total_papers_found=0,  # TODO: Implement actual counting
+            total_papers_stored=0,  # TODO: Implement actual counting
+            completed_date_categories=len(self._completed_combinations),
+            failed_date_categories=0,  # TODO: Implement actual counting
+        )
+
     async def start(self, explorer: ArxivSourceExplorer, engine: Engine) -> None:
         """Start the historical crawl manager with dependencies.
 
@@ -176,21 +202,18 @@ class HistoricalCrawlManager:
         logger.info("Starting historical crawl manager")
         self._running = True
 
-        # Store engine for database operations
-        self.engine = engine
-
         # Load completed combinations from database
-        self._load_completed_combinations_from_db()
+        self._load_completed_combinations_from_db(engine)
 
         # Start background crawl task
         self._crawl_task = asyncio.create_task(self._crawl_scheduler(engine, explorer))
 
         logger.info("Historical crawl manager started successfully")
 
-    def _load_completed_combinations_from_db(self) -> None:
+    def _load_completed_combinations_from_db(self, engine: Engine) -> None:
         """Load completed combinations from database."""
         try:
-            with Session(self.engine) as session:
+            with Session(engine) as session:
                 completed_records = session.exec(
                     select(CrawlCompletion).where(
                         CrawlCompletion.category.in_(self.categories)  # type: ignore
@@ -207,11 +230,16 @@ class HistoricalCrawlManager:
             logger.warning(f"Failed to load completed combinations from database: {e}")
 
     def _save_completion_to_db(
-        self, category: str, date: str, papers_found: int, papers_stored: int
+        self,
+        engine: Engine,
+        category: str,
+        date: str,
+        papers_found: int,
+        papers_stored: int,
     ) -> None:
         """Save completion status to database."""
         try:
-            with Session(self.engine) as session:
+            with Session(engine) as session:
                 completion = CrawlCompletion(
                     category=category,
                     date=date,

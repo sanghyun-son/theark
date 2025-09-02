@@ -298,11 +298,8 @@ class CrawlCompletion(SQLModel, table=True):
     papers_stored: int = Field(default=0, description="Number of papers stored")
     completed_at: str = Field(
         default_factory=get_current_timestamp,
-        description="ISO8601 datetime when crawl was completed"
+        description="ISO8601 datetime when crawl was completed",
     )
-    
-    class Config:
-        table_name = "crawl_completion"
 
 
 class CrawlExecutionState(SQLModel, table=True):
