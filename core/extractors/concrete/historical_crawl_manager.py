@@ -5,11 +5,13 @@ from collections.abc import Sequence
 from datetime import datetime, timedelta
 
 from sqlalchemy.engine import Engine
+from sqlmodel import Session, select
 
 from core.extractors.concrete.arxiv_crawl_manager import ArxivCrawlManager
 from core.extractors.concrete.arxiv_source_explorer import ArxivSourceExplorer
 from core.log import get_logger
 from core.models.api.responses import CrawlCycleResult
+from core.models.rows import CrawlCompletion
 from core.utils import (
     get_previous_date,
     is_date_before_end,
@@ -104,6 +106,7 @@ class HistoricalCrawlManager:
 
             # Mark as completed
             self._completed_combinations.add((category, date))
+            self._save_completion_to_db(category, date, papers_found, papers_stored)
 
             # Rate limiting
             await asyncio.sleep(self.rate_limit_delay)
@@ -114,6 +117,7 @@ class HistoricalCrawlManager:
             logger.error(f"Error crawling {category} on {date}: {e}")
             # Mark as completed even if failed
             self._completed_combinations.add((category, date))
+            self._save_completion_to_db(category, date, 0, 0)
             return 0, 0
 
     async def run_crawl_cycle(
@@ -163,7 +167,7 @@ class HistoricalCrawlManager:
 
         Args:
             explorer: ArxivSourceExplorer instance for dependency injection
-            engine: Database engine instance
+            engine: Database engine instance for persistence
         """
         if self._running:
             logger.warning("Historical crawl manager is already running")
@@ -172,10 +176,55 @@ class HistoricalCrawlManager:
         logger.info("Starting historical crawl manager")
         self._running = True
 
+        # Store engine for database operations
+        self.engine = engine
+
+        # Load completed combinations from database
+        self._load_completed_combinations_from_db()
+
         # Start background crawl task
         self._crawl_task = asyncio.create_task(self._crawl_scheduler(engine, explorer))
 
         logger.info("Historical crawl manager started successfully")
+
+    def _load_completed_combinations_from_db(self) -> None:
+        """Load completed combinations from database."""
+        try:
+            with Session(self.engine) as session:
+                completed_records = session.exec(
+                    select(CrawlCompletion).where(
+                        CrawlCompletion.category.in_(self.categories)  # type: ignore
+                    )
+                ).all()
+
+                for record in completed_records:
+                    self._completed_combinations.add((record.category, record.date))
+
+                logger.info(
+                    f"Loaded {len(self._completed_combinations)} completed combinations from database"
+                )
+        except Exception as e:
+            logger.warning(f"Failed to load completed combinations from database: {e}")
+
+    def _save_completion_to_db(
+        self, category: str, date: str, papers_found: int, papers_stored: int
+    ) -> None:
+        """Save completion status to database."""
+        try:
+            with Session(self.engine) as session:
+                completion = CrawlCompletion(
+                    category=category,
+                    date=date,
+                    papers_found=papers_found,
+                    papers_stored=papers_stored,
+                )
+                session.add(completion)
+                session.commit()
+                logger.info(
+                    f"Saved completion status for {category}-{date} to database"
+                )
+        except Exception as e:
+            logger.error(f"Failed to save completion status to database: {e}")
 
     async def stop(self) -> None:
         """Stop the historical crawl manager."""

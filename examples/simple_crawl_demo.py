@@ -62,29 +62,27 @@ async def main() -> None:
 
     print(f"\n🔄 Running crawl cycles...")
 
-    # Run a few cycles to demonstrate
-    for i in range(20):
-        print(f"\n--- Cycle {i + 1} ---")
+    # Start the crawl manager
+    print("🚀 Starting crawl manager...")
+    await crawl_manager.start(source_explorer, engine)
+    print("✅ Crawl manager started")
 
-        try:
-            print(f"🔄 Running crawl cycle {i + 1}...")
-            result = await crawl_manager.run_crawl_cycle(engine, source_explorer)
+    # Wait a bit for initial crawl cycles
+    print("⏳ Waiting for initial crawl cycles...")
+    await asyncio.sleep(5)
 
-            if result:
-                print(f"✅ Crawled {result.category} on {result.date}")
-                print(f"   Papers found: {result.papers_found}")
-                print(f"   Papers stored: {result.papers_stored}")
-            else:
-                print("🏁 No more date-category combinations to process")
+    # Check status
+    print(
+        f"📊 Crawl manager status: {'Running' if crawl_manager.is_running else 'Stopped'}"
+    )
+    print(
+        f"📈 Current progress: {crawl_manager.current_date} | Category: {crawl_manager.current_category_index}"
+    )
 
-            # Show current progress using properties
-            print(
-                f"📈 Current: {crawl_manager.current_date} | Category: {crawl_manager.current_category_index}"
-            )
-
-        except Exception as e:
-            print(f"❌ Error in cycle {i + 1}: {e}")
-            break
+    # Stop the crawl manager
+    print("🛑 Stopping crawl manager...")
+    await crawl_manager.stop()
+    print("✅ Crawl manager stopped")
 
     print(f"\n🎉 Simple crawl demo completed!")
 

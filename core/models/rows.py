@@ -288,6 +288,23 @@ class CategoryDateProgress(SQLModel, table=True):
     )
 
 
+class CrawlCompletion(SQLModel, table=True):
+    """Crawl completion status for date-category combinations."""
+
+    completion_id: int | None = Field(default=None, primary_key=True)
+    category: str = Field(description="ArXiv category (e.g., cs.AI)")
+    date: str = Field(description="Date in YYYY-MM-DD format")
+    papers_found: int = Field(default=0, description="Number of papers found")
+    papers_stored: int = Field(default=0, description="Number of papers stored")
+    completed_at: str = Field(
+        default_factory=get_current_timestamp,
+        description="ISO8601 datetime when crawl was completed"
+    )
+    
+    class Config:
+        table_name = "crawl_completion"
+
+
 class CrawlExecutionState(SQLModel, table=True):
     """Crawl execution state database model using SQLModel."""
 
