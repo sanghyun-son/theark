@@ -42,7 +42,7 @@ async def main() -> None:
     crawl_manager = HistoricalCrawlManager(
         categories=["cs.AI", "cs.LG"],
         rate_limit_delay=1.0,
-        batch_size=10,
+        batch_size=100,  # 10 → 100으로 증가
     )
     print("✅ Crawl manager created")
 
@@ -56,7 +56,7 @@ async def main() -> None:
     source_explorer = ArxivSourceExplorer(
         api_base_url="https://export.arxiv.org/api/query",  # Real ArXiv API
         delay_seconds=2.0,  # Be respectful to ArXiv API
-        max_results_per_request=10,
+        max_results_per_request=100,  # 10 → 100으로 증가
     )
     print("✅ ArXiv source explorer created")
 

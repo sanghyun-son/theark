@@ -52,7 +52,7 @@ class ArxivCrawlManager:
             category: ArXiv category (e.g., "cs.AI")
             date: Date in YYYY-MM-DD format
             start_index: Index to start fetching from
-            limit: Maximum number of papers to fetch
+            limit: Maximum number of papers per request (default: 100)
 
         Returns:
             Tuple of (papers_found, papers_stored)
@@ -60,22 +60,57 @@ class ArxivCrawlManager:
         logger.info(f"Starting crawl for {category} on {date}")
 
         try:
-            # Step 1: Fetch papers from ArXiv API using injected explorer
-            papers = await explorer.explore_historical_papers_by_category(
-                category=category, date=date, start_index=start_index, limit=limit
-            )
+            all_papers = []
+            current_start = start_index
+            batch_size = limit
 
-            papers_found = len(papers)
+            # Fetch all papers using pagination
+            while True:
+                logger.info(
+                    f"Fetching batch starting from index {current_start} with limit {batch_size}"
+                )
+
+                batch = await explorer.explore_historical_papers_by_category(
+                    category=category,
+                    date=date,
+                    start_index=current_start,
+                    limit=batch_size,
+                )
+
+                if not batch:
+                    logger.info(f"No more papers found at index {current_start}")
+                    break
+
+                all_papers.extend(batch)
+                logger.info(
+                    f"Fetched {len(batch)} papers in this batch, total so far: {len(all_papers)}"
+                )
+
+                # If we got fewer papers than requested, we've reached the end
+                if len(batch) < batch_size:
+                    logger.info(
+                        f"Received {len(batch)} papers (less than {batch_size}), reached end of results"
+                    )
+                    break
+
+                # Move to next batch
+                current_start += batch_size
+
+                # Rate limiting between batches
+                if len(batch) == batch_size:  # Only if we expect more
+                    await asyncio.sleep(self.delay_seconds)
+
+            papers_found = len(all_papers)
             logger.info(f"Found {papers_found} papers for {category} on {date}")
 
             # Step 2: Store papers in database
-            papers_stored = await self.storage_manager.store_papers_batch(papers)
+            papers_stored = await self.storage_manager.store_papers_batch(all_papers)
 
             logger.info(
                 f"Stored {papers_stored}/{papers_found} papers for {category} on {date}"
             )
 
-            # Rate limiting
+            # Final rate limiting
             await asyncio.sleep(self.delay_seconds)
 
             return papers_found, papers_stored
