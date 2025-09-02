@@ -129,33 +129,38 @@ class HistoricalCrawlManager:
         self, engine: Engine, explorer: ArxivSourceExplorer
     ) -> CrawlCycleResult | None:
         """Run one crawl cycle."""
-        # Get next date-category to process
-        next_item = self.get_next_date_category()
-        if not next_item:
-            return None
+        # Keep trying until we find an uncompleted date-category or reach the end
+        while True:
+            # Get next date-category to process
+            next_item = self.get_next_date_category()
+            if not next_item:
+                logger.info("Reached end date, crawling complete")
+                return None
 
-        date, category = next_item
+            date, category = next_item
 
-        # Check if already completed
-        if (category, date) in self._completed_combinations:
-            logger.info(f"Date-category {category}-{date} already completed, skipping")
+            # Check if already completed
+            if (category, date) in self._completed_combinations:
+                logger.info(
+                    f"Date-category {category}-{date} already completed, skipping"
+                )
+                self.advance_to_next()
+                continue  # Try next combination instead of returning None
+
+            # Found uncompleted combination, execute crawl
+            papers_found, papers_stored = await self.crawl_date_category(
+                engine, explorer, category, date
+            )
+
+            # Advance to next
             self.advance_to_next()
-            return None
 
-        # Execute crawl
-        papers_found, papers_stored = await self.crawl_date_category(
-            engine, explorer, category, date
-        )
-
-        # Advance to next
-        self.advance_to_next()
-
-        return CrawlCycleResult(
-            papers_found=papers_found,
-            papers_stored=papers_stored,
-            category=category,
-            date=date,
-        )
+            return CrawlCycleResult(
+                papers_found=papers_found,
+                papers_stored=papers_stored,
+                category=category,
+                date=date,
+            )
 
     @property
     def current_date(self) -> str:
