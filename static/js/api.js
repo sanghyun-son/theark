@@ -102,5 +102,15 @@ export class ApiService {
 
         return await response.json();
     }
+
+    async getStatistics() {
+        const response = await fetch('/v1/statistics');
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        return await response.json();
+    }
 }
 

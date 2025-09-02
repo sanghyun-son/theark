@@ -344,3 +344,59 @@ class CrawlerProgressResponse(BaseModel):
     total_papers_stored: int
     completed_date_categories: int
     failed_date_categories: int
+
+
+class StatisticsResponse(BaseModel):
+    """Response model for application statistics."""
+
+    # Paper statistics
+    total_papers: int = Field(description="Total number of papers stored in database")
+    papers_with_summary: int = Field(description="Number of papers that have summaries")
+    papers_without_summary: int = Field(
+        description="Number of papers without summaries"
+    )
+
+    # Summary statistics
+    batch_requested_summaries: int = Field(
+        description="Number of summaries requested via batch processing"
+    )
+
+    # Processing statistics
+    summary_coverage_percentage: float = Field(
+        description="Percentage of papers that have summaries (0.0 to 100.0)"
+    )
+
+    # Timestamps
+    last_updated: str = Field(description="When the statistics were last calculated")
+
+    @classmethod
+    def calculate_coverage_percentage(
+        cls, papers_with_summary: int, total_papers: int
+    ) -> float:
+        """Calculate summary coverage percentage."""
+        if total_papers == 0:
+            return 0.0
+        return round((papers_with_summary / total_papers) * 100, 2)
+
+    @classmethod
+    def create(
+        cls,
+        total_papers: int,
+        papers_with_summary: int,
+        batch_requested_summaries: int,
+        last_updated: str,
+    ) -> "StatisticsResponse":
+        """Create StatisticsResponse with calculated fields."""
+        papers_without_summary = total_papers - papers_with_summary
+        summary_coverage_percentage = cls.calculate_coverage_percentage(
+            papers_with_summary, total_papers
+        )
+
+        return cls(
+            total_papers=total_papers,
+            papers_with_summary=papers_with_summary,
+            papers_without_summary=papers_without_summary,
+            batch_requested_summaries=batch_requested_summaries,
+            summary_coverage_percentage=summary_coverage_percentage,
+            last_updated=last_updated,
+        )

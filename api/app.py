@@ -14,6 +14,7 @@ from api.routers import (
     crawler_router,
     main_router,
     papers_router,
+    statistics_router,
 )
 from api.services.app_initializer import AppServiceInitializer
 from core import get_logger, setup_logging
@@ -76,6 +77,7 @@ def create_app() -> FastAPI:
     app.include_router(papers_router)
     app.include_router(batch_router)
     app.include_router(crawler_router)
+    app.include_router(statistics_router)
     return app
 
 

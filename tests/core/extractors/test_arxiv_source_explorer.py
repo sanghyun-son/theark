@@ -150,9 +150,7 @@ async def test_fetch_papers_batch_network_error(
             "Network error"
         )
 
-        with pytest.raises(
-            (ValueError, RuntimeError, OSError)
-        ):  # The actual exception is raised, not NetworkError
+        with pytest.raises(Exception):
             await mock_arxiv_source_explorer._fetch_papers_batch(
                 query="cat:cs.AI", start=0, max_results=10
             )

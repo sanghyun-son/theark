@@ -66,12 +66,48 @@ body {
     flex-shrink: 0;
     background: var(--container-background-color);
     border-top: 1px solid var(--border-color);
-    padding: var(--spacing-sm);
-    text-align: right;
+    padding: 0;
     color: var(--light-text-color);
     font-size: 0.9rem;
     font-family: var(--font-family-korean);
     width: 100%;
+}
+
+.footer-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin: 0 auto;
+    padding: 0 var(--spacing-sm);
+}
+
+.footer-right {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+sm.github-link {
+    color: var(--link-color);
+    text-decoration: none;
+    font-weight: 600;
+    transition: color 0.2s ease;
+}
+
+.github-link:hover {
+    color: var(--link-hover-color);
+    text-decoration: underline;
+}
+
+
+.github-link {
+    color: var(--link-color);
+    text-decoration: none;
+    font-size: 1.5rem;
+    transition: color 0.2s ease;
+}
+
+.github-link:hover {
+    color: var(--link-hover-color);
 }
 
 .main {
@@ -755,3 +791,45 @@ body {
 .relevance-tag.score-2, .paper-relevance-tag.score-2 { background: var(--score-2); }
 .relevance-tag.score-1, .paper-relevance-tag.score-1 { background: var(--score-1); }
 .relevance-tag.score-0, .paper-relevance-tag.score-0 { background: var(--score-0); }
+
+/* --- Statistics Component Styles --- */
+.statistics-display {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+    font-size: 0.85rem;
+    color: var(--secondary-text-color);
+    font-family: var(--font-family-monospace);
+}
+
+.stat-text {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+}
+
+.stat-text span {
+    font-weight: 700;
+    color: var(--accent-color-1);
+}
+
+.github-link {
+    color: var(--link-color);
+    text-decoration: none;
+    font-weight: 600;
+    transition: color 0.2s ease;
+}
+
+.github-link:hover {
+    color: var(--link-hover-color);
+    text-decoration: underline;
+}
+
+/* Responsive design for statistics */
+@media (max-width: 768px) {
+    .statistics-display {
+        flex-direction: column;
+        gap: var(--spacing-xs);
+        text-align: center;
+    }
+}

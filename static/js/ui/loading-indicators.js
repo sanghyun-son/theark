@@ -68,7 +68,11 @@ export class LoadingIndicators {
         wrapper.style.cursor = "pointer";
         wrapper.style.userSelect = "none";        // 텍스트 드래그 방지 (선택적)
 
-        wrapper.onclick = () => window.paperManager.loadPapers();
+        wrapper.onclick = () => {
+            if (window.paperManager) {
+                window.paperManager.loadPapers();
+            }
+        };
 
         const leftIcon = document.createElement("span");
         leftIcon.textContent = "🔄";

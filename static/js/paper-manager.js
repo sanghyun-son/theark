@@ -2,6 +2,7 @@
 import { ApiService } from './api.js';
 import { UIService } from './ui.js';
 import { InfiniteScrollService } from './infinite-scroll.js';
+import { StatisticsComponent } from './ui/statistics.js';
 
 export class PaperManager {
     constructor() {
@@ -9,6 +10,7 @@ export class PaperManager {
         this.apiService = new ApiService();
         this.uiService = new UIService(this.apiService, this);
         this.infiniteScrollService = new InfiniteScrollService(this.apiService, this.uiService);
+        this.statisticsComponent = new StatisticsComponent(this.apiService);
         
         // State
         this.selectedCategories = new Set();

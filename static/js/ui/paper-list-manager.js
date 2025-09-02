@@ -63,7 +63,7 @@ export class PaperListManager {
         linksDiv.className = 'paper-links';
         
         const pdfLink = document.createElement('a');
-        pdfLink.href = paper.pdf_url;
+        pdfLink.href = `https://arxiv.org/pdf/${paper.arxiv_id}`;
         pdfLink.target = '_blank';
         pdfLink.className = 'paper-link';
         pdfLink.textContent = '📄';

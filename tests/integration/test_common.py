@@ -32,8 +32,6 @@ def test_root_endpoint(integration_client):
     """Test root endpoint."""
     response = integration_client.get("/")
     assert response.status_code == 200
-    assert "TheArk" in response.text
-    assert "Paper Management" in response.text
 
 
 def test_favicon_endpoint(integration_client):

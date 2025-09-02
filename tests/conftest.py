@@ -9,6 +9,7 @@ from urllib.parse import parse_qs, urlparse
 
 import pytest
 from pytest_httpserver import HTTPServer
+from sqlalchemy import create_engine
 from sqlalchemy.engine import Engine
 from sqlmodel import Session
 from werkzeug.wrappers import Request, Response
@@ -297,14 +298,11 @@ def mock_arxiv_source_explorer(mock_arxiv_server: HTTPServer) -> ArxivSourceExpl
 
 
 @pytest.fixture
-def mock_db_engine(tmp_path: Path) -> Engine:
+def mock_db_engine(tmp_path: Path) -> Generator[Engine, None, None]:
     """Create a real database engine for testing using a file-based database."""
     # Use a file-based SQLite database in tmp_path to avoid in-memory engine instance issues
     db_path = tmp_path / "test.db"
     database_url = f"sqlite:///{db_path}"
-
-    # Create engine with the file-based URL
-    from sqlalchemy import create_engine
 
     engine = create_engine(
         database_url,
@@ -318,7 +316,8 @@ def mock_db_engine(tmp_path: Path) -> Engine:
         pool_size=10,
     )
     create_database_tables(engine)
-    return engine
+    yield engine
+    engine.dispose()
 
 
 @pytest.fixture(scope="function")
