@@ -2,14 +2,15 @@
 
 import asyncio
 import logging
+from datetime import datetime
 from pathlib import Path
-from datetime import datetime, timedelta
 
-from core.extractors.concrete.historical_crawl_manager import HistoricalCrawlManager
-from core.extractors.concrete.arxiv_source_explorer import ArxivSourceExplorer
-from core.database.engine import create_database_engine, create_database_tables
-from core.types import Environment
 from sqlalchemy.engine import Engine
+
+from core.database.engine import create_database_engine, create_database_tables
+from core.extractors.concrete.arxiv_source_explorer import ArxivSourceExplorer
+from core.extractors.concrete.historical_crawl_manager import HistoricalCrawlManager
+from core.types import Environment
 
 # Set up logging
 logging.basicConfig(level=logging.DEBUG, format="%(levelname)s:%(name)s:%(message)s")
@@ -46,10 +47,10 @@ async def main() -> None:
     )
     print("✅ Crawl manager created")
 
-    print(f"\n📊 Initial state:")
+    print("\n📊 Initial state:")
     print(f"   End date: {crawl_manager.end_date}")
     print(f"   Today: {datetime.now().strftime('%Y-%m-%d')}")
-    print(f"   Will start from: yesterday")
+    print("   Will start from: yesterday")
 
     # Create source explorer with REAL ArXiv API
     print("🔧 Creating ArXiv source explorer...")
@@ -60,7 +61,7 @@ async def main() -> None:
     )
     print("✅ ArXiv source explorer created")
 
-    print(f"\n🔄 Running crawl cycles...")
+    print("\n🔄 Running crawl cycles...")
 
     # Start the crawl manager
     print("🚀 Starting crawl manager...")
@@ -84,7 +85,7 @@ async def main() -> None:
     await crawl_manager.stop()
     print("✅ Crawl manager stopped")
 
-    print(f"\n🎉 Simple crawl demo completed!")
+    print("\n🎉 Simple crawl demo completed!")
 
 
 if __name__ == "__main__":

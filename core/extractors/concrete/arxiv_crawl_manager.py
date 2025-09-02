@@ -105,7 +105,9 @@ class ArxivCrawlManager:
             papers_stored = await storage_manager.store_papers_batch(all_papers)
 
             logger.info(
-                f"Found {len(all_papers)} papers, stored {papers_stored}/{len(all_papers)} papers for {category} on {date}"
+                f"Found {len(all_papers)} papers, "
+                f"stored {papers_stored}/{len(all_papers)} "
+                f"papers for {category} on {date}"
             )
 
             return len(all_papers), papers_stored

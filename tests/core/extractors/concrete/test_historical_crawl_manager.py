@@ -5,11 +5,9 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 from sqlalchemy.engine import Engine
-from sqlmodel import Session
 
 from core.extractors.concrete.arxiv_source_explorer import ArxivSourceExplorer
 from core.extractors.concrete.historical_crawl_manager import HistoricalCrawlManager
-from core.models.rows import CategoryDateProgress, CrawlExecutionState
 
 
 def get_yesterday_date() -> str:
@@ -145,7 +143,7 @@ async def test_crawl_cycle_skips_completed_dates(
         mock_crawl.return_value = (0, 0)
 
         # Run crawl cycle
-        result = await historical_crawl_manager.run_crawl_cycle(
+        await historical_crawl_manager.run_crawl_cycle(
             mock_db_engine, mock_arxiv_source_explorer
         )
 

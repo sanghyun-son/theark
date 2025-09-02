@@ -80,7 +80,6 @@ def test_crawler_lifecycle(integration_client: TestClient) -> None:
     # Check initial status
     status_response = integration_client.get("/v1/crawler")
     assert status_response.status_code == 200
-    initial_status = status_response.json()
 
     # Start crawler
     start_response = integration_client.put("/v1/crawler")

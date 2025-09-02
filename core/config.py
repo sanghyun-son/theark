@@ -84,6 +84,9 @@ class Settings(BaseModel):
     )
 
     # LLM Settings
+    llm_api_key: str = Field(
+        default="", description="LLM API key from environment variable"
+    )
     llm_model: str = Field(
         default="gpt-4o-mini", description="LLM model to use for summarization"
     )
@@ -220,6 +223,24 @@ def load_settings() -> Settings:
         os.getenv("THEARK_ARXIV_RETRY_BASE_DELAY_SECONDS", "2")
     )
 
+    # Parse Historical Crawl settings
+    historical_crawl_enabled = os.getenv(
+        "THEARK_HISTORICAL_CRAWL_ENABLED", "false"
+    ).lower() in ["true", "1", "yes", "on"]
+    historical_crawl_categories_str = os.getenv(
+        "THEARK_HISTORICAL_CRAWL_CATEGORIES", "cs.AI,cs.LG,cs.CL"
+    )
+    historical_crawl_categories = [
+        cat.strip() for cat in historical_crawl_categories_str.split(",")
+    ]
+    historical_crawl_start_date = os.getenv("THEARK_HISTORICAL_CRAWL_START_DATE")
+    historical_crawl_rate_limit_delay = float(
+        os.getenv("THEARK_HISTORICAL_CRAWL_RATE_LIMIT_DELAY", "10.0")
+    )
+    historical_crawl_batch_size = int(
+        os.getenv("THEARK_HISTORICAL_CRAWL_BATCH_SIZE", "100")
+    )
+
     return Settings(
         environment=Environment(os.getenv("THEARK_ENV", "development")),
         api_title=os.getenv("THEARK_API_TITLE", "TheArk API"),
@@ -236,6 +257,7 @@ def load_settings() -> Settings:
         arxiv_api_base_url=os.getenv(
             "THEARK_ARXIV_API_BASE_URL", "https://export.arxiv.org/api/query"
         ),
+        llm_api_key=os.getenv("THEARK_LLM_API_KEY", ""),
         llm_model=os.getenv("THEARK_LLM_MODEL", "gpt-4o-mini"),
         llm_api_base_url=os.getenv(
             "THEARK_LLM_API_BASE_URL", "https://api.openai.com/v1"
@@ -253,6 +275,11 @@ def load_settings() -> Settings:
         arxiv_fetch_interval_minutes=arxiv_fetch_interval_minutes,
         arxiv_retry_attempts=arxiv_retry_attempts,
         arxiv_retry_base_delay_seconds=arxiv_retry_base_delay_seconds,
+        historical_crawl_enabled=historical_crawl_enabled,
+        historical_crawl_categories=historical_crawl_categories,
+        historical_crawl_start_date=historical_crawl_start_date,
+        historical_crawl_rate_limit_delay=historical_crawl_rate_limit_delay,
+        historical_crawl_batch_size=historical_crawl_batch_size,
     )
 
 
