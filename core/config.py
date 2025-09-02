@@ -135,6 +135,10 @@ class Settings(BaseModel):
         else:  # DEVELOPMENT and TESTING
             self.auth_required = False
 
+        # Override historical_crawl_enabled for testing environment
+        if self.environment == Environment.TESTING:
+            self.historical_crawl_enabled = True
+
     @property
     def is_development(self) -> bool:
         """Check if running in development mode."""
