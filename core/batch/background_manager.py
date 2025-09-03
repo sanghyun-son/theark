@@ -12,12 +12,7 @@ from core.batch.state_manager import BatchStateManager
 from core.llm.batch_builder import UnifiedBatchBuilder
 from core.llm.openai_client import UnifiedOpenAIClient
 from core.log import get_logger
-from core.models.batch import (
-    BatchItemCreate,
-    BatchMetadata,
-    BatchRequestPayload,
-    BatchResult,
-)
+from core.models.batch import BatchRequestPayload, BatchResult
 from core.models.rows import Paper
 from core.services.summarization_service import PaperSummarizationService
 
@@ -30,10 +25,10 @@ class BackgroundBatchManager:
     def __init__(
         self,
         summary_service: PaperSummarizationService,
-        batch_enabled: bool = True,
         batch_summary_interval: int = 3600,
         batch_fetch_interval: int = 600,
         batch_max_items: int = 1000,
+        batch_daily_limit: int = 10000,
         language: str = "English",
         interests: list[str] = ["Machine Learning"],
     ) -> None:
@@ -41,16 +36,16 @@ class BackgroundBatchManager:
 
         Args:
             summary_service: Paper summarization service instance
-            batch_enabled: Whether batch processing is enabled
             batch_summary_interval: Interval in seconds for summary batch processing
             batch_fetch_interval: Interval in seconds for fetching batch results
             batch_max_items: Maximum number of items per batch
+            batch_daily_limit: Maximum number of batch requests per day
             language: Language for batch summarization (default: "English")
         """
-        self._batch_enabled = batch_enabled
         self._batch_summary_interval = batch_summary_interval
         self._batch_fetch_interval = batch_fetch_interval
         self._batch_max_items = batch_max_items
+        self._batch_daily_limit = batch_daily_limit
         self._language = language
 
         self._interests = interests
@@ -74,10 +69,6 @@ class BackgroundBatchManager:
         """
         if self._running:
             logger.warning("Background batch manager is already running")
-            return
-
-        if not self._batch_enabled:
-            logger.info("Batch processing is disabled in settings")
             return
 
         logger.info("Starting background batch manager")
@@ -175,11 +166,13 @@ class BackgroundBatchManager:
             openai_client: OpenAI batch client instance
         """
         try:
-            # Get pending summaries
-            pending_papers = self._state_manager.get_pending_summaries(db_engine)
+            # Get pending summaries with batch size limit
+            pending_papers = self._state_manager.get_pending_summaries(
+                db_engine, limit=self._batch_max_items
+            )
 
             if not pending_papers:
-                logger.debug("No pending summaries to process")
+                logger.warning("No pending summaries to process")
                 return
 
             # Check daily limit
@@ -213,8 +206,9 @@ class BackgroundBatchManager:
         """Create a batch request for paper summarization.
 
         Args:
-            db_session: Database manager instance
+            db_engine: Database engine instance
             papers: List of papers to summarize
+            openai_client: OpenAI client instance
         """
         # Limit papers to batch_max_items
         papers = papers[: self._batch_max_items]
@@ -227,17 +221,10 @@ class BackgroundBatchManager:
             batch_payload.to_jsonl(), "batch_requests.jsonl", purpose="batch"
         )
 
-        # Create batch request
-        batch_metadata = BatchMetadata(
-            purpose="paper_summarization",
-            paper_count=len(papers),
-            model=openai_client.model,  # Use the model from the client
-        )
         batch_response = await openai_client.create_batch_request(
             input_file_id=file_id,
             completion_window="24h",
             endpoint="/v1/chat/completions",
-            metadata=batch_metadata.model_dump(),
         )
 
         # Store batch record in database
@@ -248,28 +235,10 @@ class BackgroundBatchManager:
             db_engine,
             batch_id=batch_response.id,
             input_file_id=file_id,
+            entity_count=len(papers),
             completion_window="24h",
             endpoint="/v1/chat/completions",
-            metadata=batch_metadata.model_dump(),
         )
-
-        # Add batch items to database
-        batch_items = []
-        for paper in papers:
-            batch_item = BatchItemCreate(
-                paper_id=paper.paper_id,
-                input_data=json.dumps(
-                    {
-                        "paper_id": paper.paper_id,
-                        "title": paper.title,
-                        "abstract": paper.abstract,
-                        "arxiv_id": paper.arxiv_id,
-                    }
-                ),
-            )
-            batch_items.append(batch_item)
-
-        self._state_manager.add_batch_items(db_engine, batch_response.id, batch_items)
 
         logger.info(
             f"Created batch request {batch_response.id} for {len(papers)} papers"
@@ -333,14 +302,16 @@ class BackgroundBatchManager:
             active_batches = self._state_manager.get_active_batches(db_engine)
 
             if not active_batches:
-                logger.debug("No active batches to process")
+                logger.warning("No active batches to process")
                 return
 
             logger.info(f"Processing {len(active_batches)} active batches")
 
             # Process each active batch
             for batch in active_batches:
-                await self._process_batch_status(db_engine, batch, openai_client)
+                await self._process_batch_status(
+                    db_engine, batch.model_dump(), openai_client
+                )
 
         except Exception as e:
             logger.error(f"Error processing active batches: {e}")
@@ -360,7 +331,8 @@ class BackgroundBatchManager:
         try:
             batch_id = batch["batch_id"]
 
-            # Get current status from OpenAI
+            # Get current status from OpenAI with tracking
+
             batch_status = await openai_client.get_batch_status(batch_id)
 
             # Update batch status in database
@@ -385,7 +357,7 @@ class BackgroundBatchManager:
                         db_engine, batch_id, batch_status.error_file_id, openai_client
                     )
 
-            logger.debug(f"Updated batch {batch_id} status to {batch_status.status}")
+            logger.info(f"Updated batch {batch_id} status to {batch_status.status}")
 
         except Exception as e:
             logger.error(
@@ -446,29 +418,13 @@ class BackgroundBatchManager:
 
             # Check if result was successful
             if result.status_code == 200:
-                # Update batch item status
-                self._state_manager.update_batch_item_status(
-                    db_engine,
-                    batch_id=batch_id,
-                    paper_id=paper_id,
-                    status="completed",
-                )
-
-                logger.debug(f"Processed successful result for paper {paper_id}")
+                logger.info(f"Processed successful result for paper {paper_id}")
             else:
                 # Handle failed result
                 error_message = (
                     result.response.get("body", {})
                     .get("error", {})
                     .get("message", "Unknown error")
-                )
-
-                self._state_manager.update_batch_item_status(
-                    db_engine,
-                    batch_id=batch_id,
-                    paper_id=paper_id,
-                    status="failed",
-                    error_message=error_message,
                 )
 
                 logger.warning(f"Failed result for paper {paper_id}: {error_message}")
@@ -512,14 +468,19 @@ class BackgroundBatchManager:
         """Check if daily batch limit has been reached.
 
         Args:
-            db_session: Database manager instance
+            db_engine: Database engine instance
 
         Returns:
             True if under daily limit, False otherwise
         """
-        # TODO: Implement daily limit checking
-        # For now, always return True
-        return True
+        try:
+            return self._state_manager.check_daily_batch_limit(
+                db_engine, self._batch_daily_limit
+            )
+        except Exception as e:
+            logger.error(f"Error checking daily limit: {e}")
+            # On error, be conservative and return False
+            return False
 
     @property
     def is_running(self) -> bool:

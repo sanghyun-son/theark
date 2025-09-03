@@ -8,7 +8,6 @@ from sqlmodel import SQLModel, create_engine
 from core.log import get_logger
 from core.models.rows import (
     ArxivFailedPaper,
-    BatchItem,
     CategoryDateProgress,
     CrawlEvent,
     CrawlExecutionState,
@@ -115,7 +114,6 @@ def create_database_tables(engine: Engine) -> None:
         CrawlEvent,
         LLMRequest,
         LLMBatchRequest,
-        BatchItem,
     ]
     for model in row_models:
         logger.info(f"> Created table for {model.__tablename__}")

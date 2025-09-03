@@ -14,7 +14,6 @@ from core.llm.openai_client import UnifiedOpenAIClient
 from core.models.batch import (
     BatchActionResponse,
     BatchDetailsResponse,
-    BatchItemsResponse,
     BatchListResponse,
     BatchStatusResponse,
     PendingSummariesResponse,
@@ -68,16 +67,12 @@ async def get_batch_details(
         active_batches = state_manager.get_active_batches(db_engine)
 
         # Find the specific batch
-        batch = next((b for b in active_batches if b["batch_id"] == batch_id), None)
+        batch = next((b for b in active_batches if b.batch_id == batch_id), None)
         if not batch:
             raise HTTPException(status_code=404, detail=f"Batch {batch_id} not found")
 
-        # Get batch items
-        batch_items = state_manager.get_batch_items(db_engine, batch_id)
-
         return BatchDetailsResponse(
             batch=batch,
-            items=batch_items,
             message="Batch details retrieved successfully",
         )
     except HTTPException:
@@ -85,27 +80,6 @@ async def get_batch_details(
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Failed to get batch details: {str(e)}"
-        )
-
-
-@router.get("/batches/{batch_id}/items")
-async def get_batch_items(
-    batch_id: str,
-    db_engine: Engine = Depends(get_engine),
-) -> BatchItemsResponse:
-    """Get items for a specific batch."""
-    try:
-        state_manager = BatchStateManager()
-        batch_items = state_manager.get_batch_items(db_engine, batch_id)
-
-        return BatchItemsResponse(
-            batch_id=batch_id,
-            items=batch_items,
-            message="Batch items retrieved successfully",
-        )
-    except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to get batch items: {str(e)}"
         )
 
 

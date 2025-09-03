@@ -67,8 +67,6 @@ class AppServiceInitializer:
         self, arxiv_base_url: str | None = None
     ) -> None:
         """Initialize crawler-related services."""
-        logger.info("Initializing crawler services...")
-
         if not self.engine:
             raise RuntimeError("Database must be initialized before crawler services")
 
@@ -87,13 +85,9 @@ class AppServiceInitializer:
                 rate_limit_delay=self.settings.historical_crawl_rate_limit_delay,
                 batch_size=self.settings.historical_crawl_batch_size,
             )
-            logger.info(
-                f"Historical crawl manager initialized with categories: "
-                f"{self.settings.historical_crawl_categories}"
-            )
         else:
+            logger.warning("Historical crawling is disabled")
             self.historical_crawl_manager = None
-            logger.info("Historical crawling is disabled")
 
         # Initialize crawl service
         self.crawl_service = (
@@ -106,13 +100,10 @@ class AppServiceInitializer:
         arxiv_extractor = ArxivExtractor(api_base_url=base_url)
         register_extractor("arxiv", arxiv_extractor)
 
-        logger.info("Crawler services initialized successfully")
-
     async def initialize_llm_services(
         self, llm_base_url: str | None = None, llm_api_key: str | None = None
     ) -> None:
         """Initialize LLM-related services."""
-        logger.info("Initializing LLM services...")
 
         # Initialize OpenAI client
         base_url = llm_base_url or self.settings.llm_api_base_url
@@ -126,11 +117,8 @@ class AppServiceInitializer:
             use_tools=self.settings.llm_use_tools,
         )
 
-        logger.info("LLM services initialized successfully")
-
     async def initialize_batch_services(self) -> None:
         """Initialize batch processing services."""
-        logger.info("Initializing batch services...")
 
         if not self.engine:
             raise RuntimeError("Database must be initialized before batch services")
@@ -142,17 +130,19 @@ class AppServiceInitializer:
         # Create summarization service first
         summary_service = PaperSummarizationService()
 
-        self.background_batch_manager = BackgroundBatchManager(
-            summary_service=summary_service,
-            batch_enabled=self.settings.batch_enabled,
-            batch_summary_interval=self.settings.batch_summary_interval,
-            batch_fetch_interval=self.settings.batch_fetch_interval,
-            batch_max_items=self.settings.batch_max_items,
-            language=self.settings.default_summary_language,
-            interests=self.settings.default_interests_list,
-        )
-
-        logger.info("Batch services initialized successfully")
+        if self.settings.batch_enabled:
+            self.background_batch_manager = BackgroundBatchManager(
+                summary_service=summary_service,
+                batch_summary_interval=self.settings.batch_summary_interval,
+                batch_fetch_interval=self.settings.batch_fetch_interval,
+                batch_max_items=self.settings.batch_max_items,
+                batch_daily_limit=self.settings.batch_daily_limit,
+                language=self.settings.default_summary_language,
+                interests=self.settings.default_interests_list,
+            )
+        else:
+            logger.warning("Batch processing is disabled")
+            self.background_batch_manager = None
 
     async def start_all_services(self) -> None:
         """Start all background services."""
@@ -168,9 +158,7 @@ class AppServiceInitializer:
 
         # Start historical crawl manager if available
         if self.historical_crawl_manager and self.arxiv_explorer:
-            logger.info("Starting historical crawl manager...")
             await self.historical_crawl_manager.start(self.arxiv_explorer, self.engine)
-            logger.info("Historical crawl manager started successfully")
 
         # Start background batch manager if available
         if self.background_batch_manager:
@@ -187,9 +175,7 @@ class AppServiceInitializer:
 
         # Stop historical crawl manager if available
         if self.historical_crawl_manager:
-            logger.info("Stopping historical crawl manager...")
             await self.historical_crawl_manager.stop()
-            logger.info("Historical crawl manager stopped successfully")
 
         # Stop background batch manager if available
         if self.background_batch_manager:
@@ -199,8 +185,6 @@ class AppServiceInitializer:
 
     def _setup_app_state(self, app: FastAPI) -> None:
         """Configure app.state with initialized services."""
-        logger.info("Setting up app state...")
-
         # Store services in app.state for dependency injection
         app.state.engine = self.engine
         app.state.arxiv_explorer = self.arxiv_explorer
@@ -208,5 +192,3 @@ class AppServiceInitializer:
         app.state.crawl_service = self.crawl_service
         app.state.summary_client = self.openai_client
         app.state.background_batch_manager = self.background_batch_manager
-
-        logger.info("App state configured successfully")

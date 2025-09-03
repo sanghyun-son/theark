@@ -28,10 +28,7 @@ from core.models.api.streaming import (
 from core.models.batch import (
     BatchActionResponse,
     BatchDetailsResponse,
-    BatchItemCreate,
-    BatchItemsResponse,
     BatchListResponse,
-    BatchMetadata,
     BatchRequestEntry,
     BatchRequestPayload,
     BatchResponseBase,
@@ -102,10 +99,7 @@ __all__ = [
     # Batch models
     "BatchActionResponse",
     "BatchDetailsResponse",
-    "BatchItemCreate",
-    "BatchItemsResponse",
     "BatchListResponse",
-    "BatchMetadata",
     "BatchRequestEntry",
     "BatchRequestPayload",
     "BatchResult",

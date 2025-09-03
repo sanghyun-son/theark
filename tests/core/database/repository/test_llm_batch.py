@@ -1,6 +1,5 @@
 """Tests for LLM batch repository."""
 
-
 from core.database.repository.llm_batch import LLMBatchRepository
 from core.database.repository.paper import PaperRepository
 from core.models.rows import Paper
@@ -130,10 +129,8 @@ def test_create_batch_record_stub(
         input_file_id="test_file",
         completion_window="24h",
         endpoint="/v1/chat/completions",
-        metadata={"test": "data"},
+        entity_count=1,
     )
-
-    # Assert - Should not raise exception, just log
 
 
 def test_update_batch_status_stub(
@@ -147,49 +144,6 @@ def test_update_batch_status_stub(
         error_file_id=None,
     )
 
-    # Assert - Should not raise exception, just log
-
-
-def test_add_batch_items_stub(
-    llm_batch_repo: LLMBatchRepository,
-) -> None:
-    """Test add_batch_items stub implementation."""
-    # Arrange
-    items = [
-        {"paper_id": 1, "input_data": "test1"},
-        {"paper_id": 2, "input_data": "test2"},
-    ]
-
-    # Act
-    llm_batch_repo.add_batch_items("test_batch", items)
-
-    # Assert - Should not raise exception, just log
-
-
-def test_add_batch_items_empty(
-    llm_batch_repo: LLMBatchRepository,
-) -> None:
-    """Test add_batch_items with empty list."""
-    # Act
-    llm_batch_repo.add_batch_items("test_batch", [])
-
-    # Assert - Should not raise exception
-
-
-def test_update_batch_item_status_stub(
-    llm_batch_repo: LLMBatchRepository,
-) -> None:
-    """Test update_batch_item_status stub implementation."""
-    # Act
-    llm_batch_repo.update_batch_item_status(
-        batch_id="test_batch",
-        item_id="test_item",
-        status="completed",
-        error="test error",
-    )
-
-    # Assert - Should not raise exception, just log
-
 
 def test_get_batch_details_stub(
     llm_batch_repo: LLMBatchRepository,
@@ -198,15 +152,6 @@ def test_get_batch_details_stub(
     # Act
     details = llm_batch_repo.get_batch_details("test_batch")
     assert details is None  # Currently returns None
-
-
-def test_get_batch_items_stub(
-    llm_batch_repo: LLMBatchRepository,
-) -> None:
-    """Test get_batch_items stub implementation."""
-    # Act
-    items = llm_batch_repo.get_batch_items("test_batch")
-    assert items == []  # Currently returns empty list
 
 
 def test_cancel_batch_stub(

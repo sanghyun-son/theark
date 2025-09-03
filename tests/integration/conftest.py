@@ -27,6 +27,7 @@ async def integration_client(
 
     # Set environment to testing for integration tests
     os.environ["THEARK_ENV"] = "testing"
+    os.environ["THEARK_BATCH_ENABLED"] = "true"
 
     app = create_app()
     settings = load_settings()

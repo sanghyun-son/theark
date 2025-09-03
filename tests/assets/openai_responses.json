@@ -1,0 +1,286 @@
+{
+  "create_batch": {
+    "id": "batch_123",
+    "object": "batch",
+    "status": "validating",
+    "input_file_id": "file_123",
+    "completion_window": "24h",
+    "endpoint": "/v1/chat/completions",
+    "created_at": 1234567890,
+    "in_progress_at": null,
+    "expires_at": 1234654290,
+    "finalizing_at": null,
+    "completed_at": null,
+    "request_counts": {"total": 0, "completed": 0, "failed": 0},
+    "metadata": {"test": "data"}
+  },
+  "list_batches": {
+    "object": "list",
+    "data": [
+      {
+        "id": "batch_1",
+        "object": "batch",
+        "status": "completed",
+        "endpoint": "/v1/chat/completions",
+        "input_file_id": "file_1",
+        "completion_window": "24h",
+        "created_at": 1234567890,
+        "in_progress_at": 1234567891,
+        "completed_at": 1234567892,
+        "output_file_id": "output_1",
+        "error_file_id": null,
+        "request_counts": {"total": 100, "completed": 100, "failed": 0},
+        "metadata": null
+      },
+      {
+        "id": "batch_2",
+        "object": "batch",
+        "status": "in_progress",
+        "endpoint": "/v1/chat/completions",
+        "input_file_id": "file_2",
+        "completion_window": "24h",
+        "created_at": 1234567891,
+        "in_progress_at": 1234567892,
+        "completed_at": null,
+        "output_file_id": null,
+        "error_file_id": null,
+        "request_counts": {"total": 50, "completed": 25, "failed": 0},
+        "metadata": null
+      }
+    ],
+    "has_more": false
+  },
+  "get_batch_status": {
+    "id": "batch_123",
+    "object": "batch",
+    "status": "completed",
+    "input_file_id": "file_123",
+    "completion_window": "24h",
+    "endpoint": "/v1/chat/completions",
+    "created_at": 1234567890,
+    "in_progress_at": 1234567891,
+    "expires_at": 1234654290,
+    "finalizing_at": 1234567892,
+    "completed_at": 1234567893,
+    "request_counts": {"total": 100, "completed": 95, "failed": 5},
+    "metadata": {"test": "data"},
+    "output_file_id": "output_123",
+    "error_file_id": "error_123"
+  },
+  "cancel_batch": {
+    "id": "batch_123",
+    "object": "batch",
+    "status": "cancelled",
+    "input_file_id": "file_123",
+    "completion_window": "24h",
+    "endpoint": "/v1/chat/completions",
+    "created_at": 1234567890,
+    "in_progress_at": 1234567891,
+    "expires_at": 1234654290,
+    "finalizing_at": null,
+    "completed_at": null,
+    "request_counts": {"total": 100, "completed": 50, "failed": 0},
+    "metadata": {"test": "data"}
+  },
+  "get_batch_output": {
+    "id": "batch_123",
+    "object": "batch",
+    "status": "completed",
+    "results": [
+      {
+        "custom_id": "paper-001",
+        "response": {
+          "status_code": 200,
+          "body": {
+            "id": "chatcmpl-batch-1",
+            "object": "chat.completion",
+            "created": 1677652288,
+            "model": "gpt-4o-mini",
+            "choices": [
+              {
+                "index": 0,
+                "message": {
+                  "role": "assistant",
+                  "content": "This is a completed batch result for paper-001."
+                },
+                "finish_reason": "stop"
+              }
+            ],
+            "usage": {
+              "prompt_tokens": 30,
+              "completion_tokens": 15,
+              "total_tokens": 45
+            }
+          }
+        }
+      }
+    ]
+  },
+  "batch_response": {
+    "id": "batch-test-456",
+    "object": "batch",
+    "status": "completed",
+    "results": [
+      {
+        "custom_id": "paper-001",
+        "response": {
+          "status_code": 200,
+          "body": {
+            "id": "chatcmpl-batch-tool-1",
+            "object": "chat.completion",
+            "created": 1677652288,
+            "model": "gpt-4o-mini",
+            "choices": [
+              {
+                "index": 0,
+                "message": {
+                  "role": "assistant",
+                  "content": null,
+                  "tool_calls": [
+                    {
+                      "id": "call_batch_tool_1",
+                      "type": "function",
+                      "function": {
+                        "name": "Structure",
+                        "arguments": "{\"tldr\": \"Advanced machine learning approach for paper analysis.\", \"motivation\": \"Need for better understanding of research papers.\", \"method\": \"Novel neural network architecture with attention mechanisms.\", \"result\": \"Improved accuracy in paper summarization by 15%.\", \"conclusion\": \"The proposed method shows significant improvement over baseline.\", \"relevance\": \"9\"}"
+                      }
+                    }
+                  ]
+                },
+                "finish_reason": "tool_calls"
+              }
+            ],
+            "usage": {
+              "prompt_tokens": 45,
+              "completion_tokens": 25,
+              "total_tokens": 70
+            }
+          }
+        }
+      },
+      {
+        "custom_id": "paper-002",
+        "response": {
+          "status_code": 200,
+          "body": {
+            "id": "chatcmpl-batch-tool-2",
+            "object": "chat.completion",
+            "created": 1677652289,
+            "model": "gpt-4o-mini",
+            "choices": [
+              {
+                "index": 0,
+                "message": {
+                  "role": "assistant",
+                  "content": null,
+                  "tool_calls": [
+                    {
+                      "id": "call_batch_tool_2",
+                      "type": "function",
+                      "function": {
+                        "name": "Structure",
+                        "arguments": "{\"tldr\": \"Deep learning framework for natural language processing.\", \"motivation\": \"Addressing limitations in current NLP approaches.\", \"method\": \"Transformer-based architecture with multi-task learning.\", \"result\": \"Achieved state-of-the-art performance on benchmark datasets.\", \"conclusion\": \"Multi-task learning improves generalization in NLP tasks.\", \"relevance\": \"8\"}"
+                      }
+                    }
+                  ]
+                },
+                "finish_reason": "tool_calls"
+              }
+            ],
+            "usage": {
+              "prompt_tokens": 40,
+              "completion_tokens": 20,
+              "total_tokens": 60
+            }
+          }
+        }
+      }
+    ]
+  },
+  "upload_file": {
+    "id": "file_123",
+    "object": "file",
+    "bytes": 1024,
+    "created_at": 1234567890,
+    "filename": "test.jsonl",
+    "purpose": "batch"
+  },
+  "list_files": {
+    "object": "list",
+    "data": [
+      {
+        "id": "file_123",
+        "object": "file",
+        "bytes": 1024,
+        "created_at": 1234567890,
+        "filename": "test.jsonl",
+        "purpose": "batch"
+      }
+    ]
+  },
+  "get_file_info": {
+    "id": "file_123",
+    "object": "file",
+    "bytes": 1024,
+    "created_at": 1234567890,
+    "filename": "test.jsonl",
+    "purpose": "batch"
+  },
+  "delete_file": {
+    "id": "file_123",
+    "object": "file",
+    "deleted": true
+  },
+  "tool_response": {
+    "id": "chatcmpl-tool-123",
+    "object": "chat.completion",
+    "created": 1677652288,
+    "model": "gpt-4o-mini",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": null,
+          "tool_calls": [
+            {
+              "id": "call_tool_123",
+              "type": "function",
+              "function": {
+                "name": "Structure",
+                "arguments": "{\"tldr\": \"Advanced machine learning approach for paper analysis.\", \"motivation\": \"Need for better understanding of research papers.\", \"method\": \"Novel neural network architecture with attention mechanisms.\", \"result\": \"Improved accuracy in paper summarization by 15%.\", \"conclusion\": \"The proposed method shows significant improvement over baseline.\", \"relevance\": \"9\"}"
+              }
+            }
+          ]
+        },
+        "finish_reason": "tool_calls"
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 45,
+      "completion_tokens": 25,
+      "total_tokens": 70
+    }
+  },
+  "text_response": {
+    "id": "chatcmpl-text-123",
+    "object": "chat.completion",
+    "created": 1677652288,
+    "model": "gpt-4o-mini",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "This is a text-based response without any tool calls. The paper appears to be about machine learning and shows promising results."
+        },
+        "finish_reason": "stop"
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 30,
+      "completion_tokens": 20,
+      "total_tokens": 50
+    }
+  }
+}

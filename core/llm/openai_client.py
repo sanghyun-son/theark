@@ -19,6 +19,7 @@ from core.models.external.openai import (
     FilePurpose,
     OpenAIMessage,
 )
+from core.services.llm_request_tracker import LLMRequestTracker
 
 logger = get_logger(__name__)
 
@@ -71,8 +72,6 @@ class UnifiedOpenAIClient:
         self._model = model
         self._use_tools = use_tools
 
-        # Initialize official OpenAI client with retry configuration
-        # Use the base URL as provided (tests already include /v1 if needed)
         self._client = AsyncOpenAI(
             api_key=api_key,
             base_url=self._base_url,
@@ -95,14 +94,12 @@ class UnifiedOpenAIClient:
         """Get whether this client uses tools by default."""
         return self._use_tools
 
-    # Regular chat completion methods
     async def create_chat_completion(
         self,
         messages: list[OpenAIMessage],
+        db_session: Session,
         model: str | None = None,
         use_tools: bool | None = None,
-        db_session: Session | None = None,
-        custom_id: str | None = None,
     ) -> ChatCompletionResponse:
         """Create a chat completion request with robust error handling.
 
@@ -128,22 +125,18 @@ class UnifiedOpenAIClient:
             messages=messages,
         )
 
-        # Note: Tool creation is now handled by PaperSummarizationService
-        # This client only handles the raw OpenAI API calls
-
-        # Log request details
-        logger.debug(
-            f"Creating chat completion with model={model}, use_tools={use_tools}"
-        )
+        logger.debug(f"/v1/chat/completions model={model}")
         logger.debug(f"Request payload:\n{payload.model_dump_json(indent=2)}")
-
-        # Convert to dict for official client
         request_data = payload.model_dump()
 
-        # Make request using official client (uses built-in retry)
-        response = await self._client.chat.completions.create(**request_data)
+        async with LLMRequestTracker(
+            db_session=db_session,
+            endpoint="/v1/chat/completions",
+        ) as tracker:
 
-        # Convert response to our model
+            response = await self._client.chat.completions.create(**request_data)
+            tracker.set_response(response)
+
         response_dict = response.model_dump()
         logger.debug(f"Response received: {response_dict}")
 
@@ -159,7 +152,6 @@ class UnifiedOpenAIClient:
         input_file_id: str,
         completion_window: CompletionWindow = "24h",
         endpoint: BatchEndpoint = "/v1/chat/completions",
-        metadata: dict[str, Any] | None = None,
     ) -> BatchRequest:
         """Create a new batch request using official client.
 
@@ -173,18 +165,13 @@ class UnifiedOpenAIClient:
             Batch request response
         """
         logger.debug(f"Creating batch request with file_id={input_file_id}")
-
-        # Use the correct API structure for the official client
         batch = await self._client.batches.create(
             input_file_id=input_file_id,
             completion_window=completion_window,
             endpoint=endpoint,
-            metadata=metadata or {},
         )
-
         logger.info(f"Created batch request: {batch.id}")
 
-        # Convert to our model
         batch_dict = batch.model_dump()
         return BatchRequest.model_validate(batch_dict)
 
@@ -193,17 +180,16 @@ class UnifiedOpenAIClient:
 
         Args:
             batch_id: ID of the batch request
+            db_session: Database session for tracking (optional)
+            custom_id: Custom identifier for tracking (optional)
 
         Returns:
             Batch status response
         """
         logger.debug(f"Getting batch status for {batch_id}")
-
         batch = await self._client.batches.retrieve(batch_id=batch_id)
-
         logger.debug(f"Batch {batch_id} status: {batch.status}")
 
-        # Convert to our model
         batch_dict = batch.model_dump()
         return BatchResponse.model_validate(batch_dict)
 
@@ -212,22 +198,23 @@ class UnifiedOpenAIClient:
 
         Args:
             batch_id: ID of the batch request to cancel
+            db_session: Database session for tracking (optional)
+            custom_id: Custom identifier for tracking (optional)
 
         Returns:
             Batch response with updated status
         """
         logger.debug(f"Cancelling batch request {batch_id}")
-
         batch = await self._client.batches.cancel(batch_id=batch_id)
-
         logger.info(f"Cancelled batch request: {batch_id}")
 
-        # Convert to our model
         batch_dict = batch.model_dump()
         return BatchResponse.model_validate(batch_dict)
 
     async def list_batch_requests(
-        self, limit: int = 10, after: str | None = None
+        self,
+        limit: int = 10,
+        after: str | None = None,
     ) -> list[BatchResponse]:
         """List batch requests.
 
@@ -273,7 +260,6 @@ class UnifiedOpenAIClient:
                 batch_status = await self.get_batch_status(batch_id)
                 yield batch_status
 
-                # Stop monitoring if batch is in a final state
                 if batch_status.status in [
                     "completed",
                     "failed",
@@ -291,7 +277,6 @@ class UnifiedOpenAIClient:
                 logger.error(f"Error monitoring batch {batch_id}: {e}")
                 raise
 
-    # File upload methods
     async def upload_file(
         self, file_path: str | Path, purpose: FilePurpose = "batch"
     ) -> str:
@@ -307,7 +292,6 @@ class UnifiedOpenAIClient:
         file_path = Path(file_path)
         logger.debug(f"Uploading file {file_path} with purpose={purpose}")
 
-        # Check if file exists before attempting upload
         if not file_path.exists():
             raise FileNotFoundError(f"File not found: {file_path}")
 
@@ -333,7 +317,6 @@ class UnifiedOpenAIClient:
         """
         logger.debug(f"Uploading data as file {filename} with purpose={purpose}")
 
-        # Convert string data to bytes
         data_bytes = data.encode("utf-8")
 
         file_obj = await self._client.files.create(
@@ -357,7 +340,6 @@ class UnifiedOpenAIClient:
 
         content = await self._client.files.content(file_id=file_id)
 
-        # Ensure parent directory exists
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
         with open(output_path, "wb") as f:

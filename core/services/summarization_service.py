@@ -133,9 +133,11 @@ class PaperSummarizationService:
         self,
         content: str,
         llm_client: UnifiedOpenAIClient,
+        db_session: Session,
         language: str = "English",
         model: str | None = None,
         use_tools: bool | None = None,
+        custom_id: str | None = None,
     ) -> Summary | None:
         """Summarize a paper using the standard prompt structure.
 
@@ -144,6 +146,8 @@ class PaperSummarizationService:
             language: Language for the response
             model: Model to use (defaults to client model)
             use_tools: Whether to use tools (defaults to client setting)
+            db_session: Database session for tracking
+            custom_id: Custom ID for tracking
 
         Returns:
             Summary object or None if failed
@@ -160,22 +164,21 @@ class PaperSummarizationService:
         # 설정 결정
         model = self._determine_model(model, llm_client)
         use_tools = self._determine_tool_usage(use_tools, llm_client)
+        payload = self._build_summarization_request(
+            content,
+            language,
+            self.default_interests,
+            model,
+            use_tools,
+        )
 
-        try:
-            # 요약 요청 생성 및 실행
-            payload = self._build_summarization_request(
-                content, language, self.default_interests, model, use_tools
-            )
-            response = await self._execute_summarization_request(payload, llm_client)
-
-            # 응답 파싱
-            return self._parse_summarization_response(
-                response, language, self.default_interests, use_tools=use_tools
-            )
-
-        except Exception as e:
-            logger.error(f"Summarization failed: {e}")
-            return None
+        response = await self._execute_summarization_request(payload, llm_client)
+        return self._parse_summarization_response(
+            response,
+            language,
+            self.default_interests,
+            use_tools=use_tools,
+        )
 
     def _determine_model(
         self, model: str | None, llm_client: UnifiedOpenAIClient
@@ -266,7 +269,9 @@ class PaperSummarizationService:
         summary = await self._summarize(
             paper.abstract,
             llm_client,
+            db_session,
             language=language,
+            custom_id=f"paper-{paper.arxiv_id}-{language}",
         )
         logger.info(f"[{paper.arxiv_id}] Summarized in {language}")
 

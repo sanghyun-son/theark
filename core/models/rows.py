@@ -1,8 +1,5 @@
 """SQLModel database models for TheArk."""
 
-from typing import Any
-
-from sqlalchemy import JSON, Column
 from sqlmodel import Field, Relationship, SQLModel
 
 from core.types import PaperSummaryStatus
@@ -168,12 +165,6 @@ class LLMRequest(SQLModel, table=True):
     is_batched: bool = Field(
         default=False, description="Whether this was a batch request"
     )
-    request_type: str = Field(
-        default="chat", description="Type of request (chat, completion, embedding)"
-    )
-    custom_id: str | None = Field(
-        default=None, description="Custom ID for tracking specific operations"
-    )
     prompt_tokens: int | None = Field(default=None, description="Tokens in the prompt")
     completion_tokens: int | None = Field(
         default=None, description="Tokens in the completion"
@@ -199,38 +190,13 @@ class LLMBatchRequest(SQLModel, table=True):
 
     batch_id: str = Field(primary_key=True, description="OpenAI batch ID")
     status: str = Field(default="pending", description="Batch status")
+    entity_count: int = Field(description="Number of entities in this batch")
     input_file_id: str | None = Field(default=None, description="Input file ID")
     error_file_id: str | None = Field(default=None, description="Error file ID")
     created_at: str = Field(description="ISO timestamp when batch was created")
     completed_at: str | None = Field(
         default=None, description="ISO timestamp when batch completed"
     )
-    request_counts: dict[str, int] | None = Field(
-        default=None, sa_column=Column(JSON), description="Request counts"
-    )
-    batch_metadata: dict[str, Any] | None = Field(
-        default=None, sa_column=Column(JSON), description="Batch metadata"
-    )
-
-
-class BatchItem(SQLModel, table=True):
-    """Batch item database model using SQLModel."""
-
-    item_id: int | None = Field(default=None, primary_key=True)
-    batch_id: str = Field(
-        foreign_key="llmbatchrequest.batch_id", description="Batch ID"
-    )
-    paper_id: int = Field(foreign_key="paper.paper_id", description="Paper ID")
-    custom_id: str = Field(description="Custom ID for tracking")
-    input_data: str = Field(description="Input data for processing")
-    status: str = Field(default="pending", description="Item status")
-    response_data: str | None = Field(default=None, description="Response data")
-    error_message: str | None = Field(default=None, description="Error message")
-    created_at: str = Field(description="ISO timestamp when item was created")
-    completed_at: str | None = Field(
-        default=None, description="ISO timestamp when item completed"
-    )
-    request_metadata: str | None = Field(default=None, description="JSON metadata")
 
 
 class ArxivFailedPaper(SQLModel, table=True):

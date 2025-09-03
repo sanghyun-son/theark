@@ -278,7 +278,29 @@ class ArxivSourceExplorer(BaseSourceExplorer):
             import xml.etree.ElementTree as ElementTree
 
             root = ElementTree.fromstring(xml_content)
+
+            # Debug: log the XML structure
+            logger.debug(f"XML root tag: {root.tag}")
+            logger.debug(f"XML root attributes: {root.attrib}")
+
+            # Try different ways to find entries
             entries = root.findall("atom:entry", self.extractor.namespace)
+            logger.debug(f"Found {len(entries)} entries with atom:entry namespace")
+
+            if not entries:
+                # Try without namespace
+                entries = root.findall("entry")
+                logger.debug(f"Found {len(entries)} entries without namespace")
+
+            if not entries:
+                # Try with explicit namespace
+                entries = root.findall(".//{http://www.w3.org/2005/Atom}entry")
+                logger.debug(f"Found {len(entries)} entries with explicit namespace")
+
+            if not entries:
+                # Try with wildcard
+                entries = root.findall(".//entry")
+                logger.debug(f"Found {len(entries)} entries with wildcard")
 
             papers = []
             for entry in entries:
@@ -289,6 +311,7 @@ class ArxivSourceExplorer(BaseSourceExplorer):
                     logger.warning(f"Failed to parse entry: {e}")
                     continue
 
+            logger.debug(f"Successfully parsed {len(papers)} papers")
             return papers
         except Exception as e:
             logger.warning(f"Failed to parse XML response: {e}")

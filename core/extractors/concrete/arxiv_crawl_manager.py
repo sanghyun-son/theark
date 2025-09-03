@@ -94,10 +94,12 @@ class ArxivCrawlManager:
             # Log final result only
             if len(all_papers) > 0:
                 logger.info(
-                    f"Found {len(all_papers)} papers, stored {papers_stored}/{len(all_papers)} for {category} on {date}"
+                    f"Found {len(all_papers)} papers, "
+                    f"stored {papers_stored}/{len(all_papers)} "
+                    f"for {category} on {date}"
                 )
             else:
-                logger.info(f"No papers found for {category} on {date}")
+                logger.warning(f"No papers found for {category} on {date}")
 
             return len(all_papers), papers_stored
 
