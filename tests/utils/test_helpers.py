@@ -53,7 +53,6 @@ class TestDataFactory:
     ) -> Summary:
         """Create a test Summary instance with default or custom values."""
         return Summary(
-            summary_id=1,
             paper_id=paper_id,
             version=version,
             overview=overview,

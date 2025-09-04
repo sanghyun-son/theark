@@ -1,6 +1,6 @@
 """Batch management router."""
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from sqlalchemy.engine import Engine
 
 from api.dependencies import (
@@ -14,10 +14,12 @@ from core.llm.openai_client import UnifiedOpenAIClient
 from core.models.batch import (
     BatchActionResponse,
     BatchDetailsResponse,
+    BatchInfo,
     BatchListResponse,
     BatchStatusResponse,
     PendingSummariesResponse,
 )
+from core.models.rows import Paper
 
 router = APIRouter(prefix="/batch", tags=["batch"])
 
@@ -25,19 +27,13 @@ router = APIRouter(prefix="/batch", tags=["batch"])
 @router.get("/status")
 async def get_batch_status() -> BatchStatusResponse:
     """Get overall batch processing status."""
-    try:
-        # Temporarily return hardcoded response for testing
-        return BatchStatusResponse(
-            pending_summaries=0,
-            active_batches=0,
-            batch_details=[],
-            message="Batch status retrieved successfully",
-        )
-    except Exception as e:
-        import traceback
-
-        error_detail = f"Failed to get batch status: {str(e)}\n{traceback.format_exc()}"
-        raise HTTPException(status_code=500, detail=error_detail)
+    # Temporarily return hardcoded response for testing
+    return BatchStatusResponse(
+        pending_summaries=0,
+        active_batches=0,
+        batch_details=[],
+        message="Batch status retrieved successfully",
+    )
 
 
 @router.get("/batches")
@@ -45,15 +41,19 @@ async def list_batches(
     db_engine: Engine = Depends(get_engine),
 ) -> BatchListResponse:
     """List all batch requests."""
-    try:
-        state_manager = BatchStateManager()
-        active_batches = state_manager.get_active_batches(db_engine)
+    from api.utils.error_handler import handle_async_api_operation
 
-        return BatchListResponse(
-            batches=active_batches, message="Batch list retrieved successfully"
-        )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to list batches: {str(e)}")
+    async def get_batches() -> list[BatchInfo]:
+        state_manager = BatchStateManager()
+        return state_manager.get_active_batches(db_engine)
+
+    active_batches = await handle_async_api_operation(
+        get_batches, "Failed to list batches"
+    )
+
+    return BatchListResponse(
+        batches=active_batches, message="Batch list retrieved successfully"
+    )
 
 
 @router.get("/batches/{batch_id}")
@@ -62,25 +62,27 @@ async def get_batch_details(
     db_engine: Engine = Depends(get_engine),
 ) -> BatchDetailsResponse:
     """Get details of a specific batch."""
-    try:
+    from api.utils.error_handler import handle_async_api_operation
+
+    async def get_batch() -> BatchInfo:
         state_manager = BatchStateManager()
         active_batches = state_manager.get_active_batches(db_engine)
 
         # Find the specific batch
         batch = next((b for b in active_batches if b.batch_id == batch_id), None)
         if not batch:
-            raise HTTPException(status_code=404, detail=f"Batch {batch_id} not found")
+            raise ValueError(f"Batch {batch_id} not found")
 
-        return BatchDetailsResponse(
-            batch=batch,
-            message="Batch details retrieved successfully",
-        )
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to get batch details: {str(e)}"
-        )
+        return batch
+
+    batch = await handle_async_api_operation(
+        get_batch, "Failed to get batch details", f"Batch {batch_id} not found"
+    )
+
+    return BatchDetailsResponse(
+        batch=batch,
+        message="Batch details retrieved successfully",
+    )
 
 
 @router.post("/batches/{batch_id}/cancel")
@@ -89,7 +91,9 @@ async def cancel_batch(
     db_engine: Engine = Depends(get_engine),
 ) -> BatchActionResponse:
     """Cancel a batch request."""
-    try:
+    from api.utils.error_handler import handle_async_api_operation
+
+    async def cancel_batch_operation() -> bool:
         # Update batch status to cancelled
         state_manager = BatchStateManager()
         state_manager.update_batch_status(
@@ -97,13 +101,16 @@ async def cancel_batch(
             batch_id=batch_id,
             status="cancelled",
         )
+        return True
 
-        return BatchActionResponse(
-            message=f"Batch {batch_id} cancelled successfully",
-            batch_id=batch_id,
-        )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to cancel batch: {str(e)}")
+    await handle_async_api_operation(
+        cancel_batch_operation, f"Failed to cancel batch {batch_id}"
+    )
+
+    return BatchActionResponse(
+        message=f"Batch {batch_id} cancelled successfully",
+        batch_id=batch_id,
+    )
 
 
 @router.get("/pending-summaries")
@@ -111,27 +118,29 @@ async def get_pending_summaries(
     db_engine: Engine = Depends(get_engine),
 ) -> PendingSummariesResponse:
     """Get papers that need summarization."""
-    try:
-        state_manager = BatchStateManager()
-        pending_papers = state_manager.get_pending_summaries(db_engine)
+    from api.utils.error_handler import handle_async_api_operation
 
-        return PendingSummariesResponse(
-            pending_summaries=len(pending_papers),
-            papers=[
-                {
-                    "paper_id": paper.paper_id,
-                    "title": paper.title,
-                    "arxiv_id": paper.arxiv_id,
-                    "published_at": paper.published_at,
-                }
-                for paper in pending_papers[:10]  # Limit to first 10 for display
-            ],
-            message="Pending summaries retrieved successfully",
-        )
-    except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to get pending summaries: {str(e)}"
-        )
+    async def get_pending() -> list[Paper]:
+        state_manager = BatchStateManager()
+        return state_manager.get_pending_summaries(db_engine)
+
+    pending_papers = await handle_async_api_operation(
+        get_pending, "Failed to get pending summaries"
+    )
+
+    return PendingSummariesResponse(
+        pending_summaries=len(pending_papers),
+        papers=[
+            {
+                "paper_id": paper.paper_id,
+                "title": paper.title,
+                "arxiv_id": paper.arxiv_id,
+                "published_at": paper.published_at,
+            }
+            for paper in pending_papers[:10]  # Limit to first 10 for display
+        ],
+        message="Pending summaries retrieved successfully",
+    )
 
 
 @router.post("/trigger-processing")
@@ -141,14 +150,17 @@ async def trigger_batch_processing(
     openai_client: UnifiedOpenAIClient = Depends(get_openai_client),
 ) -> BatchActionResponse:
     """Manually trigger batch processing."""
-    try:
+    from api.utils.error_handler import handle_async_api_operation
+
+    async def trigger_processing() -> bool:
         # Trigger processing of pending summaries
         await batch_manager.trigger_processing(db_engine, openai_client)
+        return True
 
-        return BatchActionResponse(
-            message="Batch processing triggered successfully", batch_id=None
-        )
-    except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to trigger batch processing: {str(e)}"
-        )
+    await handle_async_api_operation(
+        trigger_processing, "Failed to trigger batch processing"
+    )
+
+    return BatchActionResponse(
+        message="Batch processing triggered successfully", batch_id=None
+    )

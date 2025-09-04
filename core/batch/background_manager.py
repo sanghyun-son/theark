@@ -7,14 +7,22 @@ from pathlib import Path
 from typing import Any
 
 from sqlalchemy.engine import Engine
+from sqlmodel import Session
 
 from core.batch.state_manager import BatchStateManager
+from core.database.repository import (
+    LLMBatchRepository,
+    PaperRepository,
+    SummaryRepository,
+)
 from core.llm.batch_builder import UnifiedBatchBuilder
 from core.llm.openai_client import UnifiedOpenAIClient
 from core.log import get_logger
 from core.models.batch import BatchRequestPayload, BatchResult
-from core.models.rows import Paper
+from core.models.external.openai import ChatCompletionResponse, PaperAnalysis
+from core.models.rows import Paper, Summary
 from core.services.summarization_service import PaperSummarizationService
+from core.types import PaperSummaryStatus
 
 logger = get_logger(__name__)
 
@@ -378,59 +386,355 @@ class BackgroundBatchManager:
             batch_id: ID of the completed batch
             output_file_id: ID of the output file
         """
+        output_file_path = None
         try:
             # Download output file
             output_file_path = tempfile.mktemp(suffix=".jsonl")
             await openai_client.download_file(output_file_id, output_file_path)
 
             # Process each result
-            with open(output_file_path) as f:
-                for line in f:
-                    if line.strip():
-                        result = json.loads(line)
-                        await self._process_single_result(db_engine, batch_id, result)
-
-            # Clean up
-            Path(output_file_path).unlink(missing_ok=True)
+            await self._process_results_from_file(db_engine, batch_id, output_file_path)
 
             logger.info(f"Processed results for batch {batch_id}")
 
         except Exception as e:
             logger.error(f"Error processing batch results for {batch_id}: {e}")
+        finally:
+            # Clean up file regardless of success/failure
+            if output_file_path and Path(output_file_path).exists():
+                Path(output_file_path).unlink(missing_ok=True)
+
+    async def _process_results_from_file(
+        self, db_engine: Engine, batch_id: str, file_path: str
+    ) -> None:
+        """Process batch results from a downloaded file.
+
+        Args:
+            db_engine: Database engine instance
+            batch_id: ID of the batch
+            file_path: Path to the downloaded results file
+        """
+        try:
+            summaries_to_create = await self._parse_results_file(
+                file_path, batch_id, db_engine
+            )
+            if not summaries_to_create:
+                return
+
+            self._create_summaries_and_update_papers(
+                db_engine, summaries_to_create, batch_id
+            )
+
+        except FileNotFoundError:
+            logger.error(f"Results file not found for batch {batch_id}: {file_path}")
+        except Exception as e:
+            logger.error(f"Error reading results file for batch {batch_id}: {e}")
+
+    async def _parse_results_file(
+        self, file_path: str, batch_id: str, db_engine: Engine
+    ) -> list[Summary]:
+        """Parse the results file and extract summaries to create."""
+        summaries_to_create = []
+
+        with open(file_path) as f:
+            for line_num, line in enumerate(f, 1):
+                if not line.strip():
+                    continue
+
+                summary = await self._parse_single_line(
+                    line, line_num, batch_id, db_engine
+                )
+                if summary:
+                    summaries_to_create.append(summary)
+
+        return summaries_to_create
+
+    async def _parse_single_line(
+        self, line: str, line_num: int, batch_id: str, db_engine: Engine
+    ) -> Summary | None:
+        """Parse a single line from the results file."""
+        try:
+            result_data = json.loads(line)
+            result = BatchResult(
+                custom_id=result_data.get("custom_id"),
+                status_code=result_data.get("status_code", 200),
+                response=result_data.get("response", {}),
+                error=result_data.get("error"),
+            )
+
+            result_success, summary = await self._process_single_result(
+                db_engine, batch_id, result
+            )
+            return summary if result_success else None
+
+        except json.JSONDecodeError as e:
+            logger.warning(f"Failed to parse line {line_num} in batch {batch_id}: {e}")
+        except Exception as e:
+            logger.error(f"Error processing line {line_num} in batch {batch_id}: {e}")
+
+        return None
+
+    def _create_summaries_and_update_papers(
+        self, db_engine: Engine, summaries_to_create: list[Summary], batch_id: str
+    ) -> None:
+        """Create summaries and update paper statuses in bulk."""
+        try:
+            with Session(db_engine) as session:
+                summary_repo = SummaryRepository(session)
+                created_summaries = summary_repo.create_summaries_bulk(
+                    summaries_to_create
+                )
+
+                if not created_summaries:
+                    logger.info("No summaries were created from file")
+                    return
+
+                # Update paper statuses to DONE in bulk
+                paper_ids = [
+                    s.paper_id for s in created_summaries if s.paper_id is not None
+                ]
+
+                if paper_ids:
+                    paper_repo = PaperRepository(session)
+                    paper_repo.update_summary_status_bulk(
+                        paper_ids, PaperSummaryStatus.DONE
+                    )
+
+                logger.info(
+                    f"Created {len(created_summaries)} summaries in bulk from file"
+                )
+        except Exception as e:
+            logger.error(f"Error in bulk summary creation from file: {e}")
+            # Just ignore failures as requested
+            pass
+
+    async def _process_batch_results_direct(
+        self,
+        db_engine: Engine,
+        batch_id: str,
+        results: list[BatchResult],
+    ) -> None:
+        """Process batch results directly from BatchResult objects.
+
+        Args:
+            db_engine: Database engine instance
+            batch_id: ID of the batch
+            results: List of batch results to process
+        """
+        # Process each result and collect any system errors
+        system_errors = []
+        successful_count = 0
+        failed_count = 0
+
+        # Process results and collect summaries for bulk creation
+        summaries_to_create = []
+
+        for result in results:
+            try:
+                result_success, summary = await self._process_single_result(
+                    db_engine, batch_id, result
+                )
+                if result_success and summary:
+                    summaries_to_create.append(summary)
+                    successful_count += 1
+                else:
+                    failed_count += 1
+            except Exception as e:
+                # This is a system-level error, collect it
+                system_errors.append(e)
+                logger.error(
+                    f"System error processing result for batch {batch_id}: {e}"
+                )
+
+        # Create summaries in bulk if any exist
+        if summaries_to_create:
+            try:
+                with Session(db_engine) as session:
+                    summary_repo = SummaryRepository(session)
+                    created_summaries = summary_repo.create_summaries_bulk(
+                        summaries_to_create
+                    )
+
+                    # Update paper statuses to DONE in bulk
+                    if created_summaries:
+                        paper_ids = [
+                            s.paper_id
+                            for s in created_summaries
+                            if s.paper_id is not None
+                        ]
+                        if paper_ids:
+                            paper_repo = PaperRepository(session)
+                            paper_repo.update_summary_status_bulk(
+                                paper_ids, PaperSummaryStatus.DONE
+                            )
+
+                    logger.info(f"Created {len(created_summaries)} summaries in bulk")
+            except Exception as e:
+                logger.error(f"Error in bulk summary creation: {e}")
+                # Just ignore failures as requested
+                pass
+
+        # Update batch status based on whether system errors occurred
+        if system_errors:
+            self._update_batch_status(db_engine, batch_id, "error")
+            logger.error(
+                f"Batch {batch_id} marked as error due to {len(system_errors)} system-level failures"
+            )
+        else:
+            self._update_batch_status_with_metrics(
+                db_engine, batch_id, "completed", successful_count, failed_count
+            )
+            logger.info(
+                f"Processed {len(results)} results for batch {batch_id} ({successful_count} successful, {failed_count} failed)"
+            )
+
+    def _update_batch_status(
+        self, db_engine: Engine, batch_id: str, status: str
+    ) -> None:
+        """Update batch status in database.
+
+        Args:
+            db_engine: Database engine instance
+            batch_id: ID of the batch to update
+            status: New status to set
+        """
+        try:
+            with Session(db_engine) as session:
+                batch_repo = LLMBatchRepository(session)
+                batch_repo.update_batch_status(batch_id, status)
+        except Exception as e:
+            logger.error(f"Failed to update batch {batch_id} status to {status}: {e}")
+
+    def _update_batch_status_with_metrics(
+        self,
+        db_engine: Engine,
+        batch_id: str,
+        status: str,
+        successful_count: int,
+        failed_count: int,
+    ) -> None:
+        """Update batch status and metrics in database.
+
+        Args:
+            db_engine: Database engine instance
+            batch_id: ID of the batch to update
+            status: New status to set
+            successful_count: Number of successfully processed results
+            failed_count: Number of failed results
+        """
+        try:
+            with Session(db_engine) as session:
+                batch_repo = LLMBatchRepository(session)
+                batch_repo.update_batch_status_with_metrics(
+                    batch_id, status, successful_count, failed_count
+                )
+        except Exception as e:
+            logger.error(
+                f"Failed to update batch {batch_id} status to {status} with metrics: {e}"
+            )
 
     async def _process_single_result(
         self, db_engine: Engine, batch_id: str, result: BatchResult
-    ) -> None:
+    ) -> tuple[bool, Summary | None]:
         """Process a single batch result.
 
         Args:
-            db_session: Database manager instance
+            db_engine: Database engine instance
             batch_id: ID of the batch
             result: Single result from batch
+
+        Returns:
+            Tuple of (success_status, summary_object)
         """
         try:
-            custom_id = result.custom_id
-            if not custom_id:
-                logger.warning(f"No custom_id in batch result: {result}")
-                return
+            paper_id = self._extract_paper_id(result)
+            if not paper_id:
+                # This is a paper-level issue, not a system error
+                logger.warning(f"Invalid paper ID in result: {result}")
+                return False, None
 
-            paper_id = int(custom_id)
+            if not self._is_successful_result(result, paper_id):
+                # This is a paper-level issue, not a system error
+                return False, None
 
-            # Check if result was successful
-            if result.status_code == 200:
+            summary = self._create_summary_from_response(result, paper_id)
+            if summary:
                 logger.info(f"Processed successful result for paper {paper_id}")
+                return True, summary
             else:
-                # Handle failed result
-                error_message = (
-                    result.response.get("body", {})
-                    .get("error", {})
-                    .get("message", "Unknown error")
-                )
+                return False, None
 
-                logger.warning(f"Failed result for paper {paper_id}: {error_message}")
+        except (ValueError, TypeError) as e:
+            # These are paper-level parsing errors, not system errors
+            logger.warning(
+                f"Paper-level error processing result for batch {batch_id}: {e}"
+            )
+            return False, None
+        except Exception as e:
+            # This is a system-level error, re-raise it
+            logger.error(
+                f"System error processing single result for batch {batch_id}: {e}"
+            )
+            raise
+
+    def _extract_paper_id(self, result: BatchResult) -> int | None:
+        """Extract paper ID from batch result."""
+        custom_id = result.custom_id
+        if not custom_id:
+            logger.warning(f"No custom_id in batch result: {result}")
+            return None
+        return int(custom_id)
+
+    def _is_successful_result(self, result: BatchResult, paper_id: int) -> bool:
+        """Check if batch result was successful."""
+        if result.status_code == 200:
+            return True
+
+        error_message = (
+            result.response.get("body", {})
+            .get("error", {})
+            .get("message", "Unknown error")
+        )
+        logger.warning(f"Failed result for paper {paper_id}: {error_message}")
+        return False
+
+    def _create_summary_from_response(
+        self, result: BatchResult, paper_id: int
+    ) -> Summary | None:
+        """Create Summary object from OpenAI response."""
+        try:
+            response_body = result.response.get("body", {})
+            chat_response = ChatCompletionResponse.model_validate(response_body)
+
+            if (
+                not chat_response.choices
+                or not chat_response.choices[0].message.tool_calls
+            ):
+                logger.warning(f"No tool calls found in response for paper {paper_id}")
+                return None
+
+            tool_call = chat_response.choices[0].message.tool_calls[0]
+            paper_analysis = PaperAnalysis.from_json_string(
+                tool_call.function.arguments
+            )
+
+            return Summary(
+                paper_id=paper_id,
+                version="1.0",
+                overview=paper_analysis.tldr,
+                motivation=paper_analysis.motivation,
+                method=paper_analysis.method,
+                result=paper_analysis.result,
+                conclusion=paper_analysis.conclusion,
+                language=self._language,
+                interests="",
+                relevance=paper_analysis.relevance,
+                model=chat_response.model,
+            )
 
         except Exception as e:
-            logger.error(f"Error processing single result for batch {batch_id}: {e}")
+            logger.error(f"Error creating summary for paper {paper_id}: {e}")
+            return None
 
     async def _process_batch_errors(
         self,
@@ -446,23 +750,49 @@ class BackgroundBatchManager:
             batch_id: ID of the batch
             error_file_id: ID of the error file
         """
+        error_file_path = None
         try:
             # Download error file
             error_file_path = tempfile.mktemp(suffix=".jsonl")
             await openai_client.download_file(error_file_id, error_file_path)
 
             # Log errors
-            with open(error_file_path) as f:
-                for line in f:
-                    if line.strip():
-                        error = json.loads(line)
-                        logger.error(f"Batch {batch_id} error: {error}")
-
-            # Clean up
-            Path(error_file_path).unlink(missing_ok=True)
+            await self._log_errors_from_file(batch_id, error_file_path)
 
         except Exception as e:
             logger.error(f"Error processing batch errors for {batch_id}: {e}")
+        finally:
+            # Clean up file regardless of success/failure
+            if error_file_path and Path(error_file_path).exists():
+                Path(error_file_path).unlink(missing_ok=True)
+
+    async def _log_errors_from_file(self, batch_id: str, file_path: str) -> None:
+        """Log errors from a downloaded error file.
+
+        Args:
+            batch_id: ID of the batch
+            file_path: Path to the downloaded error file
+        """
+        try:
+            with open(file_path) as f:
+                for line_num, line in enumerate(f, 1):
+                    if not line.strip():
+                        continue
+
+                    try:
+                        error = json.loads(line)
+                        logger.error(
+                            f"Batch {batch_id} error (line {line_num}): {error}"
+                        )
+                    except json.JSONDecodeError as e:
+                        logger.warning(
+                            f"Failed to parse error line {line_num} in batch {batch_id}: {e}"
+                        )
+                        continue
+        except FileNotFoundError:
+            logger.error(f"Error file not found for batch {batch_id}: {file_path}")
+        except Exception as e:
+            logger.error(f"Error reading error file for batch {batch_id}: {e}")
 
     async def _check_daily_limit(self, db_engine: Engine) -> bool:
         """Check if daily batch limit has been reached.

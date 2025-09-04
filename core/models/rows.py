@@ -197,6 +197,11 @@ class LLMBatchRequest(SQLModel, table=True):
     completed_at: str | None = Field(
         default=None, description="ISO timestamp when batch completed"
     )
+    # Batch completion metrics
+    successful_count: int = Field(
+        default=0, description="Number of successfully processed results"
+    )
+    failed_count: int = Field(default=0, description="Number of failed results")
 
 
 class ArxivFailedPaper(SQLModel, table=True):

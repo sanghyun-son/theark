@@ -518,3 +518,106 @@ class PaperRepository(BaseRepository[Paper]):
         )
 
         return db_paper
+
+    def create_papers_bulk(self, arxiv_papers: list[Any]) -> list[Paper]:
+        """Create multiple papers from ArxivPaper objects in a single operation.
+
+        Args:
+            arxiv_papers: List of ArxivPaper objects
+
+        Returns:
+            List of created Paper objects
+        """
+        if not arxiv_papers:
+            return []
+
+        try:
+            papers_to_create = []
+
+            for arxiv_paper in arxiv_papers:
+                # Extract ArXiv-specific information from ArxivPaper
+                arxiv_id = arxiv_paper.arxiv_id
+                primary_category = arxiv_paper.primary_category
+                all_categories = arxiv_paper.categories
+
+                # Create new paper record with batched status
+                db_paper = Paper(
+                    arxiv_id=arxiv_id,
+                    title=arxiv_paper.title,
+                    abstract=arxiv_paper.abstract,
+                    primary_category=primary_category,
+                    categories=",".join(all_categories),
+                    authors=";".join(arxiv_paper.authors),
+                    url_abs=arxiv_paper.url_abs,
+                    url_pdf=arxiv_paper.url_pdf,
+                    published_at=arxiv_paper.published_date,
+                    summary_status=PaperSummaryStatus.BATCHED,
+                )
+                papers_to_create.append(db_paper)
+
+            # Bulk insert all papers
+            self.db.add_all(papers_to_create)
+            self.db.commit()
+
+            # Refresh all papers to get generated IDs
+            for paper in papers_to_create:
+                self.db.refresh(paper)
+
+            logger.info(f"Created {len(papers_to_create)} papers in bulk operation")
+
+            return papers_to_create
+
+        except Exception as e:
+            logger.error(f"Error creating papers in bulk: {e}")
+            self.db.rollback()
+            # Just ignore failures as requested
+            return []
+
+    def update_summary_status_bulk(
+        self, paper_ids: list[int], status: PaperSummaryStatus
+    ) -> int:
+        """Update summary status for multiple papers in a single operation.
+
+        Args:
+            paper_ids: List of paper IDs to update
+            status: New status to set
+
+        Returns:
+            Number of papers successfully updated
+        """
+        if not paper_ids:
+            return 0
+
+        try:
+            # Filter out None values and ensure we have valid paper IDs
+            valid_paper_ids = [pid for pid in paper_ids if pid is not None]
+            if not valid_paper_ids:
+                return 0
+
+            updated_count = 0
+
+            # Use SQLModel pattern: select, update, commit for each paper
+            for paper_id in valid_paper_ids:
+                try:
+                    statement = select(Paper).where(Paper.paper_id == paper_id)
+                    result = self.db.exec(statement)
+                    paper = result.one()
+
+                    paper.summary_status = status
+                    self.db.add(paper)
+                    updated_count += 1
+                except Exception as e:
+                    logger.warning(f"Failed to update paper {paper_id}: {e}")
+                    continue
+
+            # Commit all changes at once
+            self.db.commit()
+
+            logger.debug(f"Updated {updated_count} papers to status {status}")
+            return updated_count
+
+        except Exception as e:
+            logger.error(f"Error updating papers status in bulk: {e}")
+            self.db.rollback()
+            # Just ignore failures as requested
+            return 0

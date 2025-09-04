@@ -3,6 +3,7 @@
 from typing import Any
 
 from sqlmodel import Session, select
+from tqdm import tqdm
 
 from core.log import get_logger
 from core.models.domain.arxiv import ArxivPaper
@@ -24,7 +25,11 @@ class ArxivStorageManager:
         """
         self.engine = engine
 
-    async def store_paper_metadata(self, paper: ArxivPaper) -> Paper | None:
+    async def store_paper_metadata(
+        self,
+        paper: ArxivPaper,
+        tqdm_handler: tqdm | None = None,
+    ) -> Paper | None:
         """Store paper metadata in the database with batched status.
 
         Args:
@@ -45,7 +50,11 @@ class ArxivStorageManager:
             ).first()
 
             if existing_paper is not None:
-                logger.warning(f"Skipped: {arxiv_id} (already exists)")
+                if tqdm_handler is None:
+                    logger.warning(f"Skipped: {arxiv_id} (already exists)")
+                else:
+                    tqdm_handler.set_description(f"Skipped: {arxiv_id}")
+                    tqdm_handler.update(1)
                 return None
 
             # Create new paper record with batched status
@@ -66,11 +75,15 @@ class ArxivStorageManager:
             session.commit()
             session.refresh(db_paper)
 
-            logger.info(
-                f"Fetched: {arxiv_id} "
-                f"({paper.title[:24]}...) "
-                f"({db_paper.categories})"
-            )
+            if tqdm_handler is None:
+                logger.info(
+                    f"Fetched: {arxiv_id} "
+                    f"({paper.title[:24]}...) "
+                    f"({db_paper.categories})"
+                )
+            else:
+                tqdm_handler.set_description(f"Fetched: {arxiv_id} ")
+                tqdm_handler.update(1)
 
             return db_paper
 
@@ -85,9 +98,13 @@ class ArxivStorageManager:
         """
         stored_count = 0
 
-        for paper in papers:
+        tqdm_handler = tqdm(papers, ncols=80)
+        for paper in tqdm_handler:
             try:
-                stored_paper = await self.store_paper_metadata(paper)
+                stored_paper = await self.store_paper_metadata(
+                    paper,
+                    tqdm_handler=tqdm_handler,
+                )
                 if stored_paper:
                     stored_count += 1
             except Exception as e:
