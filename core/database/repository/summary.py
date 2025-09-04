@@ -108,3 +108,33 @@ class SummaryRepository(BaseRepository[Summary]):
             for summary in summaries
             if summary.paper_id is not None
         }
+
+    def create_summaries_bulk(self, summaries: list[Summary]) -> list[Summary]:
+        """Create multiple summaries in a single operation.
+
+        Args:
+            summaries: List of Summary objects to create
+
+        Returns:
+            List of created Summary objects with IDs
+        """
+        if not summaries:
+            return []
+
+        try:
+            # Bulk insert all summaries
+            self.db.add_all(summaries)
+            self.db.commit()
+
+            # Refresh all summaries to get generated IDs
+            for summary in summaries:
+                self.db.refresh(summary)
+
+            logger.info(f"Created {len(summaries)} summaries in bulk operation")
+            return summaries
+
+        except Exception as e:
+            logger.error(f"Error creating summaries in bulk: {e}")
+            self.db.rollback()
+            # Just ignore failures as requested
+            return []

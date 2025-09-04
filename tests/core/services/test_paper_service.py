@@ -1,13 +1,11 @@
 """Tests for PaperService."""
 
-
 import pytest
 from sqlmodel import Session
 
 from core.database.repository import (
     PaperRepository,
 )
-from core.extractors import extractor_factory
 from core.extractors.concrete import ArxivExtractor
 from core.llm.openai_client import UnifiedOpenAIClient
 from core.models import PaperCreateRequest
@@ -16,6 +14,9 @@ from core.models.api.responses import (
 )
 from core.models.rows import Paper
 from core.services.paper_service import PaperService
+from tests.utils.test_helpers import (
+    TestSetupHelper,
+)
 
 
 @pytest.fixture
@@ -31,7 +32,7 @@ def paper_service() -> PaperService:
 
 def test_extract_arxiv_id_from_request(paper_service: PaperService):
     """Test extracting arXiv ID from request."""
-    extractor_factory.register_extractor("arxiv", ArxivExtractor())
+    TestSetupHelper.register_test_extractors()
 
     paper_data = PaperCreateRequest(url="https://arxiv.org/abs/2508.01234")
     arxiv_id = paper_service._extract_arxiv_id(paper_data)
@@ -56,7 +57,7 @@ async def test_create_paper_new_paper(
 ) -> None:
     """Test creating a new paper."""
     # Setup extractor for test
-    extractor_factory.register_extractor("arxiv", mock_arxiv_extractor)
+    TestSetupHelper.register_mock_extractors(mock_arxiv_extractor)
 
     paper_data = PaperCreateRequest(
         url="https://arxiv.org/abs/1706.03762"
@@ -87,7 +88,7 @@ async def test_create_paper_existing_paper(
     mock_openai_client: UnifiedOpenAIClient,
 ) -> None:
     """Test creating paper when it already exists."""
-    extractor_factory.register_extractor("arxiv", mock_arxiv_extractor)
+    TestSetupHelper.register_mock_extractors(mock_arxiv_extractor)
 
     paper_data = PaperCreateRequest(url=f"https://arxiv.org/abs/{saved_paper.arxiv_id}")
 
@@ -163,7 +164,7 @@ async def test_create_paper_success(
 ) -> None:
     """Test successful paper creation."""
     # Register the mock extractor
-    extractor_factory.register_extractor("arxiv", mock_arxiv_extractor)
+    TestSetupHelper.register_mock_extractors(mock_arxiv_extractor)
     paper_data = PaperCreateRequest(
         url="https://arxiv.org/abs/1706.03762",
         skip_auto_summarization=True,

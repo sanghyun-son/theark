@@ -1,7 +1,6 @@
 """Constants for LLM prompts and configuration."""
 
 # System prompt for the paper analyst
-# flake8: noqa: E501
 SYSTEM_PROMPT = """You are a professional paper analyst for a daily arXiv crawler and summarizer.
 Your responses should always be in {language} (follow the exact language specified).
 Make sure to produce concise, professional, and well-structured summaries.
@@ -26,7 +25,6 @@ Notes
 - Place the relevance level in a separate field called relevance."""
 
 # User prompt template for paper analysis
-# flake8: noqa: E501
 USER_PROMPT = """Please analyze the given abstract in {language}.
 Based on the provided interest sections, evaluate the relevance of the paper and provide the value.
 

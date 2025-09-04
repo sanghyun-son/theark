@@ -72,20 +72,7 @@ def test_create_batch_record_success(
         input_file_id="file_123",
         completion_window="24h",
         endpoint="/v1/chat/completions",
-        metadata={"test": "data"},
-    )
-
-
-def test_create_batch_record_without_metadata(
-    mock_db_engine: Engine,
-) -> None:
-    """Test creation of batch record without metadata."""
-    batch_state_manager = BatchStateManager()
-
-    batch_state_manager.create_batch_record(
-        mock_db_engine,
-        batch_id="test_batch_456",
-        input_file_id="file_456",
+        entity_count=1,
     )
 
 
@@ -99,6 +86,7 @@ def test_update_batch_status_success(
         mock_db_engine,
         batch_id="test_batch_update",
         input_file_id="file_123",
+        entity_count=1,
     )
 
     batch_state_manager.update_batch_status(
@@ -119,6 +107,7 @@ def test_update_batch_status_with_error_file(
         mock_db_engine,
         batch_id="test_batch_error",
         input_file_id="file_123",
+        entity_count=1,
     )
 
     batch_state_manager.update_batch_status(
@@ -127,132 +116,6 @@ def test_update_batch_status_with_error_file(
         status="failed",
         error_file_id="error_789",
     )
-
-
-def test_add_batch_items_success(
-    mock_db_engine: Engine,
-    saved_papers: list[Paper],
-) -> None:
-    """Test successful addition of batch items."""
-    batch_state_manager = BatchStateManager()
-
-    batch_state_manager.create_batch_record(
-        mock_db_engine,
-        batch_id="test_batch_items",
-        input_file_id="file_123",
-    )
-
-    paper_id_1 = saved_papers[0].paper_id
-    paper_id_2 = saved_papers[1].paper_id
-    assert paper_id_1 is not None
-    assert paper_id_2 is not None
-
-    items = [
-        BatchItemCreate(
-            paper_id=paper_id_1,
-            input_data='{"messages": [{"role": "user", "content": "Summarize this paper"}]}',
-        ),
-        BatchItemCreate(
-            paper_id=paper_id_2,
-            input_data='{"messages": [{"role": "user", "content": "Summarize this paper"}]}',
-        ),
-    ]
-    batch_state_manager.add_batch_items(mock_db_engine, "test_batch_items", items)
-    result = batch_state_manager.get_batch_items(mock_db_engine, "test_batch_items")
-    assert len(result) == 2
-
-
-def test_add_batch_items_empty_list(
-    mock_db_engine: Engine,
-) -> None:
-    """Test adding empty list of batch items."""
-    batch_state_manager = BatchStateManager()
-
-    batch_state_manager.create_batch_record(
-        mock_db_engine,
-        batch_id="test_batch_empty",
-        input_file_id="file_123",
-    )
-
-    batch_state_manager.add_batch_items(mock_db_engine, "test_batch_empty", [])
-
-    result = batch_state_manager.get_batch_items(mock_db_engine, "test_batch_empty")
-    assert len(result) == 0
-
-
-def test_update_batch_item_status_success(
-    mock_db_engine: Engine,
-    saved_papers: list[Paper],
-) -> None:
-    """Test successful update of batch item status."""
-    batch_state_manager = BatchStateManager()
-
-    batch_state_manager.create_batch_record(
-        mock_db_engine,
-        batch_id="test_batch_item_update",
-        input_file_id="file_123",
-    )
-
-    paper_id = saved_papers[0].paper_id
-    assert paper_id is not None
-
-    items = [
-        BatchItemCreate(
-            paper_id=paper_id,
-            input_data='{"messages": [{"role": "user", "content": "Summarize this paper"}]}',
-        ),
-    ]
-    batch_state_manager.add_batch_items(mock_db_engine, "test_batch_item_update", items)
-
-    batch_state_manager.update_batch_item_status(
-        mock_db_engine,
-        batch_id="test_batch_item_update",
-        paper_id=paper_id,
-        status="completed",
-    )
-
-    result = batch_state_manager.get_batch_items(
-        mock_db_engine, "test_batch_item_update"
-    )
-    assert len(result) == 1
-
-
-def test_update_batch_item_status_with_error(
-    mock_db_engine: Engine,
-    saved_papers: list[Paper],
-) -> None:
-    """Test updating batch item status with error."""
-    batch_state_manager = BatchStateManager()
-
-    batch_state_manager.create_batch_record(
-        mock_db_engine,
-        batch_id="test_batch_item_error",
-        input_file_id="file_123",
-    )
-
-    paper_id = saved_papers[0].paper_id
-    assert paper_id is not None
-
-    items = [
-        BatchItemCreate(
-            paper_id=paper_id,
-            input_data='{"messages": [{"role": "user", "content": "Summarize this paper"}]}',
-        ),
-    ]
-    batch_state_manager.add_batch_items(mock_db_engine, "test_batch_item_error", items)
-
-    batch_state_manager.update_batch_item_status(
-        mock_db_engine,
-        batch_id="test_batch_item_error",
-        paper_id=paper_id,
-        status="failed",
-        error_message="Processing failed due to invalid input",
-    )
-
-    result = batch_state_manager.get_batch_items(
-        mock_db_engine, "test_batch_item_error"
-    )
-    assert len(result) == 1
 
 
 def test_get_active_batches_success(

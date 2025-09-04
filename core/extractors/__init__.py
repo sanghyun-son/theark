@@ -10,7 +10,6 @@ from core.extractors.exceptions import (
     ParsingError,
     UnsupportedURLError,
 )
-from core.extractors.factory import ExtractorFactory, extractor_factory
 from core.models.domain.paper_extraction import PaperMetadata
 
 __all__ = [
@@ -24,9 +23,6 @@ __all__ = [
     "NetworkError",
     "ParsingError",
     "UnsupportedURLError",
-    # Factory
-    "ExtractorFactory",
-    "extractor_factory",
     # Models
     "PaperMetadata",
     "ArxivExtractor",

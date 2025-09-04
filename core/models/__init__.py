@@ -28,10 +28,7 @@ from core.models.api.streaming import (
 from core.models.batch import (
     BatchActionResponse,
     BatchDetailsResponse,
-    BatchItemCreate,
-    BatchItemsResponse,
     BatchListResponse,
-    BatchMetadata,
     BatchRequestEntry,
     BatchRequestPayload,
     BatchResponseBase,
@@ -54,8 +51,6 @@ from core.models.external.openai import (
 
 # Database models (SQLModel rows)
 from core.models.rows import (
-    CrawlEvent,
-    FeedItem,
     LLMRequest,
     Paper,
     PaperBase,
@@ -96,16 +91,11 @@ __all__ = [
     "User",
     "UserInterest",
     "UserStar",
-    "FeedItem",
-    "CrawlEvent",
     "LLMRequest",
     # Batch models
     "BatchActionResponse",
     "BatchDetailsResponse",
-    "BatchItemCreate",
-    "BatchItemsResponse",
     "BatchListResponse",
-    "BatchMetadata",
     "BatchRequestEntry",
     "BatchRequestPayload",
     "BatchResult",

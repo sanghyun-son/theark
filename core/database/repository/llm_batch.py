@@ -1,12 +1,13 @@
 """Repository for LLM batch operations."""
 
 from datetime import UTC, datetime
-from typing import Any
 
+from sqlalchemy import func
 from sqlmodel import Session, desc, select
 
 from core.log import get_logger
-from core.models.rows import BatchItem, LLMBatchRequest, Paper
+from core.models.batch import BatchInfo
+from core.models.rows import LLMBatchRequest, Paper
 from core.types import PaperSummaryStatus
 
 logger = get_logger(__name__)
@@ -19,8 +20,12 @@ class LLMBatchRepository:
         """Initialize repository with database session."""
         self.db = db_session
 
-    def get_pending_summaries(self) -> list[Paper]:
-        """Get papers that need summarization."""
+    def get_pending_summaries(self, limit: int = 1000) -> list[Paper]:
+        """Get papers that need summarization.
+
+        Args:
+            limit: Maximum number of papers to return (default: 1000)
+        """
 
         try:
             statement = (
@@ -31,11 +36,13 @@ class LLMBatchRepository:
                     & (Paper.abstract != "")
                 )
                 .order_by(desc(Paper.published_at))
-                .limit(1000)
+                .limit(limit)
             )
             result = self.db.exec(statement)
             papers = list(result.all())
-            logger.debug(f"Found {len(papers)} papers pending summarization")
+            logger.debug(
+                f"Found {len(papers)} papers pending summarization (limit: {limit})"
+            )
             return papers
         except Exception as exc:
             logger.error(f"Error getting pending summaries: {exc}")
@@ -76,24 +83,20 @@ class LLMBatchRepository:
             return
 
         try:
-            # Update papers one by one to avoid SQLAlchemy in_ operator issues
-            updated_count = 0
-            for paper_id in paper_ids:
-                statement = select(Paper).where(Paper.paper_id == paper_id)
-                result = self.db.exec(statement)
-                paper = result.first()
+            # Use bulk update for better performance
+            from core.database.repository.paper import PaperRepository
 
-                if paper:
-                    paper.summary_status = PaperSummaryStatus.PROCESSING
-                    updated_count += 1
-
-            self.db.commit()
+            paper_repo = PaperRepository(self.db)
+            updated_count = paper_repo.update_summary_status_bulk(
+                paper_ids, PaperSummaryStatus.PROCESSING
+            )
             logger.debug(f"Marked {updated_count} papers as processing")
         except Exception as e:
             logger.error(f"Error marking papers as processing: {e}")
-            raise
+            # Just ignore failures as requested
+            pass
 
-    def get_active_batches(self) -> list[dict[str, Any]]:
+    def get_active_batches(self) -> list[BatchInfo]:
         """Get currently active batch requests."""
         try:
             statement = select(LLMBatchRequest).where(
@@ -105,18 +108,19 @@ class LLMBatchRepository:
             logger.error(f"Error getting active batches: {exc}")
             return []
 
-        # Convert to dict format for compatibility
+        # Convert to BatchInfo objects
         batch_list = []
         for batch in batches:
-            batch_dict = {
-                "batch_id": batch.batch_id,
-                "status": batch.status,
-                "created_at": batch.created_at,
-                "completed_at": batch.completed_at,
-                "request_counts": batch.request_counts,
-                "metadata": batch.batch_metadata,
-            }
-            batch_list.append(batch_dict)
+            batch_info = BatchInfo(
+                batch_id=batch.batch_id,
+                status=batch.status,
+                created_at=batch.created_at,
+                completed_at=batch.completed_at,
+                entity_count=batch.entity_count,
+                input_file_id=batch.input_file_id,
+                error_file_id=batch.error_file_id,
+            )
+            batch_list.append(batch_info)
 
         logger.debug(f"Found {len(batch_list)} active batches")
         return batch_list
@@ -125,9 +129,9 @@ class LLMBatchRepository:
         self,
         batch_id: str,
         input_file_id: str,
+        entity_count: int,
         completion_window: str = "24h",
         endpoint: str = "/v1/chat/completions",
-        metadata: dict[str, Any] | None = None,
     ) -> None:
         """Create a new batch request record."""
         from datetime import datetime
@@ -136,15 +140,15 @@ class LLMBatchRepository:
             batch_id=batch_id,
             status="pending",
             input_file_id=input_file_id,
+            entity_count=entity_count,
             created_at=datetime.now(UTC).isoformat(),
-            batch_metadata=metadata or {},
         )
 
         self.db.add(batch_record)
         self.db.commit()
         self.db.refresh(batch_record)
 
-        logger.debug(f"Created batch record: {batch_id}")
+        logger.debug(f"Created batch record: {batch_id} with {entity_count} entities")
 
     def update_batch_status(
         self,
@@ -177,39 +181,38 @@ class LLMBatchRepository:
         else:
             logger.warning(f"Batch {batch_id} not found for status update")
 
-    def add_batch_items(self, batch_id: str, items: list[dict[str, Any]]) -> None:
-        """Add items to a batch request.
+    def update_batch_status_with_metrics(
+        self, batch_id: str, status: str, successful_count: int, failed_count: int
+    ) -> None:
+        """Update batch status and metrics in database.
 
         Args:
             batch_id: Batch ID
-            items: List of batch items
+            status: New status
+            successful_count: Number of successfully processed results
+            failed_count: Number of failed results
         """
-        if not items:
+        batch = self.db.exec(
+            select(LLMBatchRequest).where(LLMBatchRequest.batch_id == batch_id)
+        ).first()
+
+        if batch is None:
+            logger.warning(f"Batch {batch_id} not found")
             return
 
-        from datetime import datetime
+        batch.status = status
+        batch.successful_count = successful_count
+        batch.failed_count = failed_count
 
-        batch_items = []
-        for item_data in items:
-            paper_id = item_data.get("paper_id")
-            if paper_id is None:
-                logger.warning(f"Skipping batch item with no paper_id: {item_data}")
-                continue
+        if status in ["completed", "failed"]:
+            batch.completed_at = datetime.now(UTC).isoformat()
 
-            batch_item = BatchItem(
-                batch_id=batch_id,
-                paper_id=paper_id,
-                custom_id=item_data.get("custom_id", str(paper_id)),
-                input_data=item_data.get("input_data", ""),
-                status="pending",
-                created_at=datetime.utcnow().isoformat(),
-            )
-            batch_items.append(batch_item)
-
-        self.db.add_all(batch_items)
         self.db.commit()
-
-        logger.debug(f"Added {len(batch_items)} items to batch {batch_id}")
+        self.db.refresh(batch)
+        logger.debug(
+            f"Updated batch {batch_id} status to {status} with metrics: "
+            f"{successful_count} successful, {failed_count} failed"
+        )
 
     def update_batch_item_status(
         self, batch_id: str, item_id: str, status: str, error: str | None = None
@@ -229,7 +232,7 @@ class LLMBatchRepository:
         if error:
             logger.debug(f"Error for item {item_id}: {error}")
 
-    def get_batch_details(self, batch_id: str) -> dict[str, Any] | None:
+    def get_batch_details(self, batch_id: str) -> BatchInfo | None:
         """Get detailed information about a batch request.
 
         Args:
@@ -242,55 +245,21 @@ class LLMBatchRepository:
         result = self.db.exec(statement)
         batch = result.first()
 
-        if batch:
-            batch_dict = {
-                "batch_id": batch.batch_id,
-                "status": batch.status,
-                "input_file_id": batch.input_file_id,
-                "error_file_id": batch.error_file_id,
-                "created_at": batch.created_at,
-                "completed_at": batch.completed_at,
-                "request_counts": batch.request_counts,
-                "metadata": batch.batch_metadata,
-            }
-            logger.debug(f"Found batch details for {batch_id}")
-            return batch_dict
-        else:
-            logger.debug(f"Batch {batch_id} not found")
+        if batch is None:
+            logger.warning(f"Batch {batch_id} not found")
             return None
 
-    def get_batch_items(self, batch_id: str) -> list[dict[str, Any]]:
-        """Get items for a batch request.
-
-        Args:
-            batch_id: Batch ID
-
-        Returns:
-            List of batch items
-        """
-        statement = select(BatchItem).where(BatchItem.batch_id == batch_id)
-        result = self.db.exec(statement)
-        items = result.all()
-
-        # Convert to dict format for compatibility
-        item_list = []
-        for item in items:
-            item_dict = {
-                "item_id": item.item_id,
-                "batch_id": item.batch_id,
-                "paper_id": item.paper_id,
-                "custom_id": item.custom_id,
-                "input_data": item.input_data,
-                "status": item.status,
-                "response_data": item.response_data,
-                "error_message": item.error_message,
-                "created_at": item.created_at,
-                "completed_at": item.completed_at,
-            }
-            item_list.append(item_dict)
-
-        logger.debug(f"Found {len(item_list)} items for batch {batch_id}")
-        return item_list
+        batch_info = BatchInfo(
+            batch_id=batch.batch_id,
+            status=batch.status,
+            input_file_id=batch.input_file_id,
+            error_file_id=batch.error_file_id,
+            created_at=batch.created_at,
+            completed_at=batch.completed_at,
+            entity_count=batch.entity_count,
+        )
+        logger.debug(f"Found batch details for {batch_id}")
+        return batch_info
 
     def cancel_batch(self, batch_id: str) -> bool:
         """Cancel a batch request.
@@ -305,12 +274,46 @@ class LLMBatchRepository:
         result = self.db.exec(statement)
         batch = result.first()
 
-        if batch:
-            batch.status = "cancelled"
-            self.db.commit()
-            self.db.refresh(batch)
-            logger.debug(f"Cancelled batch {batch_id}")
+        if batch is None:
+            logger.warning(f"Batch {batch_id} not found")
+            return False
+
+        batch.status = "cancelled"
+        self.db.commit()
+        self.db.refresh(batch)
+        logger.debug(f"Cancelled batch {batch_id}")
+        return True
+
+    def check_daily_batch_limit(self, daily_limit: int) -> bool:
+        """Check if daily batch limit has been reached.
+
+        Args:
+            daily_limit: Maximum number of batch requests allowed per day
+
+        Returns:
+            True if under daily limit, False otherwise
+        """
+        try:
+            # Get today's date in UTC
+            today = datetime.now(UTC).date()
+
+            # Sum total entities from batch requests created today
+            stmt = (
+                select(func.sum(LLMBatchRequest.entity_count))
+                .select_from(LLMBatchRequest)
+                .where(func.date(LLMBatchRequest.created_at) == today)
+            )
+            result = self.db.exec(stmt).one()
+            daily_count = result if result is not None else 0
+
+            if daily_count >= daily_limit:
+                logger.warning(f"Daily limit reached: {daily_count}/{daily_limit}")
+                return False
+
+            logger.debug(f"Daily batches: {daily_count}/{daily_limit}")
             return True
-        else:
-            logger.debug(f"Batch {batch_id} not found for cancellation")
+
+        except Exception as e:
+            logger.error(f"Error checking daily batch limit: {e}")
+            # On error, be conservative and return False
             return False

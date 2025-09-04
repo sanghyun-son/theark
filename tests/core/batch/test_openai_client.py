@@ -10,16 +10,13 @@ from core.models.external.openai import BatchRequest, BatchResponse
 
 
 @pytest.mark.asyncio
-async def test_create_batch_request(
-    mock_openai_client: UnifiedOpenAIClient,
-) -> None:
+async def test_create_batch_request(mock_openai_client: UnifiedOpenAIClient) -> None:
     """Test creating a batch request."""
     # Act
     result = await mock_openai_client.create_batch_request(
         input_file_id="file_123",
         completion_window="24h",
         endpoint="/v1/chat/completions",
-        metadata={"test": "data"},
     )
 
     # Assert
@@ -43,9 +40,7 @@ async def test_get_batch_status(mock_openai_client: UnifiedOpenAIClient) -> None
 
 
 @pytest.mark.asyncio
-async def test_cancel_batch_request(
-    mock_openai_client: UnifiedOpenAIClient,
-) -> None:
+async def test_cancel_batch_request(mock_openai_client: UnifiedOpenAIClient) -> None:
     """Test cancelling a batch request."""
     # Act
     result = await mock_openai_client.cancel_batch_request("batch_123")
@@ -56,9 +51,7 @@ async def test_cancel_batch_request(
 
 
 @pytest.mark.asyncio
-async def test_list_batch_requests(
-    mock_openai_client: UnifiedOpenAIClient,
-) -> None:
+async def test_list_batch_requests(mock_openai_client: UnifiedOpenAIClient) -> None:
     """Test listing batch requests."""
     # Act
     result = await mock_openai_client.list_batch_requests(limit=10)
@@ -110,14 +103,13 @@ async def test_download_file(mock_openai_client: UnifiedOpenAIClient) -> None:
 
 
 @pytest.mark.asyncio
-async def test_monitor_batch_progress(
-    mock_openai_client: UnifiedOpenAIClient,
-) -> None:
+async def test_monitor_batch_progress(mock_openai_client: UnifiedOpenAIClient) -> None:
     """Test monitoring batch progress."""
     # Act
     updates = []
     async for update in mock_openai_client.monitor_batch_progress(
-        "batch_123", check_interval=0.1
+        "batch_123",
+        check_interval=0.1,
     ):
         updates.append(update)
         break  # Stop after first update for testing

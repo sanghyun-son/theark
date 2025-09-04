@@ -48,6 +48,19 @@ class BatchResult(BaseModel):
     error: dict[str, Any] | None = Field(None, description="Error information")
 
 
+# Core Batch Models
+class BatchInfo(BaseModel):
+    """Basic batch information."""
+
+    batch_id: str = Field(..., description="Batch identifier")
+    status: str = Field(..., description="Batch status")
+    created_at: str = Field(..., description="Creation timestamp")
+    completed_at: str | None = Field(None, description="Completion timestamp")
+    entity_count: int = Field(..., description="Number of entities in batch")
+    input_file_id: str | None = Field(None, description="Input file ID")
+    error_file_id: str | None = Field(None, description="Error file ID")
+
+
 # API Response Models
 class BatchResponseBase(BaseModel):
     """Base class for batch API responses."""
@@ -60,27 +73,20 @@ class BatchStatusResponse(BatchResponseBase):
 
     pending_summaries: int = Field(..., description="Number of pending summaries")
     active_batches: int = Field(..., description="Number of active batches")
-    batch_details: list[dict[str, Any]] = Field(..., description="Batch details")
+    batch_details: list[BatchInfo] = Field(..., description="Batch details")
 
 
 class BatchListResponse(BatchResponseBase):
     """Model for batch list response."""
 
-    batches: list[dict[str, Any]] = Field(..., description="List of batches")
+    batches: list[BatchInfo] = Field(..., description="List of batches")
 
 
 class BatchDetailsResponse(BatchResponseBase):
     """Model for batch details response."""
 
-    batch: dict[str, Any] = Field(..., description="Batch information")
-    items: list[dict[str, Any]] = Field(..., description="Batch items")
-
-
-class BatchItemsResponse(BatchResponseBase):
-    """Model for batch items response."""
-
-    batch_id: str = Field(..., description="Batch ID")
-    items: list[dict[str, Any]] = Field(..., description="Batch items")
+    batch: BatchInfo = Field(..., description="Batch information")
+    message: str = Field(..., description="Response message")
 
 
 class BatchActionResponse(BatchResponseBase):

@@ -4,6 +4,7 @@ from sqlmodel import Session
 
 # SQLModel repositories
 from .llm_batch import LLMBatchRepository
+from .llm_request import LLMRequestRepository
 from .paper import PaperRepository
 from .summary import SummaryRepository
 from .summary_read import SummaryReadRepository
@@ -21,4 +22,5 @@ __all__ = [
     "UserInterestRepository",
     "UserStarRepository",
     "LLMBatchRepository",
+    "LLMRequestRepository",
 ]

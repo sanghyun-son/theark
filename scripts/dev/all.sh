@@ -1,0 +1,1 @@
+./scripts/dev/check.sh && ./scripts/dev/test.sh

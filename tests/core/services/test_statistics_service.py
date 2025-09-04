@@ -1,11 +1,12 @@
 """Tests for StatisticsService."""
 
-import pytest
 from datetime import datetime
+
+import pytest
 from sqlmodel import Session
 
-from core.models.rows import Paper, Summary
 from core.models.api.responses import StatisticsResponse
+from core.models.rows import Paper, Summary
 from core.services.statistics_service import StatisticsService
 
 

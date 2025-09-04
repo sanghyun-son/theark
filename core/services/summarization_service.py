@@ -133,27 +133,37 @@ class PaperSummarizationService:
         self,
         content: str,
         llm_client: UnifiedOpenAIClient,
+        db_session: Session,
         language: str = "English",
         model: str | None = None,
         use_tools: bool | None = None,
+        custom_id: str | None = None,
     ) -> Summary | None:
         """Summarize a paper using the standard prompt structure.
 
         Args:
             content: Paper abstract content
-            interest_section: User's interest section
             language: Language for the response
             model: Model to use (defaults to client model)
             use_tools: Whether to use tools (defaults to client setting)
-            db_session: Database manager for tracking (optional)
-            custom_id: Custom identifier for tracking (optional)
+            db_session: Database session for tracking
+            custom_id: Custom ID for tracking
 
         Returns:
-            Chat completion response
+            Summary object or None if failed
         """
-        model = model or llm_client.model
-        use_tools = use_tools if use_tools is not None else llm_client.use_tools
+        # Early Exit: 입력 검증
+        if not content:
+            logger.error("Content is required for summarization")
+            return None
 
+        if not language:
+            logger.error("Language is required for summarization")
+            return None
+
+        # 설정 결정
+        model = self._determine_model(model, llm_client)
+        use_tools = self._determine_tool_usage(use_tools, llm_client)
         payload = self._build_summarization_request(
             content,
             language,
@@ -161,17 +171,36 @@ class PaperSummarizationService:
             model,
             use_tools,
         )
-        request_data = payload.model_dump()
-        response = await llm_client._client.chat.completions.create(**request_data)
 
-        response_dict = response.model_dump()
-        chat_response = ChatCompletionResponse.model_validate(response_dict)
+        response = await self._execute_summarization_request(payload, llm_client)
         return self._parse_summarization_response(
-            chat_response,
+            response,
             language,
             self.default_interests,
             use_tools=use_tools,
         )
+
+    def _determine_model(
+        self, model: str | None, llm_client: UnifiedOpenAIClient
+    ) -> str:
+        """Determine which model to use for summarization."""
+        return model or llm_client.model
+
+    def _determine_tool_usage(
+        self, use_tools: bool | None, llm_client: UnifiedOpenAIClient
+    ) -> bool:
+        """Determine whether to use tools for summarization."""
+        return use_tools if use_tools is not None else llm_client.use_tools
+
+    async def _execute_summarization_request(
+        self, payload: ChatCompletionRequest, llm_client: UnifiedOpenAIClient
+    ) -> ChatCompletionResponse:
+        """Execute the summarization request using the LLM client."""
+        request_data = payload.model_dump()
+        response = await llm_client._client.chat.completions.create(**request_data)
+
+        response_dict = response.model_dump()
+        return ChatCompletionResponse.model_validate(response_dict)
 
     def _create_paper_analysis_tool(self, language: str) -> OpenAITool:
         """Create the paper analysis function calling tool."""
@@ -240,7 +269,9 @@ class PaperSummarizationService:
         summary = await self._summarize(
             paper.abstract,
             llm_client,
+            db_session,
             language=language,
+            custom_id=f"paper-{paper.arxiv_id}-{language}",
         )
         logger.info(f"[{paper.arxiv_id}] Summarized in {language}")
 

@@ -32,7 +32,8 @@ from core.models.domain.arxiv import ArxivPaper
 from core.models.rows import Paper, Summary, User
 from core.services.summarization_service import PaperSummarizationService
 from core.types import PaperSummaryStatus
-from tests.shared_test_data import ARXIV_RESPONSES, OPENAI_RESPONSES
+
+from tests.utils.test_helpers import TestDataFactory
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -53,13 +54,17 @@ def logger() -> Logger:
 def mock_openai_server(httpserver: HTTPServer) -> HTTPServer:
     """Set up mock OpenAI server for integration tests."""
 
+    example_path = Path("tests", "assets", "openai_responses.json")
+    with open(example_path, "r") as f:
+        openai_responses = json.load(f)
+
     def chat_completion_handler(request: Request) -> Response:
         """Handle chat completion requests with or without tools."""
         body = json.loads(request.data.decode("utf-8"))
         if "tools" in body and body.get("tool_choice"):
-            response_data = OPENAI_RESPONSES["tool_response"]
+            response_data = openai_responses["tool_response"]
         else:
-            response_data = OPENAI_RESPONSES["text_response"]
+            response_data = openai_responses["text_response"]
 
         return Response(
             json.dumps(response_data),
@@ -67,164 +72,43 @@ def mock_openai_server(httpserver: HTTPServer) -> HTTPServer:
             headers={"Content-Type": "application/json"},
         )
 
-    # Mock endpoints
+    # Mock Chat Completions endpoint
     httpserver.expect_request(
         "/v1/chat/completions",
         method="POST",
     ).respond_with_handler(chat_completion_handler)
 
-    # Add the POST /v1/batches endpoint that the official client uses
     httpserver.expect_request("/v1/batches", method="POST").respond_with_json(
-        {
-            "id": "batch_123",
-            "object": "batch",
-            "status": "completed",
-            "input_file_id": "file_123",
-            "completion_window": "24h",
-            "endpoint": "/v1/chat/completions",
-            "created_at": 1234567890,
-            "in_progress_at": 1234567891,
-            "expires_at": 1234654290,
-            "finalizing_at": 1234567892,
-            "completed_at": 1234567893,
-            "request_counts": {"total": 100, "completed": 95, "failed": 5},
-            "metadata": {"test": "data"},
-        }
+        openai_responses["create_batch"]
     )
-
-    # Add the POST /v1/batches/{batch_id}/cancel endpoint that the official client uses
+    httpserver.expect_request("/v1/batches", method="GET").respond_with_json(
+        openai_responses["list_batches"]
+    )
+    httpserver.expect_request("/v1/batches/batch_123", method="GET").respond_with_json(
+        openai_responses["get_batch_status"]
+    )
     httpserver.expect_request(
         "/v1/batches/batch_123/cancel", method="POST"
-    ).respond_with_json(
-        {
-            "id": "batch_123",
-            "object": "batch",
-            "status": "cancelled",
-            "input_file_id": "file_123",
-            "completion_window": "24h",
-            "endpoint": "/v1/chat/completions",
-            "created_at": 1234567890,
-            "in_progress_at": 1234567891,
-            "expires_at": 1234654290,
-            "finalizing_at": None,
-            "completed_at": 1234567893,
-            "request_counts": {"total": 100, "completed": 50, "failed": 0},
-            "metadata": {"test": "data"},
-        }
-    )
-
-    # Add the GET /v1/batches endpoint that the official client uses
-    httpserver.expect_request("/v1/batches", method="GET").respond_with_json(
-        {
-            "object": "list",
-            "data": [
-                {
-                    "id": "batch_1",
-                    "object": "batch",
-                    "status": "completed",
-                    "endpoint": "/v1/chat/completions",
-                    "input_file_id": "file_1",
-                    "completion_window": "24h",
-                    "created_at": 1234567890,
-                    "in_progress_at": 1234567891,
-                    "completed_at": 1234567892,
-                    "output_file_id": "output_1",
-                    "error_file_id": None,
-                    "request_counts": {"total": 100, "completed": 100, "failed": 0},
-                    "metadata": None,
-                },
-                {
-                    "id": "batch_2",
-                    "object": "batch",
-                    "status": "in_progress",
-                    "endpoint": "/v1/chat/completions",
-                    "input_file_id": "file_2",
-                    "completion_window": "24h",
-                    "created_at": 1234567891,
-                    "in_progress_at": 1234567892,
-                    "completed_at": None,
-                    "output_file_id": None,
-                    "error_file_id": None,
-                    "request_counts": {"total": 50, "completed": 25, "failed": 0},
-                    "metadata": None,
-                },
-            ],
-            "has_more": False,
-        }
-    )
-
-    # Add the GET /v1/batches/{batch_id} endpoint that the official client uses
-    httpserver.expect_request("/v1/batches/batch_123", method="GET").respond_with_json(
-        {
-            "id": "batch_123",
-            "object": "batch",
-            "status": "completed",
-            "input_file_id": "file_123",
-            "completion_window": "24h",
-            "endpoint": "/v1/chat/completions",
-            "created_at": 1234567890,
-            "in_progress_at": 1234567891,
-            "expires_at": 1234654290,
-            "finalizing_at": 1234567892,
-            "completed_at": 1234567893,
-            "request_counts": {"total": 100, "completed": 95, "failed": 5},
-            "metadata": {"test": "data"},
-        }
-    )
-
+    ).respond_with_json(openai_responses["cancel_batch"])
+    httpserver.expect_request(
+        "/v1/batches/batch_123/output", method="GET"
+    ).respond_with_json(openai_responses["get_batch_output"])
     httpserver.expect_request("/v1/files", method="POST").respond_with_json(
-        {
-            "id": "file_123",
-            "object": "file",
-            "bytes": 1024,
-            "created_at": 1234567890,
-            "filename": "test.jsonl",
-            "purpose": "batch",
-        }
+        openai_responses["upload_file"]
     )
-
+    httpserver.expect_request("/v1/files", method="GET").respond_with_json(
+        openai_responses["list_files"]
+    )
+    httpserver.expect_request("/v1/files/file_123", method="GET").respond_with_json(
+        openai_responses["get_file_info"]
+    )
     httpserver.expect_request(
         "/v1/files/file_123/content", method="GET"
     ).respond_with_data(
         b'{"custom_id": "1", "method": "POST", "url": "/v1/chat/completions", "body": {"model": "gpt-4", "messages": [{"role": "user", "content": "Hello"}]}}\n'
     )
-
-    # Mock completed batch results endpoint
-    httpserver.expect_request("/v1/batch/completed", method="GET").respond_with_json(
-        {
-            "id": "batch_123",
-            "object": "batch",
-            "status": "completed",
-            "results": [
-                {
-                    "custom_id": "paper-001",
-                    "response": {
-                        "status_code": 200,
-                        "body": {
-                            "id": "chatcmpl-batch-1",
-                            "object": "chat.completion",
-                            "created": 1677652288,
-                            "model": "gpt-4o-mini",
-                            "choices": [
-                                {
-                                    "index": 0,
-                                    "message": {
-                                        "role": "assistant",
-                                        "content": "This is a completed batch result for paper-001.",
-                                    },
-                                    "finish_reason": "stop",
-                                }
-                            ],
-                            "usage": {
-                                "prompt_tokens": 30,
-                                "completion_tokens": 15,
-                                "total_tokens": 45,
-                            },
-                        },
-                    },
-                }
-            ],
-        }
+    httpserver.expect_request("/v1/files/file_123", method="DELETE").respond_with_json(
+        openai_responses["delete_file"]
     )
 
     return httpserver
@@ -234,6 +118,56 @@ def mock_openai_server(httpserver: HTTPServer) -> HTTPServer:
 def mock_arxiv_server(httpserver: HTTPServer) -> HTTPServer:
     """Set up mock arXiv server for integration tests."""
 
+    # Load ArXiv responses from JSON file
+    arxiv_responses_path = Path("tests", "assets", "arxiv_responses.json")
+    with open(arxiv_responses_path, "r") as f:
+        arxiv_responses = json.load(f)
+
+    def create_subset_xml_response(
+        xml_content: str, start: int, max_results: int
+    ) -> str:
+        """Create a subset XML response based on start and max_results parameters."""
+        import xml.etree.ElementTree as ElementTree
+
+        root = ElementTree.fromstring(xml_content)
+
+        # Try to find entries with and without namespace
+        entries = root.findall("entry")
+        if not entries:
+            # Try with namespace
+            entries = root.findall(".//entry")
+        if not entries:
+            # Try with explicit namespace
+            entries = root.findall(".//{http://www.w3.org/2005/Atom}entry")
+
+        total_papers = len(entries)
+        start_index = min(start, total_papers)
+        end_index = min(start + max_results, total_papers)
+
+        print(
+            f"DEBUG: total_papers={total_papers}, start={start}, max_results={max_results}"
+        )
+        print(f"DEBUG: start_index={start_index}, end_index={end_index}")
+        print(f"DEBUG: papers to return: {end_index - start_index}")
+
+        new_root = ElementTree.Element("feed")
+        new_root.set("xmlns", "http://www.w3.org/2005/Atom")
+
+        # Copy feed metadata (title, id, updated, etc.) - but NOT entries
+        for child in root:
+            if not child.tag.endswith("entry"):  # entry로 끝나지 않는 요소만 복사
+                new_root.append(child)
+
+        # Add ONLY the subset of entries based on start and max_results
+        for i in range(start_index, end_index):
+            if i < len(entries):
+                new_root.append(entries[i])
+
+        # Convert back to string
+        result = ElementTree.tostring(new_root, encoding="unicode")
+        print(f"DEBUG: Final XML length: {len(result)}")
+        return result
+
     def arxiv_query_handler(request: Request) -> Response:
         """Handle arXiv API query requests."""
         # Parse query parameters
@@ -241,20 +175,44 @@ def mock_arxiv_server(httpserver: HTTPServer) -> HTTPServer:
         query_params = parse_qs(parsed_url.query)
         id_list = query_params.get("id_list", [""])[0]
         search_query = query_params.get("search_query", [""])[0]
+        max_results = int(query_params.get("max_results", ["10"])[0])
+        start = int(query_params.get("start", ["0"])[0])
 
-        # Handle any cs.AI category search with date range
-        if "cat:cs.AI" in search_query and "submittedDate:" in search_query:
-            # Return the example XML response for any cs.AI category search
-            example_path = Path("tests", "assets", "example_arxiv_response.xml")
+        if "cat:cs.AI" in search_query:
+            # Load the example XML and return subset based on start and max_results
+            example_path = Path(
+                "tests",
+                "assets",
+                "example_arxiv_range_query_response.xml",
+            )
             with open(example_path, encoding="utf-8") as f:
-                response_data = f.read()
+                xml_content = f.read()
+
+            # Create subset XML response
+            response_data = create_subset_xml_response(xml_content, start, max_results)
             return Response(
                 response_data,
                 status=200,
                 headers={"Content-Type": "application/xml"},
             )
 
-        # Handle different paper scenarios for individual paper queries
+        # Handle non-existent categories with empty response
+        if "cat:nonexistent" in search_query:
+            empty_feed = """<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+    <title>ArXiv Query Results</title>
+    <id>http://arxiv.org/api/query?search_query=cat:nonexistent</id>
+    <updated>2024-01-01T00:00:00Z</updated>
+    <opensearch:totalResults>0</opensearch:totalResults>
+    <opensearch:startIndex>0</opensearch:startIndex>
+    <opensearch:itemsPerPage>10</opensearch:itemsPerPage>
+</feed>"""
+            return Response(
+                empty_feed,
+                status=200,
+                headers={"Content-Type": "application/xml"},
+            )
+
         if id_list == "1706.99999":
             # Server error scenario
             return Response(
@@ -262,11 +220,11 @@ def mock_arxiv_server(httpserver: HTTPServer) -> HTTPServer:
                 status=500,
                 headers={"Content-Type": "text/plain"},
             )
-        elif id_list in ARXIV_RESPONSES:
-            response_data = ARXIV_RESPONSES[id_list]
+        elif id_list in arxiv_responses:
+            response_data = arxiv_responses[id_list]
         else:
             # Default response for other papers
-            response_data = ARXIV_RESPONSES["default"]
+            response_data = arxiv_responses["default"]
 
         return Response(
             response_data,
@@ -357,18 +315,7 @@ def llm_batch_repo(mock_db_session: Session) -> LLMBatchRepository:
 @pytest.fixture
 def saved_paper(paper_repo: PaperRepository) -> Paper:
     """Create and save a test paper."""
-    paper = Paper(
-        arxiv_id="2508.01234",
-        title="Test Paper Title",
-        abstract="Test paper abstract",
-        primary_category="cs.AI",
-        categories="cs.AI,cs.LG",
-        authors="Author One;Author Two",
-        url_abs="https://arxiv.org/abs/2508.01234",
-        url_pdf="https://arxiv.org/pdf/2508.01234",
-        published_at="2023-08-01T00:00:00Z",
-        summary_status=PaperSummaryStatus.DONE,
-    )
+    paper = TestDataFactory.create_test_paper()
     return paper_repo.create(paper)
 
 
@@ -381,20 +328,8 @@ def summary_repo(mock_db_session: Session) -> SummaryRepository:
 @pytest.fixture
 def saved_summary(summary_repo: SummaryRepository, saved_paper: Paper) -> Summary:
     """Create and save a test summary."""
-    summary = Summary(
-        summary_id=1,
-        paper_id=saved_paper.paper_id,
-        version="1.0",
-        overview="Test overview",
-        motivation="Test motivation",
-        method="Test method",
-        result="Test result",
-        conclusion="Test conclusion",
-        language="English",
-        interests="AI,ML",
-        relevance=8,
-        model="gpt-4",
-    )
+    assert saved_paper.paper_id is not None
+    summary = TestDataFactory.create_test_summary(saved_paper.paper_id)
     return summary_repo.create(summary)
 
 
@@ -485,11 +420,12 @@ def mock_background_manager() -> BackgroundBatchManager:
     mock_summary_service = MagicMock(spec=PaperSummarizationService)
     return BackgroundBatchManager(
         summary_service=mock_summary_service,
-        batch_enabled=True,
         batch_summary_interval=3600,
         batch_fetch_interval=600,
         batch_max_items=1000,
+        batch_daily_limit=5,
         language="English",
+        interests=["Machine Learning"],
     )
 
 
