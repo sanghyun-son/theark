@@ -51,8 +51,6 @@ from core.models.external.openai import (
 
 # Database models (SQLModel rows)
 from core.models.rows import (
-    CrawlEvent,
-    FeedItem,
     LLMRequest,
     Paper,
     PaperBase,
@@ -93,8 +91,6 @@ __all__ = [
     "User",
     "UserInterest",
     "UserStar",
-    "FeedItem",
-    "CrawlEvent",
     "LLMRequest",
     # Batch models
     "BatchActionResponse",

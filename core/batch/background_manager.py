@@ -508,6 +508,38 @@ class BackgroundBatchManager:
             # Just ignore failures as requested
             pass
 
+    def _create_summaries_and_update_papers_direct(
+        self, db_engine: Engine, summaries_to_create: list[Summary]
+    ) -> None:
+        """Create summaries and update paper statuses in bulk for direct processing."""
+        try:
+            with Session(db_engine) as session:
+                summary_repo = SummaryRepository(session)
+                created_summaries = summary_repo.create_summaries_bulk(
+                    summaries_to_create
+                )
+
+                if not created_summaries:
+                    logger.info("No summaries were created in bulk")
+                    return
+
+                # Update paper statuses to DONE in bulk
+                paper_ids = [
+                    s.paper_id for s in created_summaries if s.paper_id is not None
+                ]
+
+                if paper_ids:
+                    paper_repo = PaperRepository(session)
+                    paper_repo.update_summary_status_bulk(
+                        paper_ids, PaperSummaryStatus.DONE
+                    )
+
+                logger.info(f"Created {len(created_summaries)} summaries in bulk")
+        except Exception as e:
+            logger.error(f"Error in bulk summary creation: {e}")
+            # Just ignore failures as requested
+            pass
+
     async def _process_batch_results_direct(
         self,
         db_engine: Engine,
@@ -548,31 +580,9 @@ class BackgroundBatchManager:
 
         # Create summaries in bulk if any exist
         if summaries_to_create:
-            try:
-                with Session(db_engine) as session:
-                    summary_repo = SummaryRepository(session)
-                    created_summaries = summary_repo.create_summaries_bulk(
-                        summaries_to_create
-                    )
-
-                    # Update paper statuses to DONE in bulk
-                    if created_summaries:
-                        paper_ids = [
-                            s.paper_id
-                            for s in created_summaries
-                            if s.paper_id is not None
-                        ]
-                        if paper_ids:
-                            paper_repo = PaperRepository(session)
-                            paper_repo.update_summary_status_bulk(
-                                paper_ids, PaperSummaryStatus.DONE
-                            )
-
-                    logger.info(f"Created {len(created_summaries)} summaries in bulk")
-            except Exception as e:
-                logger.error(f"Error in bulk summary creation: {e}")
-                # Just ignore failures as requested
-                pass
+            self._create_summaries_and_update_papers_direct(
+                db_engine, summaries_to_create
+            )
 
         # Update batch status based on whether system errors occurred
         if system_errors:
@@ -706,35 +716,52 @@ class BackgroundBatchManager:
             response_body = result.response.get("body", {})
             chat_response = ChatCompletionResponse.model_validate(response_body)
 
-            if (
-                not chat_response.choices
-                or not chat_response.choices[0].message.tool_calls
-            ):
+            if not self._has_valid_tool_calls(chat_response):
                 logger.warning(f"No tool calls found in response for paper {paper_id}")
                 return None
 
-            tool_call = chat_response.choices[0].message.tool_calls[0]
+            # At this point, we know choices[0] and tool_calls exist
+            first_choice = chat_response.choices[0]
+            if not first_choice.message.tool_calls:
+                logger.warning(f"No tool calls found in response for paper {paper_id}")
+                return None
+
+            tool_call = first_choice.message.tool_calls[0]
             paper_analysis = PaperAnalysis.from_json_string(
                 tool_call.function.arguments
             )
 
-            return Summary(
-                paper_id=paper_id,
-                version="1.0",
-                overview=paper_analysis.tldr,
-                motivation=paper_analysis.motivation,
-                method=paper_analysis.method,
-                result=paper_analysis.result,
-                conclusion=paper_analysis.conclusion,
-                language=self._language,
-                interests="",
-                relevance=paper_analysis.relevance,
-                model=chat_response.model,
+            return self._build_summary_from_analysis(
+                paper_analysis, paper_id, chat_response.model
             )
 
         except Exception as e:
             logger.error(f"Error creating summary for paper {paper_id}: {e}")
             return None
+
+    def _has_valid_tool_calls(self, chat_response: ChatCompletionResponse) -> bool:
+        """Check if chat response has valid tool calls."""
+        return bool(
+            chat_response.choices and chat_response.choices[0].message.tool_calls
+        )
+
+    def _build_summary_from_analysis(
+        self, paper_analysis: PaperAnalysis, paper_id: int, model: str
+    ) -> Summary:
+        """Build Summary object from paper analysis."""
+        return Summary(
+            paper_id=paper_id,
+            version="1.0",
+            overview=paper_analysis.tldr,
+            motivation=paper_analysis.motivation,
+            method=paper_analysis.method,
+            result=paper_analysis.result,
+            conclusion=paper_analysis.conclusion,
+            language=self._language,
+            interests="",
+            relevance=paper_analysis.relevance,
+            model=model,
+        )
 
     async def _process_batch_errors(
         self,

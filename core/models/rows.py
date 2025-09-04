@@ -116,40 +116,6 @@ class UserStar(SQLModel, table=True):
     paper: Paper = Relationship(back_populates="user_stars")
 
 
-class FeedItem(SQLModel, table=True):
-    """Feed item database model using SQLModel."""
-
-    feed_id: int | None = Field(default=None, primary_key=True)
-    arxiv_id: str = Field(unique=True, index=True, description="arXiv ID")
-    title: str = Field(description="Feed item title")
-    abstract: str = Field(description="Feed item abstract")
-    authors: str = Field(description="Semicolon-separated authors")
-    categories: str = Field(description="Comma-separated categories")
-    published_at: str = Field(description="ISO8601 datetime")
-    url_abs: str = Field(description="Abstract URL")
-    url_pdf: str | None = Field(default=None, description="PDF URL")
-    is_processed: bool = Field(
-        default=False, description="Whether item has been processed"
-    )
-
-
-class CrawlEvent(SQLModel, table=True):
-    """Crawl event database model using SQLModel."""
-
-    event_id: int | None = Field(default=None, primary_key=True)
-    event_type: str = Field(description="Event type (start, success, error)")
-    source: str = Field(description="Data source (arxiv, etc.)")
-    items_processed: int = Field(default=0, description="Number of items processed")
-    items_new: int = Field(default=0, description="Number of new items")
-    items_updated: int = Field(default=0, description="Number of updated items")
-    error_message: str | None = Field(
-        default=None, description="Error message if failed"
-    )
-    duration_seconds: float | None = Field(
-        default=None, description="Crawl duration in seconds"
-    )
-
-
 class LLMRequest(SQLModel, table=True):
     """LLM request tracking database model using SQLModel."""
 
@@ -225,40 +191,6 @@ class ArxivFailedPaper(SQLModel, table=True):
     )
 
 
-class CategoryDateProgress(SQLModel, table=True):
-    """Category-date combination crawl progress tracking."""
-
-    progress_id: int | None = Field(default=None, primary_key=True)
-    category: str = Field(description="ArXiv category (e.g., cs.AI)")
-    date: str = Field(description="Date in YYYY-MM-DD format")
-    is_completed: bool = Field(
-        default=False, description="Whether this date is completed for this category"
-    )
-    papers_found: int = Field(
-        default=0, description="Number of papers found for this date-category"
-    )
-    papers_stored: int = Field(
-        default=0, description="Number of papers successfully stored"
-    )
-    error_message: str | None = Field(
-        default=None, description="Error message if failed"
-    )
-    started_at: str | None = Field(
-        default=None, description="When crawling started for this date-category"
-    )
-    completed_at: str | None = Field(
-        default=None, description="When crawling completed for this date-category"
-    )
-    created_at: str = Field(
-        default_factory=get_current_timestamp,
-        description="ISO8601 datetime - automatically updated",
-    )
-    updated_at: str = Field(
-        default_factory=get_current_timestamp,
-        description="ISO8601 datetime - automatically updated",
-    )
-
-
 class CrawlCompletion(SQLModel, table=True):
     """Crawl completion status for date-category combinations."""
 
@@ -270,37 +202,4 @@ class CrawlCompletion(SQLModel, table=True):
     completed_at: str = Field(
         default_factory=get_current_timestamp,
         description="ISO8601 datetime when crawl was completed",
-    )
-
-
-class CrawlExecutionState(SQLModel, table=True):
-    """Crawl execution state database model using SQLModel."""
-
-    state_id: int | None = Field(default=None, primary_key=True)
-    current_date: str = Field(description="Current crawling date (YYYY-MM-DD)")
-    current_category_index: int = Field(
-        default=0, description="Current category index being processed"
-    )
-    categories: str = Field(
-        default="",
-        description="Comma-separated list of categories to crawl",
-    )
-    is_active: bool = Field(default=True, description="Whether crawling is active")
-    total_papers_found: int = Field(
-        default=0, description="Total papers found across all categories"
-    )
-    total_papers_stored: int = Field(
-        default=0, description="Total papers successfully stored"
-    )
-    last_activity_at: str = Field(
-        default_factory=get_current_timestamp,
-        description="ISO8601 datetime of last activity",
-    )
-    created_at: str = Field(
-        default_factory=get_current_timestamp,
-        description="ISO8601 datetime - automatically updated",
-    )
-    updated_at: str = Field(
-        default_factory=get_current_timestamp,
-        description="ISO8601 datetime - automatically updated",
     )
