@@ -6,8 +6,16 @@ export class ApiService {
         this.configApiUrl = '/v1/config';
     }
 
-    async getPapers(limit = 20, offset = 0, language = 'Korean') {
-        const response = await fetch(`${this.apiBaseUrl}/lightweight?limit=${limit}&offset=${offset}&language=${language}`);
+    async getPapers(limit = 20, offset = 0, language = 'Korean', prioritizeSummaries = true, sortByRelevance = true) {
+        const params = new URLSearchParams({
+            limit: limit.toString(),
+            offset: offset.toString(),
+            language: language,
+            prioritize_summaries: prioritizeSummaries.toString(),
+            sort_by_relevance: sortByRelevance.toString()
+        });
+        
+        const response = await fetch(`${this.apiBaseUrl}/lightweight?${params}`);
         
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);

@@ -3,7 +3,7 @@
 from collections.abc import AsyncGenerator
 from typing import Any
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 from sqlalchemy.engine import Engine
 from sqlmodel import Session
@@ -15,6 +15,7 @@ from api.dependencies import (
     get_settings,
     get_summary_generator,
 )
+from api.routers.common_queries import get_summary_language_param
 from api.utils.error_handler import handle_async_api_operation
 from core.config import Settings
 from core.database.repository.summary import SummaryRepository
@@ -159,7 +160,7 @@ async def mark_summary_as_read(
 @router.get("/{paper_id}/summary", response_model=SummaryDetailResponse)
 async def get_paper_summary(
     paper_id: int,
-    language: str = Query(default="Korean", description="Language for summary"),
+    language: str = Depends(get_summary_language_param),
     db_session: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> SummaryDetailResponse:

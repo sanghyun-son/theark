@@ -64,6 +64,24 @@ export class PaperManager {
                 this.infiniteScrollService.loadPapers();
             });
         }
+        
+        // Paper options checkboxes change
+        const prioritizeSummariesCheckbox = document.getElementById('prioritize-summaries');
+        const sortByRelevanceCheckbox = document.getElementById('sort-by-relevance');
+        
+        if (prioritizeSummariesCheckbox) {
+            prioritizeSummariesCheckbox.addEventListener('change', () => {
+                this.infiniteScrollService.reset();
+                this.infiniteScrollService.loadPapers();
+            });
+        }
+        
+        if (sortByRelevanceCheckbox) {
+            sortByRelevanceCheckbox.addEventListener('change', () => {
+                this.infiniteScrollService.reset();
+                this.infiniteScrollService.loadPapers();
+            });
+        }
     }
 
     validateUrl() {

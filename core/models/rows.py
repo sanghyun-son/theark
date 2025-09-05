@@ -1,6 +1,6 @@
 """SQLModel database models for TheArk."""
 
-from sqlmodel import Field, Relationship, SQLModel
+from sqlmodel import Field, Index, Relationship, SQLModel
 
 from core.types import PaperSummaryStatus
 from core.utils import get_current_timestamp
@@ -35,6 +35,12 @@ class PaperBase(SQLModel):
 class Paper(PaperBase, table=True):
     """Paper database model using SQLModel."""
 
+    # Performance indexes
+    __table_args__ = (
+        Index("idx_paper_updated_at", "updated_at"),  # For ORDER BY updated_at DESC
+        Index("idx_paper_summary_status", "summary_status"),  # For filtering by status
+    )
+
     # Relationship attributes
     summaries: list["Summary"] = Relationship(back_populates="paper")
     user_stars: list["UserStar"] = Relationship(back_populates="paper")
@@ -60,6 +66,13 @@ class Summary(SQLModel, table=True):
         description="ISO8601 datetime - automatically updated",
     )
 
+    # Performance indexes
+    __table_args__ = (
+        Index("idx_summary_paper_id", "paper_id"),  # For JOINs with paper table
+        Index("idx_summary_language", "language"),  # For language filtering
+        Index("idx_summary_relevance", "relevance"),  # For relevance-based sorting
+    )
+
     # Relationship attributes
     paper: Paper = Relationship(back_populates="summaries")
     summary_reads: list["SummaryRead"] = Relationship(back_populates="summary")
@@ -72,6 +85,13 @@ class SummaryRead(SQLModel, table=True):
     user_id: int = Field(foreign_key="user.user_id")
     summary_id: int = Field(foreign_key="summary.summary_id")
     read_at: str = Field(description="ISO8601 datetime when summary was read")
+
+    # Performance indexes
+    __table_args__ = (
+        Index(
+            "idx_summaryread_user_summary", "user_id", "summary_id"
+        ),  # For user status queries
+    )
 
     # Relationship attributes
     summary: Summary = Relationship(back_populates="summary_reads")
@@ -110,6 +130,13 @@ class UserStar(SQLModel, table=True):
     user_id: int = Field(foreign_key="user.user_id")
     paper_id: int = Field(foreign_key="paper.paper_id")
     note: str | None = Field(default=None, description="User note for the star")
+
+    # Performance indexes
+    __table_args__ = (
+        Index(
+            "idx_userstar_user_paper", "user_id", "paper_id"
+        ),  # For user status queries
+    )
 
     # Relationship attributes
     user: User = Relationship(back_populates="user_stars")

@@ -1,6 +1,6 @@
 """Paper CRUD operations router."""
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends
 from sqlmodel import Session
 
 from api.dependencies import (
@@ -8,6 +8,7 @@ from api.dependencies import (
     get_db,
     get_summary_generator,
 )
+from api.routers.common_queries import get_enhanced_paper_params, get_paper_params
 from api.utils.error_handler import handle_async_api_operation
 from core.database.repository.paper import PaperRepository
 from core.llm.openai_client import UnifiedOpenAIClient
@@ -28,11 +29,7 @@ router = APIRouter()
 async def get_papers(
     db_session: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-    limit: int = Query(
-        default=20, ge=1, le=100, description="Number of papers to return"
-    ),
-    offset: int = Query(default=0, ge=0, description="Number of papers to skip"),
-    language: str = Query(default="Korean", description="Language for summaries"),
+    params: tuple[int, int, str, bool, bool] = Depends(get_paper_params),
 ) -> PaperListResponse:
     """Get papers with pagination.
 
@@ -49,6 +46,7 @@ async def get_papers(
     """
 
     async def get_papers_operation() -> PaperListResponse:
+        limit, offset, language, prioritize_summaries, sort_by_relevance = params
         paper_service = PaperService()
         user_id = current_user.user_id
         return await paper_service.get_papers(
@@ -57,6 +55,8 @@ async def get_papers(
             skip=offset,  # Convert offset to skip
             limit=limit,
             language=language,
+            prioritize_summaries=prioritize_summaries,
+            sort_by_relevance=sort_by_relevance,
         )
 
     return await handle_async_api_operation(
@@ -64,15 +64,64 @@ async def get_papers(
     )
 
 
+@router.get("/enhanced", response_model=PaperListResponse)
+async def get_papers_enhanced(
+    db_session: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    params: tuple[int, int, str, bool, bool, list[str] | None] = Depends(
+        get_enhanced_paper_params
+    ),
+) -> PaperListResponse:
+    """Get papers with enhanced sorting and filtering options.
+
+    This endpoint supports:
+    - Summary status prioritization
+    - Relevance-based sorting
+    - Category filtering
+
+    Args:
+        limit: Number of papers to return (1-100)
+        offset: Number of papers to skip
+        language: Language for summaries
+        prioritize_summaries: Prioritize papers by summary status
+        sort_by_relevance: Sort papers by relevance score
+        categories: Comma-separated list of categories to filter by
+        current_user: Current user information
+
+    Returns:
+        List of papers with enhanced sorting and filtering
+
+    Raises:
+        HTTPException: If retrieval fails
+    """
+
+    async def get_papers_enhanced_operation() -> PaperListResponse:
+        limit, offset, language, prioritize_summaries, sort_by_relevance, categories = (
+            params
+        )
+        paper_service = PaperService()
+        user_id = current_user.user_id
+        return await paper_service.get_papers_enhanced(
+            db_session,
+            user_id,
+            skip=offset,  # Convert offset to skip
+            limit=limit,
+            language=language,
+            prioritize_summaries=prioritize_summaries,
+            sort_by_relevance=sort_by_relevance,
+            categories=categories,
+        )
+
+    return await handle_async_api_operation(
+        get_papers_enhanced_operation, error_message="Failed to get enhanced papers"
+    )
+
+
 @router.get("/lightweight", response_model=PaperListLightweightResponse)
 async def get_papers_lightweight(
     db_session: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-    limit: int = Query(
-        default=20, ge=1, le=100, description="Number of papers to return"
-    ),
-    offset: int = Query(default=0, ge=0, description="Number of papers to skip"),
-    language: str = Query(default="Korean", description="Language for summaries"),
+    params: tuple[int, int, str, bool, bool] = Depends(get_paper_params),
 ) -> PaperListLightweightResponse:
     """Get papers with overview only for better performance.
 
@@ -83,6 +132,8 @@ async def get_papers_lightweight(
         limit: Number of papers to return (1-100)
         offset: Number of papers to skip
         language: Language for summaries
+        prioritize_summaries: Whether to prioritize papers with summaries
+        sort_by_relevance: Whether to sort papers by relevance score
         current_user: Current user information
 
     Returns:
@@ -93,6 +144,7 @@ async def get_papers_lightweight(
     """
 
     async def get_papers_lightweight_operation() -> PaperListLightweightResponse:
+        limit, offset, language, prioritize_summaries, sort_by_relevance = params
         paper_service = PaperService()
         user_id = current_user.user_id
         return await paper_service.get_papers_lightweight(
@@ -101,6 +153,8 @@ async def get_papers_lightweight(
             skip=offset,  # Convert offset to skip
             limit=limit,
             language=language,
+            prioritize_summaries=prioritize_summaries,
+            sort_by_relevance=sort_by_relevance,
         )
 
     return await handle_async_api_operation(

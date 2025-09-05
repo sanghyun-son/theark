@@ -172,3 +172,108 @@ def test_delete_paper_not_found(integration_client: TestClient):
     response = integration_client.delete("/v1/papers/99999")
 
     assert response.status_code == 404
+
+
+# Lightweight endpoint tests
+@pytest.mark.asyncio
+async def test_get_papers_lightweight_success(integration_client: TestClient):
+    """Test successful lightweight paper list retrieval."""
+    response = integration_client.get("/v1/papers/lightweight")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert "papers" in data
+    assert "total_count" in data
+    assert "limit" in data
+    assert "offset" in data
+    assert "has_more" in data
+
+
+@pytest.mark.asyncio
+async def test_get_papers_lightweight_with_parameters(integration_client: TestClient):
+    """Test lightweight paper list retrieval with custom parameters."""
+    response = integration_client.get(
+        "/v1/papers/lightweight?limit=5&offset=0&language=Korean"
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["limit"] == 5
+    assert data["offset"] == 0
+    assert len(data["papers"]) <= 5
+
+
+@pytest.mark.asyncio
+async def test_get_papers_lightweight_prioritize_summaries(
+    integration_client: TestClient,
+):
+    """Test lightweight paper list with prioritize_summaries=true."""
+    # First, get papers without prioritization
+    response_normal = integration_client.get(
+        "/v1/papers/lightweight?limit=10&prioritize_summaries=false"
+    )
+    assert response_normal.status_code == 200
+    data_normal = response_normal.json()
+
+    # Then, get papers with prioritization
+    response_prioritized = integration_client.get(
+        "/v1/papers/lightweight?limit=10&prioritize_summaries=true"
+    )
+    assert response_prioritized.status_code == 200
+    data_prioritized = response_prioritized.json()
+
+    # Both should return the same number of papers
+    assert len(data_normal["papers"]) == len(data_prioritized["papers"])
+
+    # Check if prioritized results have more papers with summaries
+    normal_with_summaries = sum(
+        1 for paper in data_normal["papers"] if paper.get("has_summary", False)
+    )
+    prioritized_with_summaries = sum(
+        1 for paper in data_prioritized["papers"] if paper.get("has_summary", False)
+    )
+
+    print(f"Normal response: {len(data_normal['papers'])} papers")
+    print(f"Prioritized response: {len(data_prioritized['papers'])} papers")
+    print(f"Normal: {normal_with_summaries} papers with summaries")
+    print(f"Prioritized: {prioritized_with_summaries} papers with summaries")
+
+    # Print first few papers for debugging
+    print("Normal first 3 papers:")
+    for i, paper in enumerate(data_normal["papers"][:3]):
+        print(
+            f"  {i+1}. ID: {paper['paper_id']}, has_summary: {paper.get('has_summary', False)}, summary_status: {paper.get('summary_status', 'N/A')}"
+        )
+
+    print("Prioritized first 3 papers:")
+    for i, paper in enumerate(data_prioritized["papers"][:3]):
+        print(
+            f"  {i+1}. ID: {paper['paper_id']}, has_summary: {paper.get('has_summary', False)}, summary_status: {paper.get('summary_status', 'N/A')}"
+        )
+
+    # Prioritized should have at least as many papers with summaries
+    assert prioritized_with_summaries >= normal_with_summaries
+
+
+@pytest.mark.asyncio
+async def test_get_papers_lightweight_sort_by_relevance(integration_client: TestClient):
+    """Test lightweight paper list with sort_by_relevance=true."""
+    response = integration_client.get(
+        "/v1/papers/lightweight?limit=5&sort_by_relevance=true"
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data["papers"]) <= 5
+
+
+@pytest.mark.asyncio
+async def test_get_papers_lightweight_combined_options(integration_client: TestClient):
+    """Test lightweight paper list with both prioritize_summaries and sort_by_relevance."""
+    response = integration_client.get(
+        "/v1/papers/lightweight?limit=5&prioritize_summaries=true&sort_by_relevance=true"
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data["papers"]) <= 5

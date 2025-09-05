@@ -1,12 +1,13 @@
 """Paper star operations router."""
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends
 from sqlmodel import Session
 
 from api.dependencies import (
     get_current_user,
     get_db,
 )
+from api.routers.common_queries import get_pagination_params
 from api.utils.error_handler import handle_async_api_operation
 from core.models.api.requests import StarRequest
 from core.models.api.responses import StarredPapersResponse, StarResponse
@@ -54,10 +55,7 @@ async def add_star(
 async def get_starred_papers(
     db_session: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-    limit: int = Query(
-        default=20, ge=1, le=100, description="Number of papers to return"
-    ),
-    offset: int = Query(default=0, ge=0, description="Number of papers to skip"),
+    params: tuple[int, int] = Depends(get_pagination_params),
 ) -> StarredPapersResponse:
     """Get all starred papers for the current user.
 
@@ -74,6 +72,7 @@ async def get_starred_papers(
     """
 
     async def get_starred_papers_operation() -> StarredPapersResponse:
+        limit, offset = params
         paper_service = PaperService()
         user_id = current_user.user_id
         if user_id is None:

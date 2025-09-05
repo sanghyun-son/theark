@@ -47,7 +47,9 @@ export class InfiniteScrollService {
         
         try {
             const language = document.getElementById('summary-language').value;
-            const data = await this.apiService.getPapers(this.pageSize, this.currentPage * this.pageSize, language);
+            const prioritizeSummaries = document.getElementById('prioritize-summaries').checked;
+            const sortByRelevance = document.getElementById('sort-by-relevance').checked;
+            const data = await this.apiService.getPapers(this.pageSize, this.currentPage * this.pageSize, language, prioritizeSummaries, sortByRelevance);
             
             // Append new papers to existing array
             this.papers = this.papers.concat(data.papers);
@@ -75,7 +77,9 @@ export class InfiniteScrollService {
         try {
             this.isLoading = true;
             const language = document.getElementById('summary-language').value;
-            const data = await this.apiService.getPapers(this.pageSize, this.currentPage * this.pageSize, language);
+            const prioritizeSummaries = document.getElementById('prioritize-summaries').checked;
+            const sortByRelevance = document.getElementById('sort-by-relevance').checked;
+            const data = await this.apiService.getPapers(this.pageSize, this.currentPage * this.pageSize, language, prioritizeSummaries, sortByRelevance);
             
             this.papers = data.papers; // Store papers
             this.hasMore = data.has_more;

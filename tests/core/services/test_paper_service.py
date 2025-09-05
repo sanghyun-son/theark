@@ -1,5 +1,7 @@
 """Tests for PaperService."""
 
+import logging
+
 import pytest
 from sqlmodel import Session
 
@@ -17,6 +19,9 @@ from core.services.paper_service import PaperService
 from tests.utils.test_helpers import (
     TestSetupHelper,
 )
+
+
+logger = logging.getLogger(__name__)
 
 
 @pytest.fixture
@@ -210,3 +215,90 @@ async def test_get_papers_lightweight(
         assert hasattr(paper, "is_read")
         # Should not have full summary object
         assert not hasattr(paper, "summary")
+
+
+@pytest.mark.asyncio
+async def test_paper_prioritization(
+    paper_service: PaperService,
+    mock_db_session: Session,
+    paper_repo: PaperRepository,
+) -> None:
+    """Test that papers with summaries are prioritized by status."""
+    from core.types import PaperSummaryStatus
+
+    # Create test papers with different summary statuses
+    papers = [
+        # Paper with DONE summary (should be first)
+        Paper(
+            arxiv_id="2201.00001",
+            title="Paper with DONE summary",
+            abstract="Abstract 1",
+            authors="Author 1",
+            primary_category="cs.AI",
+            categories="cs.AI",
+            url_abs="http://arxiv.org/abs/2201.00001",
+            url_pdf="http://arxiv.org/pdf/2201.00001",
+            published_at="2023-01-01",
+            summary_status=PaperSummaryStatus.DONE,
+        ),
+        # Paper with ERROR summary (should be third)
+        Paper(
+            arxiv_id="2201.00002",
+            title="Paper with ERROR summary",
+            abstract="Abstract 2",
+            authors="Author 2",
+            primary_category="cs.AI",
+            categories="cs.AI",
+            url_abs="http://arxiv.org/abs/2201.00002",
+            url_pdf="http://arxiv.org/pdf/2201.00002",
+            published_at="2023-01-02",
+            summary_status=PaperSummaryStatus.ERROR,
+        ),
+        # Paper with PROCESSING summary (should be second)
+        Paper(
+            arxiv_id="2201.00003",
+            title="Paper with PROCESSING summary",
+            abstract="Abstract 3",
+            authors="Author 3",
+            primary_category="cs.AI",
+            categories="cs.AI",
+            url_abs="http://arxiv.org/abs/2201.00003",
+            url_pdf="http://arxiv.org/pdf/2201.00003",
+            published_at="2023-01-03",
+            summary_status=PaperSummaryStatus.PROCESSING,
+        ),
+    ]
+
+    # Save papers to database
+    for paper in papers:
+        paper_repo.create(paper)
+
+    # Test with prioritization enabled (default)
+    result_prioritized = await paper_service.get_papers(
+        mock_db_session, user_id=None, skip=0, limit=10, prioritize_summaries=True
+    )
+
+    # Test with prioritization disabled
+    result_not_prioritized = await paper_service.get_papers(
+        mock_db_session, user_id=None, skip=0, limit=10, prioritize_summaries=False
+    )
+
+    # Verify we got the expected number of papers
+    assert len(result_prioritized.papers) == 3
+    assert len(result_not_prioritized.papers) == 3
+
+    # With prioritization: DONE should be first, PROCESSING second, ERROR third
+    logger.info(f"Prioritized titles: {result_prioritized.papers}")
+    logger.info(f"Not prioritized titles: {result_not_prioritized.papers}")
+
+    prioritized_titles = [paper.title for paper in result_prioritized.papers]
+    assert "Paper with DONE summary" in prioritized_titles[0]
+    assert "Paper with PROCESSING summary" in prioritized_titles[1]
+    assert "Paper with ERROR summary" in prioritized_titles[2]
+
+    # Without prioritization: should be ordered by updated_at (most recent first)
+    # Since we created them in order, the last created should be first
+    not_prioritized_titles = [paper.title for paper in result_not_prioritized.papers]
+    assert "Paper with PROCESSING summary" in not_prioritized_titles[0]  # Most recent
+    assert "Paper with ERROR summary" in not_prioritized_titles[1]
+    assert "Paper with DONE summary" in not_prioritized_titles[2]  # Oldest

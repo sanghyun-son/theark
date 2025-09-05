@@ -415,13 +415,22 @@ class BackgroundBatchManager:
                 status = await openai_client.get_batch_status(batch_info.batch_id)
 
                 # Convert status to BatchStatusInfo
+                created_at = getattr(status, "created_at", None)
+                completed_at = getattr(status, "completed_at", None)
+
+                # Convert timestamps to strings if they are integers
+                if isinstance(created_at, int):
+                    created_at = str(created_at)
+                if isinstance(completed_at, int):
+                    completed_at = str(completed_at)
+
                 status_info = BatchStatusInfo(
                     batch_id=batch_info.batch_id,
                     status=status.status,
                     output_file_id=getattr(status, "output_file_id", None),
                     error_file_id=getattr(status, "error_file_id", None),
-                    created_at=getattr(status, "created_at", None),
-                    completed_at=getattr(status, "completed_at", None),
+                    created_at=created_at,
+                    completed_at=completed_at,
                 )
 
                 return BatchProcessingResult(
@@ -1081,10 +1090,9 @@ class BackgroundBatchManager:
 
             summary = self._create_summary_from_response(result, paper_id)
             if summary:
-                logger.info(f"Processed successful result for paper {paper_id}")
                 return True, summary
-            else:
-                return False, None
+
+            return False, None
 
         except (ValueError, TypeError) as e:
             # These are paper-level parsing errors, not system errors

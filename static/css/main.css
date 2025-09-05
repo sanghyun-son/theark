@@ -824,11 +824,89 @@ sm.github-link {
     text-decoration: underline;
 }
 
+/* Paper Options Toggle Switches */
+.paper-options {
+    display: flex;
+    gap: var(--spacing-lg);
+    margin-top: var(--spacing-sm);
+    padding: var(--spacing-sm) var(--spacing-md);
+    background: var(--container-background-color);
+    border-radius: var(--border-radius-lg);
+    border: 2px solid var(--border-color);
+    font-family: var(--font-family-korean);
+    box-shadow: var(--box-shadow-sm);
+    align-items: center;
+}
+
+.toggle-switch {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+.toggle-switch-text {
+    font-size: 0.9rem;
+    color: var(--primary-text-color);
+    user-select: none;
+}
+
+.toggle-switch-checkbox {
+    display: none;
+}
+
+.toggle-switch-label {
+    display: block;
+    position: relative;
+    width: 50px;
+    height: 22px;
+    cursor: pointer;
+    background: #ccc;
+    border-radius: 22px;
+    transition: background-color 0.3s ease;
+}
+
+.toggle-switch-inner {
+    display: block;
+    width: 100%;
+    height: 100%;
+    border-radius: 22px;
+    transition: all 0.3s ease;
+}
+
+.toggle-switch-switch {
+    display: block;
+    position: absolute;
+    top: 3px;
+    left: 5px;
+    width: 16px;
+    height: 16px;
+    background: white;
+    border-radius: 50%;
+    transition: all 0.3s ease;
+}
+
+.toggle-switch-checkbox:checked + .toggle-switch-label {
+    background: var(--accent-color-1);
+}
+
+.toggle-switch-checkbox:checked + .toggle-switch-label .toggle-switch-switch {
+    transform: translateX(24px);
+}
+
+.toggle-switch-checkbox:focus + .toggle-switch-label {
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.2);
+}
+
 /* Responsive design for statistics */
 @media (max-width: 768px) {
     .statistics-display {
         flex-direction: column;
         gap: var(--spacing-xs);
         text-align: center;
+    }
+    
+    .paper-options {
+        flex-direction: column;
+        gap: var(--spacing-sm);
     }
 }

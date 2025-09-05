@@ -21,6 +21,7 @@ from core.models import (
     SummaryReadResponse,
 )
 from core.models.api.responses import (
+    PaperListItemResponse,
     PaperListLightweightResponse,
     PaperListResponse,
     SummaryDetailResponse,
@@ -28,6 +29,7 @@ from core.models.api.responses import (
 from core.models.domain.paper_extraction import PaperMetadata
 from core.models.rows import Paper, Summary
 from core.services.summarization_service import PaperSummarizationService
+from core.types import PaperSummaryStatus
 
 logger = get_logger(__name__)
 
@@ -209,7 +211,9 @@ class PaperService:
         user_id: int | None = None,
         skip: int = 0,
         limit: int = 100,
-        language: str | None = None,
+        language: str = "Korean",
+        prioritize_summaries: bool = True,
+        sort_by_relevance: bool = False,
     ) -> PaperListResponse:
         """Get a list of papers with optional filtering.
 
@@ -218,18 +222,104 @@ class PaperService:
 
         Related method: get_paper() - for retrieving a single paper
         """
+        # Use the same logic as get_papers_lightweight for better performance
         paper_repo = PaperRepository(db_session)
-        papers = paper_repo.get_papers_with_summaries(
-            skip=skip, limit=limit, language=language
+        papers = paper_repo.get_papers_with_overview_optimized(
+            skip=skip,
+            limit=limit,
+            language=language,
+            prioritize_summaries=prioritize_summaries,
+            sort_by_relevance=sort_by_relevance,
+            categories=None,  # No category filtering by default
         )
 
-        # Use the same enrichment logic as get_paper for consistency
+        # Convert Paper objects to PaperListItemResponse objects
+        paper_overview_data = [
+            PaperListItemResponse.model_validate(paper.model_dump()) for paper in papers
+        ]
+
+        if user_id:
+            paper_responses = await self._enrich_papers_with_user_status(
+                paper_overview_data, db_session, user_id, language
+            )
+        else:
+            paper_responses = self._create_papers_without_user_status(
+                paper_overview_data
+            )
+
+        # Convert PaperListItemResponse to PaperResponse
+        paper_responses_full = []
+        for paper_item in paper_responses:
+            # Get the original paper object
+            original_paper = next(
+                (p for p in papers if p.paper_id == paper_item.paper_id), None
+            )
+            if original_paper:
+                # Create full PaperResponse
+                paper_response = self._enrich_paper_response(
+                    original_paper, db_session, user_id, language=language
+                )
+                paper_response.is_starred = paper_item.is_starred
+                paper_response.is_read = paper_item.is_read
+                paper_responses_full.append(paper_response)
+
+        total_count = paper_repo.get_total_count()
+        has_more = (skip + limit) < total_count
+
+        return PaperListResponse(
+            papers=paper_responses_full,
+            total_count=total_count,
+            limit=limit,
+            offset=skip,
+            has_more=has_more,
+        )
+
+    async def get_papers_enhanced(
+        self,
+        db_session: Session,
+        user_id: int | None = None,
+        skip: int = 0,
+        limit: int = 100,
+        language: str = "Korean",
+        prioritize_summaries: bool = False,
+        sort_by_relevance: bool = False,
+        categories: list[str] | None = None,
+    ) -> PaperListResponse:
+        """Get papers with enhanced sorting and filtering options.
+
+        This method supports:
+        - Summary status prioritization
+        - Relevance-based sorting
+        - Category filtering
+
+        Args:
+            db_session: Database session
+            user_id: User ID for personalization
+            skip: Number of records to skip
+            limit: Maximum number of records to return
+            language: Language for summaries
+            prioritize_summaries: Whether to prioritize by summary status
+            sort_by_relevance: Whether to sort by relevance score
+            categories: List of categories to filter by
+
+        Returns:
+            Enhanced paper list with specified sorting and filtering
+        """
+        paper_repo = PaperRepository(db_session)
+        papers = paper_repo.get_papers_with_summaries(
+            skip=skip,
+            limit=limit,
+            language=language,
+            prioritize_summaries=prioritize_summaries,
+            sort_by_relevance=sort_by_relevance,
+            categories=categories,
+        )
+
         paper_responses = [
             self._enrich_paper_response(paper, db_session, user_id, language=language)
             for paper in papers
         ]
 
-        # Get total count for pagination
         total_count = paper_repo.get_total_count()
         has_more = (skip + limit) < total_count
 
@@ -247,7 +337,9 @@ class PaperService:
         user_id: int | None = None,
         skip: int = 0,
         limit: int = 100,
-        language: str | None = None,
+        language: str = "Korean",
+        prioritize_summaries: bool = True,
+        sort_by_relevance: bool = False,
     ) -> PaperListLightweightResponse:
         """Get a lightweight list of papers with overview only.
 
@@ -260,88 +352,266 @@ class PaperService:
             skip: Number of records to skip
             limit: Maximum number of records to return
             language: Language for summaries
+            prioritize_summaries: Whether to prioritize papers with summaries
+            sort_by_relevance: Whether to sort papers by relevance score
 
         Returns:
             Lightweight paper list with overview only
         """
         paper_repo = PaperRepository(db_session)
+        logger.debug(
+            f"get_papers_lightweight called with: "
+            f"prioritize_summaries={prioritize_summaries}, "
+            f"sort_by_relevance={sort_by_relevance}"
+        )
+        papers = paper_repo.get_papers_with_overview_optimized(
+            skip=skip,
+            limit=limit,
+            language=language,
+            prioritize_summaries=prioritize_summaries,
+            sort_by_relevance=sort_by_relevance,
+            categories=None,  # No category filtering by default
+        )
+        logger.debug(f"Repository returned {len(papers)} papers")
+        if papers:
+            logger.debug(f"First paper summary_status: {papers[0].summary_status}")
 
-        # Use optimized batch method if user_id is provided
+        # Get overview and relevance data for papers
+        paper_ids = [paper.paper_id for paper in papers if paper.paper_id]
+        overviews: dict[int, str] = {}
+        relevances: dict[int, int] = {}
+        if paper_ids:
+            summary_repo = SummaryRepository(db_session)
+            summaries_dict = summary_repo.get_by_paper_ids_and_language(
+                paper_ids, language
+            )
+            overviews = {
+                summary.paper_id: summary.overview
+                for summary in summaries_dict.values()
+                if summary.paper_id
+            }
+            relevances = {
+                summary.paper_id: summary.relevance
+                for summary in summaries_dict.values()
+                if summary.paper_id
+            }
+
+        paper_overview_data: list[PaperListItemResponse] = []
+        for paper in papers:
+            if paper.paper_id is None:
+                continue
+            paper_data = PaperListItemResponse.model_validate(paper.model_dump())
+            paper_data.overview = overviews.get(paper.paper_id)
+            paper_data.relevance = relevances.get(paper.paper_id)
+            paper_overview_data.append(paper_data)
+
         if user_id:
-            paper_overview_data = paper_repo.get_papers_with_overview_optimized(
-                skip=skip, limit=limit, language=language
+            paper_responses = await self._enrich_papers_with_user_status(
+                paper_overview_data, db_session, user_id, language
             )
-
-            # Create responses with user status
-            paper_responses = []
-            for overview_data in paper_overview_data:
-                overview_data.is_starred = False
-                overview_data.is_read = False
-                paper_responses.append(overview_data)
-
-            # Batch fetch user status for better performance
-            if paper_responses:
-                paper_ids = [
-                    data.paper_id for data in paper_overview_data if data.paper_id
-                ]
-
-                # Batch fetch star status
-                star_repo = UserStarRepository(db_session)
-                starred_paper_ids = set(
-                    star_repo.get_starred_paper_ids(user_id, paper_ids)
-                )
-
-                # Batch fetch read status
-                summary_read_repo = SummaryReadRepository(db_session)
-                summary_repo = SummaryRepository(db_session)
-
-                summary_paper_ids = [
-                    data.paper_id
-                    for data in paper_overview_data
-                    if data.paper_id and data.has_summary
-                ]
-
-                summaries = {}
-                if summary_paper_ids:
-                    summaries = summary_repo.get_by_paper_ids_and_language(
-                        summary_paper_ids, language or "Korean"
-                    )
-
-                summary_ids = [s.summary_id for s in summaries.values() if s.summary_id]
-                read_summary_ids = set()
-                if summary_ids:
-                    read_summary_ids = set(
-                        summary_read_repo.get_read_summary_ids(user_id, summary_ids)
-                    )
-
-                # Update user status
-                for i, overview_data in enumerate(paper_overview_data):
-                    paper_id = overview_data.paper_id
-                    is_starred = paper_id in starred_paper_ids if paper_id else False
-
-                    is_read = False
-                    if paper_id and overview_data.has_summary:
-                        summary = summaries.get(paper_id)
-                        if summary and summary.summary_id:
-                            is_read = summary.summary_id in read_summary_ids
-
-                    paper_responses[i].is_starred = is_starred
-                    paper_responses[i].is_read = is_read
         else:
-            # No user_id, use simple optimized method
-            paper_overview_data = paper_repo.get_papers_with_overview_optimized(
-                skip=skip, limit=limit, language=language
+            paper_responses = self._create_papers_without_user_status(
+                paper_overview_data
             )
 
-            # Create responses without user-specific data
-            paper_responses = []
-            for overview_data in paper_overview_data:
-                # overview_data is already a PaperListItemResponse, just set user status
-                overview_data.is_starred = False
-                overview_data.is_read = False
-                paper_responses.append(overview_data)
+        return self._build_lightweight_response(
+            paper_responses, paper_repo, skip, limit
+        )
 
-        # Get total count for pagination
+    async def _enrich_papers_with_user_status(
+        self,
+        paper_overview_data: list[PaperListItemResponse],
+        db_session: Session,
+        user_id: int,
+        language: str = "Korean",
+    ) -> list[PaperListItemResponse]:
+        """Enrich papers with user-specific status (star/read).
+
+        Args:
+            paper_overview_data: List of paper overview data
+            db_session: Database session
+            user_id: User ID for status lookup
+            language: Language for summaries
+
+        Returns:
+            List of papers enriched with user status
+        """
+        # Initialize responses with default user status
+        paper_responses = []
+        for overview_data in paper_overview_data:
+            overview_data.is_starred = False
+            overview_data.is_read = False
+            # Set has_summary based on summary_status
+            overview_data.has_summary = (
+                overview_data.summary_status == PaperSummaryStatus.DONE
+            )
+            paper_responses.append(overview_data)
+
+        if not paper_responses:
+            return paper_responses
+
+        # Batch fetch user status for better performance
+        paper_ids = [data.paper_id for data in paper_overview_data if data.paper_id]
+
+        # Get star status
+        starred_paper_ids = self._batch_fetch_user_star_status(
+            db_session, user_id, paper_ids
+        )
+
+        # Get read status
+        read_summary_ids = self._batch_fetch_user_read_status(
+            db_session, user_id, paper_overview_data, language
+        )
+
+        # Update user status
+        self._update_paper_user_status(
+            paper_responses, paper_overview_data, starred_paper_ids, read_summary_ids
+        )
+
+        return paper_responses
+
+    def _create_papers_without_user_status(
+        self, paper_overview_data: list[PaperListItemResponse]
+    ) -> list[PaperListItemResponse]:
+        """Create paper responses without user-specific data.
+
+        Args:
+            paper_overview_data: List of paper overview data
+
+        Returns:
+            List of papers with default user status
+        """
+        paper_responses = []
+        for overview_data in paper_overview_data:
+            overview_data.is_starred = False
+            overview_data.is_read = False
+            # Set has_summary based on summary_status
+            overview_data.has_summary = (
+                overview_data.summary_status == PaperSummaryStatus.DONE
+            )
+            paper_responses.append(overview_data)
+        return paper_responses
+
+    def _batch_fetch_user_star_status(
+        self, db_session: Session, user_id: int, paper_ids: list[int]
+    ) -> set[int]:
+        """Batch fetch star status for multiple papers.
+
+        Args:
+            db_session: Database session
+            user_id: User ID
+            paper_ids: List of paper IDs
+
+        Returns:
+            Set of starred paper IDs
+        """
+        if not paper_ids:
+            return set()
+
+        star_repo = UserStarRepository(db_session)
+        return set(star_repo.get_starred_paper_ids(user_id, paper_ids))
+
+    def _batch_fetch_user_read_status(
+        self,
+        db_session: Session,
+        user_id: int,
+        paper_overview_data: list[PaperListItemResponse],
+        language: str = "Korean",
+    ) -> dict[int, int]:
+        """Batch fetch read status for multiple papers.
+
+        Args:
+            db_session: Database session
+            user_id: User ID
+            paper_overview_data: List of paper overview data
+            language: Language for summaries
+
+        Returns:
+            Dictionary mapping paper_id to summary_id for read summaries
+        """
+        summary_paper_ids = [
+            data.paper_id
+            for data in paper_overview_data
+            if data.paper_id and data.has_summary
+        ]
+
+        if not summary_paper_ids:
+            return {}
+
+        # Get summaries for these papers
+        summary_repo = SummaryRepository(db_session)
+        summaries_dict = summary_repo.get_by_paper_ids_and_language(
+            summary_paper_ids, language
+        )
+
+        if not summaries_dict:
+            return {}
+
+        # Get summary IDs
+        summary_ids: list[int] = []
+        for summary in summaries_dict.values():
+            if summary.summary_id is not None:
+                summary_ids.append(summary.summary_id)
+        if not summary_ids:
+            return {}
+
+        # Batch fetch read status
+        summary_read_repo = SummaryReadRepository(db_session)
+        read_summary_ids = summary_read_repo.get_read_summary_ids(user_id, summary_ids)
+
+        # Create mapping from paper_id to summary_id for read summaries
+        read_summary_mapping = {}
+        for summary in summaries_dict.values():
+            if summary.summary_id in read_summary_ids and summary.paper_id:
+                read_summary_mapping[summary.paper_id] = summary.summary_id
+
+        return read_summary_mapping
+
+    def _update_paper_user_status(
+        self,
+        paper_responses: list[PaperListItemResponse],
+        paper_overview_data: list[PaperListItemResponse],
+        starred_paper_ids: set[int],
+        read_summary_mapping: dict[int, int],
+    ) -> None:
+        """Update papers with user status data.
+
+        Args:
+            paper_responses: List of paper responses to update
+            paper_overview_data: Original paper overview data
+            starred_paper_ids: Set of starred paper IDs
+            read_summary_mapping: Dictionary mapping paper_id to summary_id for read summaries
+        """
+        for i, overview_data in enumerate(paper_overview_data):
+            paper_id = overview_data.paper_id
+            is_starred = paper_id in starred_paper_ids if paper_id else False
+
+            is_read = False
+            if paper_id and overview_data.has_summary:
+                # Check if this paper's summary has been read
+                is_read = paper_id in read_summary_mapping
+
+            paper_responses[i].is_starred = is_starred
+            paper_responses[i].is_read = is_read
+
+    def _build_lightweight_response(
+        self,
+        paper_responses: list[PaperListItemResponse],
+        paper_repo: PaperRepository,
+        skip: int,
+        limit: int,
+    ) -> PaperListLightweightResponse:
+        """Build the final lightweight response.
+
+        Args:
+            paper_responses: List of enriched paper responses
+            paper_repo: Paper repository for total count
+            skip: Number of records skipped
+            limit: Number of records requested
+
+        Returns:
+            Complete lightweight response
+        """
         total_count = paper_repo.get_total_count()
         has_more = (skip + limit) < total_count
 
