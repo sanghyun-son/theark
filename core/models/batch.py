@@ -4,6 +4,8 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from core.models.rows import Summary
+
 
 class BatchItemCreate(BaseModel):
     """Model for creating batch items."""
@@ -100,3 +102,50 @@ class PendingSummariesResponse(BatchResponseBase):
 
     pending_summaries: int = Field(..., description="Number of pending summaries")
     papers: list[dict[str, Any]] = Field(..., description="List of papers")
+
+
+# Bulk Processing Models
+class BatchStatusInfo(BaseModel):
+    """Batch status information from OpenAI API."""
+
+    batch_id: str = Field(description="OpenAI batch ID")
+    status: str = Field(description="Current batch status")
+    output_file_id: str | None = Field(
+        default=None, description="Output file ID if completed"
+    )
+    error_file_id: str | None = Field(
+        default=None, description="Error file ID if failed"
+    )
+    created_at: str | None = Field(default=None, description="Creation timestamp")
+    completed_at: str | None = Field(default=None, description="Completion timestamp")
+
+
+class BatchProcessingResult(BaseModel):
+    """Result of batch processing operation."""
+
+    batch_info: BatchInfo = Field(description="Original batch information")
+    status_info: BatchStatusInfo = Field(description="Status information from API")
+    success: bool = Field(description="Whether processing was successful")
+    error_message: str | None = Field(
+        default=None, description="Error message if failed"
+    )
+    summaries: list[Summary] = Field(
+        default_factory=list, description="Created summaries"
+    )
+
+
+class BulkProcessingSummary(BaseModel):
+    """Summary of bulk processing operation."""
+
+    total_batches: int = Field(description="Total number of batches processed")
+    successful_batches: int = Field(
+        description="Number of successfully processed batches"
+    )
+    failed_batches: int = Field(description="Number of failed batches")
+    total_summaries: int = Field(description="Total number of summaries created")
+    processing_time_seconds: float = Field(
+        description="Total processing time in seconds"
+    )
+    batches_processed: list[BatchProcessingResult] = Field(
+        description="Individual batch results"
+    )

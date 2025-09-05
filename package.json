@@ -10,6 +10,11 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:prod": "vite build --mode production",
+    "preview": "vite preview",
+    "clean": "rm -rf static/dist",
+    "deploy:build": "./scripts/build/frontend.sh",
+    "deploy:check": "test -f static/dist/index.html && echo '✅ Production build ready' || echo '❌ No production build found'",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {

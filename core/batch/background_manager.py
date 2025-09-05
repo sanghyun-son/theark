@@ -3,6 +3,7 @@
 import asyncio
 import json
 import tempfile
+import time
 from pathlib import Path
 from typing import Any
 
@@ -18,7 +19,14 @@ from core.database.repository import (
 from core.llm.batch_builder import UnifiedBatchBuilder
 from core.llm.openai_client import UnifiedOpenAIClient
 from core.log import get_logger
-from core.models.batch import BatchRequestPayload, BatchResult
+from core.models.batch import (
+    BatchInfo,
+    BatchProcessingResult,
+    BatchRequestPayload,
+    BatchResult,
+    BatchStatusInfo,
+    BulkProcessingSummary,
+)
 from core.models.external.openai import ChatCompletionResponse, PaperAnalysis
 from core.models.rows import Paper, Summary
 from core.services.summarization_service import PaperSummarizationService
@@ -226,7 +234,9 @@ class BackgroundBatchManager:
 
         # Upload data to OpenAI
         file_id = await openai_client.upload_data(
-            batch_payload.to_jsonl(), "batch_requests.jsonl", purpose="batch"
+            batch_payload.to_jsonl(),
+            "batch_requests.jsonl",
+            purpose="batch",
         )
 
         batch_response = await openai_client.create_batch_request(
@@ -246,10 +256,6 @@ class BackgroundBatchManager:
             entity_count=len(papers),
             completion_window="24h",
             endpoint="/v1/chat/completions",
-        )
-
-        logger.info(
-            f"Created batch request {batch_response.id} for {len(papers)} papers"
         )
 
     def _create_batch_payload(
@@ -303,7 +309,8 @@ class BackgroundBatchManager:
         """Process active batch requests and fetch results.
 
         Args:
-            db_session: Database session instance
+            db_engine: Database engine instance
+            openai_client: OpenAI client instance
         """
         try:
             # Get active batches
@@ -315,14 +322,419 @@ class BackgroundBatchManager:
 
             logger.info(f"Processing {len(active_batches)} active batches")
 
-            # Process each active batch
-            for batch in active_batches:
-                await self._process_batch_status(
-                    db_engine, batch.model_dump(), openai_client
-                )
+            # Use bulk processing for better performance
+            await self._process_batches_bulk(db_engine, active_batches, openai_client)
 
         except Exception as e:
             logger.error(f"Error processing active batches: {e}")
+
+    async def _process_batches_bulk(
+        self,
+        db_engine: Engine,
+        active_batches: list[BatchInfo],
+        openai_client: UnifiedOpenAIClient,
+    ) -> BulkProcessingSummary:
+        """Process multiple batches in bulk for better performance.
+
+        Args:
+            db_engine: Database engine instance
+            active_batches: List of active batch information
+            openai_client: OpenAI client instance
+
+        Returns:
+            BulkProcessingSummary with processing results
+        """
+        logger.info(f"Starting bulk processing of {len(active_batches)} batches")
+        start_time = time.time()
+
+        # Step 1: Check all batch statuses
+        batch_results = await self._check_batch_statuses_bulk(
+            active_batches, openai_client
+        )
+
+        # Step 2: Group batches by status for efficient processing
+        completed_batches = [
+            r for r in batch_results if r.status_info.status == "completed"
+        ]
+        failed_batches = [r for r in batch_results if r.status_info.status == "failed"]
+
+        # Step 3: Process completed batches in bulk
+        if completed_batches:
+            logger.info(
+                f"Processing {len(completed_batches)} completed batches in bulk"
+            )
+            await self._process_completed_batches_bulk(
+                db_engine, completed_batches, openai_client
+            )
+
+        # Step 4: Process failed batches
+        if failed_batches:
+            logger.info(f"Processing {len(failed_batches)} failed batches")
+            await self._process_failed_batches_bulk(
+                db_engine, failed_batches, openai_client
+            )
+
+        # Step 5: Update all batch statuses in bulk
+        await self._update_batch_statuses_bulk(db_engine, batch_results)
+
+        processing_time = time.time() - start_time
+
+        # Create summary
+        summary = BulkProcessingSummary(
+            total_batches=len(active_batches),
+            successful_batches=len([r for r in batch_results if r.success]),
+            failed_batches=len([r for r in batch_results if not r.success]),
+            total_summaries=sum(len(r.summaries) for r in batch_results),
+            processing_time_seconds=processing_time,
+            batches_processed=batch_results,
+        )
+
+        logger.info(
+            f"Bulk processing completed in {processing_time:.2f}s: "
+            f"{summary.successful_batches} successful, {summary.failed_batches} failed, "
+            f"{summary.total_summaries} summaries created"
+        )
+
+        return summary
+
+    async def _check_batch_statuses_bulk(
+        self, active_batches: list[BatchInfo], openai_client: UnifiedOpenAIClient
+    ) -> list[BatchProcessingResult]:
+        """Check status of multiple batches concurrently.
+
+        Args:
+            active_batches: List of active batch information
+            openai_client: OpenAI client instance
+
+        Returns:
+            List of BatchProcessingResult objects
+        """
+
+        async def check_single_batch(batch_info: BatchInfo) -> BatchProcessingResult:
+            try:
+                status = await openai_client.get_batch_status(batch_info.batch_id)
+
+                # Convert status to BatchStatusInfo
+                status_info = BatchStatusInfo(
+                    batch_id=batch_info.batch_id,
+                    status=status.status,
+                    output_file_id=getattr(status, "output_file_id", None),
+                    error_file_id=getattr(status, "error_file_id", None),
+                    created_at=getattr(status, "created_at", None),
+                    completed_at=getattr(status, "completed_at", None),
+                )
+
+                return BatchProcessingResult(
+                    batch_info=batch_info,
+                    status_info=status_info,
+                    success=True,
+                    summaries=[],
+                )
+            except Exception as e:
+                logger.error(
+                    f"Error checking status for batch {batch_info.batch_id}: {e}"
+                )
+                return BatchProcessingResult(
+                    batch_info=batch_info,
+                    status_info=BatchStatusInfo(
+                        batch_id=batch_info.batch_id,
+                        status="error",
+                        output_file_id=None,
+                        error_file_id=None,
+                    ),
+                    success=False,
+                    error_message=str(e),
+                    summaries=[],
+                )
+
+        # Check all batch statuses concurrently
+        tasks = [check_single_batch(batch) for batch in active_batches]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        # Filter out exceptions and build result list
+        batch_results = []
+        for result in results:
+            if isinstance(result, Exception):
+                logger.error(f"Exception in batch status check: {result}")
+                continue
+            if isinstance(result, BatchProcessingResult):
+                batch_results.append(result)
+
+        logger.info(f"Checked status for {len(batch_results)} batches")
+        return batch_results
+
+    async def _process_completed_batches_bulk(
+        self,
+        db_engine: Engine,
+        completed_batches: list[BatchProcessingResult],
+        openai_client: UnifiedOpenAIClient,
+    ) -> None:
+        """Process multiple completed batches in true bulk.
+
+        Args:
+            db_engine: Database engine instance
+            completed_batches: List of BatchProcessingResult objects for completed batches
+            openai_client: OpenAI client instance
+        """
+        if not completed_batches:
+            return
+
+        logger.info(
+            f"Starting true bulk processing of {len(completed_batches)} completed batches"
+        )
+
+        # Step 1: Download all result files concurrently
+        downloaded_files = await self._download_batch_files_bulk(
+            completed_batches, openai_client
+        )
+
+        # Step 2: Parse all result files and collect summaries
+        all_summaries = []
+        batch_summary_mapping = {}
+
+        for batch_result, file_path in downloaded_files:
+            if file_path:
+                try:
+                    summaries = await self._parse_results_file(
+                        file_path, batch_result.batch_info.batch_id, db_engine
+                    )
+                    all_summaries.extend(summaries)
+                    batch_summary_mapping[batch_result.batch_info.batch_id] = summaries
+
+                    # Update the batch result with summaries
+                    batch_result.summaries = summaries
+                    batch_result.success = True
+                except Exception as e:
+                    logger.error(
+                        f"Error parsing results for batch {batch_result.batch_info.batch_id}: {e}"
+                    )
+                    batch_result.success = False
+                    batch_result.error_message = str(e)
+                finally:
+                    # Clean up downloaded file
+                    if Path(file_path).exists():
+                        Path(file_path).unlink(missing_ok=True)
+
+        # Step 3: Bulk create all summaries and update papers
+        if all_summaries:
+            await self._bulk_create_summaries_and_update_papers(
+                db_engine, all_summaries, batch_summary_mapping
+            )
+
+        logger.info(
+            f"Bulk processing completed: {len(all_summaries)} summaries processed"
+        )
+
+    async def _download_batch_files_bulk(
+        self,
+        completed_batches: list[BatchProcessingResult],
+        openai_client: UnifiedOpenAIClient,
+    ) -> list[tuple[BatchProcessingResult, str | None]]:
+        """Download all batch result files concurrently.
+
+        Args:
+            completed_batches: List of BatchProcessingResult objects
+            openai_client: OpenAI client instance
+
+        Returns:
+            List of (BatchProcessingResult, file_path) tuples
+        """
+
+        async def download_single_file(
+            batch_result: BatchProcessingResult,
+        ) -> tuple[BatchProcessingResult, str | None]:
+            """Download a single batch result file."""
+            try:
+                if not batch_result.status_info.output_file_id:
+                    logger.warning(
+                        f"No output file for batch {batch_result.batch_info.batch_id}"
+                    )
+                    return batch_result, None
+
+                # Create temporary file
+                output_file_path = tempfile.mktemp(suffix=".jsonl")
+                await openai_client.download_file(
+                    batch_result.status_info.output_file_id, output_file_path
+                )
+                return batch_result, output_file_path
+            except Exception as e:
+                logger.error(
+                    f"Error downloading file for batch {batch_result.batch_info.batch_id}: {e}"
+                )
+                return batch_result, None
+
+        # Download all files concurrently
+        tasks = [
+            download_single_file(batch_result) for batch_result in completed_batches
+        ]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        # Filter out exceptions and return valid results
+        downloaded_files = []
+        for result in results:
+            if isinstance(result, Exception):
+                logger.error(f"Exception in file download: {result}")
+                continue
+            if isinstance(result, tuple) and len(result) == 2:
+                downloaded_files.append(result)
+
+        logger.info(f"Downloaded {len(downloaded_files)} files concurrently")
+        return downloaded_files
+
+    async def _bulk_create_summaries_and_update_papers(
+        self,
+        db_engine: Engine,
+        all_summaries: list[Summary],
+        batch_summary_mapping: dict[str, list[Summary]],
+    ) -> None:
+        """Bulk create summaries and update papers in a single transaction.
+
+        Args:
+            db_engine: Database engine instance
+            all_summaries: All summaries to create
+            batch_summary_mapping: Mapping of batch_id to summaries for metrics
+        """
+        try:
+            with Session(db_engine) as session:
+                # Bulk create all summaries
+                summary_repo = SummaryRepository(session)
+                created_summaries = summary_repo.create_summaries_bulk(all_summaries)
+                logger.info(f"Bulk created {len(created_summaries)} summaries")
+
+                # Update papers in bulk
+                paper_repo = PaperRepository(session)
+                paper_ids = [
+                    summary.paper_id
+                    for summary in created_summaries
+                    if summary.paper_id is not None
+                ]
+                if paper_ids:
+                    updated_count = paper_repo.update_summary_status_bulk(
+                        paper_ids, PaperSummaryStatus.DONE
+                    )
+                    logger.info(f"Bulk updated {updated_count} papers to DONE status")
+
+                # Update batch metrics in bulk
+                batch_repo = LLMBatchRepository(session)
+                for batch_id, summaries in batch_summary_mapping.items():
+                    successful_count = len(summaries)
+                    batch_repo.update_batch_status_with_metrics(
+                        batch_id,
+                        status="completed",
+                        successful_count=successful_count,
+                        failed_count=0,
+                    )
+
+                session.commit()
+                logger.info(
+                    f"Bulk transaction completed: {len(created_summaries)} summaries, {len(paper_ids)} papers updated"
+                )
+
+        except Exception as e:
+            logger.error(f"Error in bulk summary creation and paper update: {e}")
+            # Session rollback is handled by the context manager
+
+    async def _process_failed_batches_bulk(
+        self,
+        db_engine: Engine,
+        failed_batches: list[BatchProcessingResult],
+        openai_client: UnifiedOpenAIClient,
+    ) -> None:
+        """Process multiple failed batches in bulk.
+
+        Args:
+            db_engine: Database engine instance
+            failed_batches: List of BatchProcessingResult objects for failed batches
+            openai_client: OpenAI client instance
+        """
+
+        async def process_single_failed_batch(
+            batch_result: BatchProcessingResult,
+        ) -> BatchProcessingResult:
+            """Process a single failed batch and return updated result."""
+            try:
+                logger.error(f"Batch {batch_result.batch_info.batch_id} failed")
+                if batch_result.status_info.error_file_id:
+                    await self._process_batch_errors(
+                        db_engine,
+                        batch_result.batch_info.batch_id,
+                        batch_result.status_info.error_file_id,
+                        openai_client,
+                    )
+                batch_result.success = True
+                return batch_result
+            except Exception as e:
+                logger.error(
+                    f"Error processing failed batch {batch_result.batch_info.batch_id}: {e}"
+                )
+                batch_result.success = False
+                batch_result.error_message = str(e)
+                return batch_result
+
+        # Process all failed batches concurrently
+        tasks = [
+            process_single_failed_batch(batch_result) for batch_result in failed_batches
+        ]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        # Count successful and failed processing
+        successful = sum(
+            1
+            for result in results
+            if isinstance(result, BatchProcessingResult) and result.success
+        )
+        failed = len(results) - successful
+        logger.info(
+            f"Bulk failed batch processing: {successful} successful, {failed} failed"
+        )
+
+    async def _update_batch_statuses_bulk(
+        self, db_engine: Engine, batch_results: list[BatchProcessingResult]
+    ) -> None:
+        """Update batch statuses in bulk for better database performance.
+
+        Args:
+            db_engine: Database engine instance
+            batch_results: List of BatchProcessingResult objects
+        """
+        try:
+            with Session(db_engine) as session:
+
+                # Prepare bulk update data
+                batch_updates = []
+                for batch_result in batch_results:
+                    batch_updates.append(
+                        {
+                            "batch_id": batch_result.batch_info.batch_id,
+                            "status": batch_result.status_info.status,
+                            "error_file_id": batch_result.status_info.error_file_id,
+                        }
+                    )
+
+                if not batch_updates:
+                    return
+
+                # Execute bulk update using SQLModel's bulk operations
+                batch_repo = LLMBatchRepository(session)
+                for update_data in batch_updates:
+                    batch_id = update_data["batch_id"]
+                    status = update_data["status"]
+                    error_file_id = update_data["error_file_id"]
+
+                    if batch_id and status:
+                        batch_repo.update_batch_status(
+                            batch_id,
+                            status=status,
+                            error_file_id=error_file_id,
+                        )
+
+                session.commit()
+                logger.info(
+                    f"Bulk updated status for {len(batch_updates)} batches in single transaction"
+                )
+
+        except Exception as e:
+            logger.error(f"Error updating batch statuses in bulk: {e}")
 
     async def _process_batch_status(
         self,

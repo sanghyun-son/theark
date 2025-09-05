@@ -79,3 +79,4 @@ Thumbs.db
 
 # Production files
 .env
+.env.prod

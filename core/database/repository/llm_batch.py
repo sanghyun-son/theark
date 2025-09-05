@@ -100,7 +100,8 @@ class LLMBatchRepository:
         """Get currently active batch requests."""
         try:
             statement = select(LLMBatchRequest).where(
-                LLMBatchRequest.status == "pending"
+                (LLMBatchRequest.status == "pending")
+                or (LLMBatchRequest.status == "in_progress")
             )
             result = self.db.exec(statement)
             batches = result.all()
