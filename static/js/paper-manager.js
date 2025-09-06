@@ -68,6 +68,8 @@ export class PaperManager {
         // Paper options checkboxes change
         const prioritizeSummariesCheckbox = document.getElementById('prioritize-summaries');
         const sortByRelevanceCheckbox = document.getElementById('sort-by-relevance');
+        const prioritizeStarredCheckbox = document.getElementById('prioritize-starred');
+        const prioritizeReadCheckbox = document.getElementById('prioritize-read');
         
         if (prioritizeSummariesCheckbox) {
             prioritizeSummariesCheckbox.addEventListener('change', () => {
@@ -78,6 +80,20 @@ export class PaperManager {
         
         if (sortByRelevanceCheckbox) {
             sortByRelevanceCheckbox.addEventListener('change', () => {
+                this.infiniteScrollService.reset();
+                this.infiniteScrollService.loadPapers();
+            });
+        }
+        
+        if (prioritizeStarredCheckbox) {
+            prioritizeStarredCheckbox.addEventListener('change', () => {
+                this.infiniteScrollService.reset();
+                this.infiniteScrollService.loadPapers();
+            });
+        }
+        
+        if (prioritizeReadCheckbox) {
+            prioritizeReadCheckbox.addEventListener('change', () => {
                 this.infiniteScrollService.reset();
                 this.infiniteScrollService.loadPapers();
             });

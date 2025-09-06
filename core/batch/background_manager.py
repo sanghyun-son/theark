@@ -772,20 +772,25 @@ class BackgroundBatchManager:
                 error_file_id=batch_status.error_file_id,
             )
 
-            # If batch is completed, process results
+            # Early exit: Handle completed batch
             if batch_status.status == "completed" and batch_status.output_file_id:
                 await self._process_batch_results(
                     db_engine, batch_id, batch_status.output_file_id, openai_client
                 )
+                logger.info(f"Updated batch {batch_id} status to {batch_status.status}")
+                return
 
-            # If batch failed, log error
-            elif batch_status.status == "failed":
+            # Early exit: Handle failed batch
+            if batch_status.status == "failed":
                 logger.error(f"Batch {batch_id} failed")
                 if batch_status.error_file_id:
                     await self._process_batch_errors(
                         db_engine, batch_id, batch_status.error_file_id, openai_client
                     )
+                logger.info(f"Updated batch {batch_id} status to {batch_status.status}")
+                return
 
+            # Default: Log status update
             logger.info(f"Updated batch {batch_id} status to {batch_status.status}")
 
         except Exception as e:

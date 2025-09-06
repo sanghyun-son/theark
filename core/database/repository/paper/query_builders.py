@@ -26,6 +26,20 @@ class PaperQueryBuilder:
             else_=5,  # Papers with no summary status
         ).label("priority")
 
+    def _build_star_priority_case(self, user_id: int) -> Label[int]:
+        """Build priority case for starred papers ordering."""
+        return case(
+            (UserStar.user_id == user_id, 1),  # type: ignore[arg-type]
+            else_=2,  # Non-starred papers second
+        ).label("star_priority")
+
+    def _build_read_priority_case(self, user_id: int) -> Label[int]:
+        """Build priority case for read papers ordering."""
+        return case(
+            (SummaryRead.user_id == user_id, 1),  # type: ignore[arg-type]
+            else_=2,  # Unread papers second
+        ).label("read_priority")
+
     def build_simple_query(
         self,
         skip: int = 0,
@@ -151,20 +165,20 @@ class PaperQueryBuilder:
     ) -> Select[tuple[Paper, float]]:
         """Build query with combined priority and relevance sorting."""
 
-        priority_case = self._build_priority_case()
+        priority = self._build_priority_case()
 
-        relevance_case = case(
+        relevance = case(
             (Summary.relevance.is_not(None), Summary.relevance),  # type: ignore[attr-defined]
             else_=0.0,
         ).label("relevance")
 
         query = (
-            select(Paper, relevance_case)
+            select(Paper, relevance)
             .join(Summary, isouter=True)
             .where(Summary.language == language)
             .order_by(
-                priority_case.asc(),  # Lower priority number = higher priority
-                relevance_case.desc(),  # Higher relevance = better
+                priority.asc(),  # Lower priority number = higher priority
+                relevance.desc(),  # Higher relevance = better
                 desc(Paper.updated_at),  # Newer papers first
             )
             .offset(skip)
@@ -180,11 +194,11 @@ class PaperQueryBuilder:
         limit: int,
     ) -> SelectOfScalar[Paper]:
         """Build query with summary status priority sorting."""
-        priority_case = self._build_priority_case()
+        priority = self._build_priority_case()
 
         return (
             base_query.order_by(
-                priority_case.asc(),  # Lower priority number = higher priority
+                priority.asc(),  # Lower priority number = higher priority
                 desc(Paper.updated_at),  # Newer papers first
             )
             .offset(skip)
@@ -199,17 +213,17 @@ class PaperQueryBuilder:
         language: str = "Korean",
     ) -> Select[tuple[Paper, float]]:
         """Build query with relevance-based sorting."""
-        relevance_case = case(
+        relevance = case(
             (Summary.relevance.is_not(None), Summary.relevance),  # type: ignore[attr-defined]
             else_=0.0,
         ).label("relevance")
 
         query = (
-            select(Paper, relevance_case)
+            select(Paper, relevance)
             .join(Summary, isouter=True)
             .where(Summary.language == language)
             .order_by(
-                relevance_case.desc(),  # Higher relevance = better
+                relevance.desc(),  # Higher relevance = better
                 desc(Paper.updated_at),  # Newer papers first
             )
             .offset(skip)
@@ -217,6 +231,135 @@ class PaperQueryBuilder:
         )
 
         return query
+
+    def build_star_priority_query(
+        self,
+        user_id: int,
+        skip: int = 0,
+        limit: int = 100,
+        categories: list[str] | None = None,
+    ) -> Select[tuple[Paper, int]]:
+        """Build query with starred papers prioritized.
+
+        Args:
+            user_id: User ID for star filtering
+            skip: Number of records to skip
+            limit: Maximum number of records to return
+            categories: List of categories to filter by
+
+        Returns:
+            SQLAlchemy query for (Paper, star_priority) tuples
+        """
+        star_case = self._build_star_priority_case(user_id)
+
+        query = select(Paper, star_case).join(UserStar, isouter=True)
+
+        # Apply category filtering
+        if categories:
+            category_conditions = [
+                Paper.categories.like(f"%{category}%")  # type: ignore[attr-defined]
+                for category in categories
+            ]
+            query = query.where(or_(*category_conditions))
+
+        return (
+            query.order_by(
+                star_case.asc(),  # Starred papers first
+                desc(Paper.updated_at),  # Newer papers first
+            )
+            .offset(skip)
+            .limit(limit)
+        )
+
+    def build_read_priority_query(
+        self,
+        user_id: int,
+        skip: int = 0,
+        limit: int = 100,
+        categories: list[str] | None = None,
+    ) -> Select[tuple[Paper, int]]:
+        """Build query with read papers prioritized.
+
+        Args:
+            user_id: User ID for read status filtering
+            skip: Number of records to skip
+            limit: Maximum number of records to return
+            categories: List of categories to filter by
+
+        Returns:
+            SQLAlchemy query for (Paper, read_priority) tuples
+        """
+        read_case = self._build_read_priority_case(user_id)
+
+        query = (
+            select(Paper, read_case)
+            .select_from(Paper)
+            .join(Summary, isouter=True)
+            .join(SummaryRead, isouter=True)
+        )
+
+        # Apply category filtering
+        if categories:
+            category_conditions = [
+                Paper.categories.like(f"%{category}%")  # type: ignore[attr-defined]
+                for category in categories
+            ]
+            query = query.where(or_(*category_conditions))
+
+        return (
+            query.order_by(
+                read_case.asc(),  # Read papers first
+                desc(Paper.updated_at),  # Newer papers first
+            )
+            .offset(skip)
+            .limit(limit)
+        )
+
+    def build_combined_star_read_query(
+        self,
+        user_id: int,
+        skip: int = 0,
+        limit: int = 100,
+        categories: list[str] | None = None,
+    ) -> Select[tuple[Paper, int, int]]:
+        """Build query with both starred and read papers prioritized.
+
+        Args:
+            user_id: User ID for star and read filtering
+            skip: Number of records to skip
+            limit: Maximum number of records to return
+            categories: List of categories to filter by
+
+        Returns:
+            SQLAlchemy query for (Paper, star_priority, read_priority) tuples
+        """
+        star_case = self._build_star_priority_case(user_id)
+        read_case = self._build_read_priority_case(user_id)
+
+        query = (
+            select(Paper, star_case, read_case)
+            .join(UserStar, isouter=True)
+            .join(Summary, isouter=True)
+            .join(SummaryRead, isouter=True)
+        )
+
+        # Apply category filtering
+        if categories:
+            category_conditions = [
+                Paper.categories.like(f"%{category}%")  # type: ignore[attr-defined]
+                for category in categories
+            ]
+            query = query.where(or_(*category_conditions))
+
+        return (
+            query.order_by(
+                star_case.asc(),  # Starred papers first
+                read_case.asc(),  # Read papers second
+                desc(Paper.updated_at),  # Newer papers first
+            )
+            .offset(skip)
+            .limit(limit)
+        )
 
 
 class PaperJoinQueryBuilder:

@@ -287,18 +287,18 @@ class ArxivSourceExplorer(BaseSourceExplorer):
             entries = root.findall("atom:entry", self.extractor.namespace)
             logger.debug(f"Found {len(entries)} entries with atom:entry namespace")
 
+            # Early exit: Try without namespace if no entries found
             if not entries:
-                # Try without namespace
                 entries = root.findall("entry")
                 logger.debug(f"Found {len(entries)} entries without namespace")
 
+            # Early exit: Try with explicit namespace if no entries found
             if not entries:
-                # Try with explicit namespace
                 entries = root.findall(".//{http://www.w3.org/2005/Atom}entry")
                 logger.debug(f"Found {len(entries)} entries with explicit namespace")
 
+            # Early exit: Try with wildcard if still no entries found
             if not entries:
-                # Try with wildcard
                 entries = root.findall(".//entry")
                 logger.debug(f"Found {len(entries)} entries with wildcard")
 

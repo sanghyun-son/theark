@@ -88,44 +88,60 @@ class LLMRequestTracker:
         llm_request_repo = LLMRequestRepository(self.db_session)
         response_time_ms = int((time.time() - self.start_time) * 1000)
 
+        # Early exit: Handle error case
         if exc_type is not None:
-            # 에러 케이스
             self.request_record.status = "error"
             self.request_record.error_message = str(exc_val)
             self.request_record.response_time_ms = response_time_ms
             self.request_record.http_status_code = 500
-        elif self.response and hasattr(self.response, "usage") and self.response.usage:
-            # 성공 케이스 - OpenAI ChatCompletion 응답에서 자동으로 정보 추출
-            self.request_record.status = "success"
-            self.request_record.prompt_tokens = self.response.usage.prompt_tokens
-            self.request_record.completion_tokens = (
-                self.response.usage.completion_tokens
-            )
-            self.request_record.total_tokens = self.response.usage.total_tokens
-            self.request_record.response_time_ms = response_time_ms
-            self.request_record.http_status_code = 200
+            return
 
-            # 비용 자동 계산
-            cost = self._calculate_cost(
-                self.request_record.model,
-                self.response.usage.prompt_tokens,
-                self.response.usage.completion_tokens,
-            )
-            self.request_record.estimated_cost_usd = cost
-        elif self.response and hasattr(self.response, "id"):
-            # 성공 케이스 - OpenAI Batch/File 등 다른 응답에서
-            self.request_record.status = "success"
-            self.request_record.response_time_ms = response_time_ms
-            self.request_record.http_status_code = 200
+        # Early exit: Handle ChatCompletion response
+        if self.response and hasattr(self.response, "usage") and self.response.usage:
+            self._handle_chat_completion_response(response_time_ms)
+            return
 
-            # Batch response는 토큰 정보가 없으므로 비용 계산 불가
-            self.request_record.estimated_cost_usd = None
-        else:
-            # 응답이 없거나 예상과 다른 경우
-            self.request_record.status = "unknown"
-            self.request_record.response_time_ms = response_time_ms
+        # Early exit: Handle Batch/File response
+        if self.response and hasattr(self.response, "id"):
+            self._handle_batch_file_response(response_time_ms)
+            return
+
+        # Default: Unknown response type
+        self.request_record.status = "unknown"
+        self.request_record.response_time_ms = response_time_ms
 
         llm_request_repo.update(self.request_record)
+
+    def _handle_chat_completion_response(self, response_time_ms: int) -> None:
+        """Handle ChatCompletion response with usage information."""
+        if not self.request_record:
+            return
+
+        self.request_record.status = "success"
+        self.request_record.prompt_tokens = self.response.usage.prompt_tokens
+        self.request_record.completion_tokens = self.response.usage.completion_tokens
+        self.request_record.total_tokens = self.response.usage.total_tokens
+        self.request_record.response_time_ms = response_time_ms
+        self.request_record.http_status_code = 200
+
+        # Calculate cost
+        cost = self._calculate_cost(
+            self.request_record.model,
+            self.response.usage.prompt_tokens,
+            self.response.usage.completion_tokens,
+        )
+        self.request_record.estimated_cost_usd = cost
+
+    def _handle_batch_file_response(self, response_time_ms: int) -> None:
+        """Handle Batch/File response without usage information."""
+        if not self.request_record:
+            return
+
+        self.request_record.status = "success"
+        self.request_record.response_time_ms = response_time_ms
+        self.request_record.http_status_code = 200
+        # Batch response has no token information, so cost calculation is not possible
+        self.request_record.estimated_cost_usd = None
 
     def set_response(self, response: Any) -> None:
         """Set the LLM response for automatic logging.

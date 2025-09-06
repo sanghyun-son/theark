@@ -49,7 +49,9 @@ export class InfiniteScrollService {
             const language = document.getElementById('summary-language').value;
             const prioritizeSummaries = document.getElementById('prioritize-summaries').checked;
             const sortByRelevance = document.getElementById('sort-by-relevance').checked;
-            const data = await this.apiService.getPapers(this.pageSize, this.currentPage * this.pageSize, language, prioritizeSummaries, sortByRelevance);
+            const prioritizeStarred = document.getElementById('prioritize-starred').checked;
+            const prioritizeRead = document.getElementById('prioritize-read').checked;
+            const data = await this.apiService.getPapers(this.pageSize, this.currentPage * this.pageSize, language, prioritizeSummaries, sortByRelevance, prioritizeStarred, prioritizeRead);
             
             // Append new papers to existing array
             this.papers = this.papers.concat(data.papers);
@@ -79,7 +81,9 @@ export class InfiniteScrollService {
             const language = document.getElementById('summary-language').value;
             const prioritizeSummaries = document.getElementById('prioritize-summaries').checked;
             const sortByRelevance = document.getElementById('sort-by-relevance').checked;
-            const data = await this.apiService.getPapers(this.pageSize, this.currentPage * this.pageSize, language, prioritizeSummaries, sortByRelevance);
+            const prioritizeStarred = document.getElementById('prioritize-starred').checked;
+            const prioritizeRead = document.getElementById('prioritize-read').checked;
+            const data = await this.apiService.getPapers(this.pageSize, this.currentPage * this.pageSize, language, prioritizeSummaries, sortByRelevance, prioritizeStarred, prioritizeRead);
             
             this.papers = data.papers; // Store papers
             this.hasMore = data.has_more;

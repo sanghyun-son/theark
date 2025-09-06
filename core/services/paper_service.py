@@ -139,23 +139,32 @@ class PaperService:
         is_starred = False
         is_read = False
 
-        # Always fetch summary if language is provided and summary is not already provided
+        # Early exit: Fetch summary if needed
         if summary is None and language and paper.paper_id is not None:
             summary_repo = SummaryRepository(db_session)
             summary = summary_repo.get_by_paper_id_and_language(
                 paper.paper_id, language
             )
 
-        if user_id is not None and paper.paper_id is not None:
-            # Use UserStarRepository directly to check if paper is starred
-            star_repo = UserStarRepository(db_session)
-            is_starred = star_repo.is_paper_starred(user_id, paper.paper_id)
+        # Early exit: No user ID or paper ID, return without user status
+        if user_id is None or paper.paper_id is None:
+            return PaperResponse.from_crawler_paper(
+                paper,
+                summary=summary,
+                is_starred=is_starred,
+                is_read=is_read,
+            )
 
-            if summary and summary.summary_id:
-                summary_read_repo = SummaryReadRepository(db_session)
-                is_read = summary_read_repo.is_summary_read_by_user(
-                    user_id, summary.summary_id
-                )
+        # Get user star status
+        star_repo = UserStarRepository(db_session)
+        is_starred = star_repo.is_paper_starred(user_id, paper.paper_id)
+
+        # Get user read status if summary exists
+        if summary and summary.summary_id:
+            summary_read_repo = SummaryReadRepository(db_session)
+            is_read = summary_read_repo.is_summary_read_by_user(
+                user_id, summary.summary_id
+            )
 
         return PaperResponse.from_crawler_paper(
             paper,
@@ -214,6 +223,8 @@ class PaperService:
         language: str = "Korean",
         prioritize_summaries: bool = True,
         sort_by_relevance: bool = False,
+        prioritize_starred: bool = False,
+        prioritize_read: bool = False,
     ) -> PaperListResponse:
         """Get a list of papers with optional filtering.
 
@@ -222,15 +233,17 @@ class PaperService:
 
         Related method: get_paper() - for retrieving a single paper
         """
-        # Use the same logic as get_papers_lightweight for better performance
+        # Use the unified method for all cases
         paper_repo = PaperRepository(db_session)
-        papers = paper_repo.get_papers_with_overview_optimized(
+        papers = paper_repo.get_papers_with_user_priority(
+            user_id=user_id or 0,  # Handle None case
             skip=skip,
             limit=limit,
             language=language,
             prioritize_summaries=prioritize_summaries,
             sort_by_relevance=sort_by_relevance,
-            categories=None,  # No category filtering by default
+            prioritize_starred=prioritize_starred,
+            prioritize_read=prioritize_read,
         )
 
         # Convert Paper objects to PaperListItemResponse objects
@@ -340,6 +353,8 @@ class PaperService:
         language: str = "Korean",
         prioritize_summaries: bool = True,
         sort_by_relevance: bool = False,
+        prioritize_starred: bool = False,
+        prioritize_read: bool = False,
     ) -> PaperListLightweightResponse:
         """Get a lightweight list of papers with overview only.
 
@@ -354,6 +369,8 @@ class PaperService:
             language: Language for summaries
             prioritize_summaries: Whether to prioritize papers with summaries
             sort_by_relevance: Whether to sort papers by relevance score
+            prioritize_starred: Whether to prioritize starred papers
+            prioritize_read: Whether to prioritize read papers
 
         Returns:
             Lightweight paper list with overview only
@@ -362,15 +379,21 @@ class PaperService:
         logger.debug(
             f"get_papers_lightweight called with: "
             f"prioritize_summaries={prioritize_summaries}, "
-            f"sort_by_relevance={sort_by_relevance}"
+            f"sort_by_relevance={sort_by_relevance}, "
+            f"prioritize_starred={prioritize_starred}, "
+            f"prioritize_read={prioritize_read}"
         )
-        papers = paper_repo.get_papers_with_overview_optimized(
+
+        # Use the unified method for all cases
+        papers = paper_repo.get_papers_with_user_priority(
+            user_id=user_id or 0,  # Handle None case
             skip=skip,
             limit=limit,
             language=language,
             prioritize_summaries=prioritize_summaries,
             sort_by_relevance=sort_by_relevance,
-            categories=None,  # No category filtering by default
+            prioritize_starred=prioritize_starred,
+            prioritize_read=prioritize_read,
         )
         logger.debug(f"Repository returned {len(papers)} papers")
         if papers:
@@ -405,15 +428,19 @@ class PaperService:
             paper_data.relevance = relevances.get(paper.paper_id)
             paper_overview_data.append(paper_data)
 
-        if user_id:
-            paper_responses = await self._enrich_papers_with_user_status(
-                paper_overview_data, db_session, user_id, language
-            )
-        else:
+        # Early exit: No user ID, create papers without user status
+        if not user_id:
             paper_responses = self._create_papers_without_user_status(
                 paper_overview_data
             )
+            return self._build_lightweight_response(
+                paper_responses, paper_repo, skip, limit
+            )
 
+        # User ID provided, enrich with user status
+        paper_responses = await self._enrich_papers_with_user_status(
+            paper_overview_data, db_session, user_id, language
+        )
         return self._build_lightweight_response(
             paper_responses, paper_repo, skip, limit
         )
@@ -447,6 +474,7 @@ class PaperService:
             )
             paper_responses.append(overview_data)
 
+        # Early exit: No papers to process
         if not paper_responses:
             return paper_responses
 
@@ -650,13 +678,14 @@ class PaperService:
         if not summary:
             raise ValueError(f"No summary found for paper {paper_id} in {language}")
 
-        # Check read status
+        # Early exit: No user ID or summary ID, return without read status
         is_read = False
-        if user_id and summary.summary_id:
-            summary_read_repo = SummaryReadRepository(db_session)
-            is_read = summary_read_repo.is_summary_read_by_user(
-                user_id, summary.summary_id
-            )
+        if not user_id or not summary.summary_id:
+            return SummaryDetailResponse(summary=summary, is_read=is_read)
+
+        # Check read status
+        summary_read_repo = SummaryReadRepository(db_session)
+        is_read = summary_read_repo.is_summary_read_by_user(user_id, summary.summary_id)
 
         return SummaryDetailResponse(summary=summary, is_read=is_read)
 
@@ -723,9 +752,10 @@ class PaperService:
         if not summary:
             raise ValueError("Summary not found")
 
-        summary_read_repo = SummaryReadRepository(db_session)
         if summary.summary_id is None:
             raise ValueError("Summary has no ID")
+
+        summary_read_repo = SummaryReadRepository(db_session)
         success = summary_read_repo.mark_as_read(user_id, summary.summary_id)
         if not success:
             raise ValueError("Failed to mark summary as read")

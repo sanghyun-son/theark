@@ -95,22 +95,25 @@ class PaperRepository(BaseRepository[Paper]):
         Returns:
             List of Paper objects
         """
+        # Early exit: Combined priority and relevance
         if prioritize_summaries and sort_by_relevance:
             logger.debug(
                 f"Using combined query: "
                 f"prioritize_summaries={prioritize_summaries}, "
                 f"sort_by_relevance={sort_by_relevance}"
             )
-            combined_query = self.query_builder.build_combined_query(
+            query = self.query_builder.build_combined_query(
                 skip=skip,
                 limit=limit,
                 categories=categories,
                 language=language,
             )
-            result = self.db.exec(combined_query)
+            result = self.db.exec(query)
             query_results = result.all()
-            papers = [row[0] for row in query_results]
-        elif prioritize_summaries:
+            return [row[0] for row in query_results]
+
+        # Early exit: Priority only
+        if prioritize_summaries:
             logger.debug(
                 f"Using priority query: "
                 f"prioritize_summaries={prioritize_summaries}, "
@@ -124,24 +127,26 @@ class PaperRepository(BaseRepository[Paper]):
             logger.debug(f"Priority query returned {len(papers)} papers")
             if papers:
                 logger.debug(f"First paper summary_status: {papers[0].summary_status}")
-        elif sort_by_relevance:
+            return papers
+
+        # Early exit: Relevance only
+        if sort_by_relevance:
             relevance_query = self.query_builder.build_relevance_query(
                 skip=skip,
                 limit=limit,
                 categories=categories,
                 language=language,
             )
-            result = self.db.exec(relevance_query)
-            query_results = result.all()
-            papers = [row[0] for row in query_results]
-        else:
-            simple_query = self.query_builder.build_simple_query(
-                skip=skip, limit=limit, categories=categories
-            )
-            simple_result = self.db.exec(simple_query)
-            papers = list(simple_result.all())
+            relevance_result = self.db.exec(relevance_query)
+            query_results = relevance_result.all()
+            return [row[0] for row in query_results]
 
-        return papers
+        # Default: Simple query
+        simple_query = self.query_builder.build_simple_query(
+            skip=skip, limit=limit, categories=categories
+        )
+        simple_result = self.db.exec(simple_query)
+        return list(simple_result.all())
 
     def get_papers_with_overview_optimized(
         self,
@@ -478,3 +483,81 @@ class PaperRepository(BaseRepository[Paper]):
         # Use the session's execute method for UPDATE statements
         self.db.execute(statement)
         return len(paper_ids)  # Return the number of papers we tried to update
+
+    def get_papers_with_user_priority(
+        self,
+        user_id: int,
+        skip: int = 0,
+        limit: int = 100,
+        language: str = "Korean",
+        prioritize_summaries: bool = False,
+        sort_by_relevance: bool = False,
+        prioritize_starred: bool = False,
+        prioritize_read: bool = False,
+    ) -> list[Paper]:
+        """Get papers with various user-based prioritization options.
+
+        Args:
+            user_id: User ID for star and read filtering
+            skip: Number of records to skip
+            limit: Maximum number of records to return
+            language: Language for summaries
+            prioritize_summaries: Whether to prioritize by summary status
+            sort_by_relevance: Whether to sort by relevance score
+            prioritize_starred: Whether to prioritize starred papers
+            prioritize_read: Whether to prioritize read papers
+
+        Returns:
+            List of Paper objects with user-based prioritization
+        """
+        # Early exit: No user-based prioritization
+        if not prioritize_starred and not prioritize_read:
+            return self.get_papers_with_overview_optimized(
+                skip=skip,
+                limit=limit,
+                language=language,
+                prioritize_summaries=prioritize_summaries,
+                sort_by_relevance=sort_by_relevance,
+            )
+
+        # Early exit: Combined star and read priority
+        if prioritize_starred and prioritize_read:
+            query = self.query_builder.build_combined_star_read_query(
+                user_id=user_id,
+                skip=skip,
+                limit=limit,
+                categories=None,
+            )
+            result = self.db.exec(query)
+            return [paper for paper, _, _ in result.all()]
+
+        # Early exit: Star priority only
+        if prioritize_starred:
+            star_query = self.query_builder.build_star_priority_query(
+                user_id=user_id,
+                skip=skip,
+                limit=limit,
+                categories=None,
+            )
+            star_result = self.db.exec(star_query)
+            return [paper for paper, _ in star_result.all()]
+
+        # Early exit: Read priority only
+        if prioritize_read:
+            read_query = self.query_builder.build_read_priority_query(
+                user_id=user_id,
+                skip=skip,
+                limit=limit,
+                categories=None,
+            )
+            read_result = self.db.exec(read_query)
+            return [paper for paper, _ in read_result.all()]
+
+        # Fallback to existing method
+        return self.get_papers_with_overview_optimized(
+            skip=skip,
+            limit=limit,
+            language=language,
+            prioritize_summaries=prioritize_summaries,
+            sort_by_relevance=sort_by_relevance,
+        )

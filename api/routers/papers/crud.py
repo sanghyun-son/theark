@@ -29,7 +29,7 @@ router = APIRouter()
 async def get_papers(
     db_session: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-    params: tuple[int, int, str, bool, bool] = Depends(get_paper_params),
+    params: tuple[int, int, str, bool, bool, bool, bool] = Depends(get_paper_params),
 ) -> PaperListResponse:
     """Get papers with pagination.
 
@@ -46,7 +46,15 @@ async def get_papers(
     """
 
     async def get_papers_operation() -> PaperListResponse:
-        limit, offset, language, prioritize_summaries, sort_by_relevance = params
+        (
+            limit,
+            offset,
+            language,
+            prioritize_summaries,
+            sort_by_relevance,
+            prioritize_starred,
+            prioritize_read,
+        ) = params
         paper_service = PaperService()
         user_id = current_user.user_id
         return await paper_service.get_papers(
@@ -57,6 +65,8 @@ async def get_papers(
             language=language,
             prioritize_summaries=prioritize_summaries,
             sort_by_relevance=sort_by_relevance,
+            prioritize_starred=prioritize_starred,
+            prioritize_read=prioritize_read,
         )
 
     return await handle_async_api_operation(
@@ -121,7 +131,7 @@ async def get_papers_enhanced(
 async def get_papers_lightweight(
     db_session: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-    params: tuple[int, int, str, bool, bool] = Depends(get_paper_params),
+    params: tuple[int, int, str, bool, bool, bool, bool] = Depends(get_paper_params),
 ) -> PaperListLightweightResponse:
     """Get papers with overview only for better performance.
 
@@ -132,8 +142,10 @@ async def get_papers_lightweight(
         limit: Number of papers to return (1-100)
         offset: Number of papers to skip
         language: Language for summaries
-        prioritize_summaries: Whether to prioritize papers with summaries
-        sort_by_relevance: Whether to sort papers by relevance score
+        summaries: Whether to prioritize papers with summaries
+        relevance: Whether to sort papers by relevance score
+        starred: Whether to prioritize starred papers
+        read: Whether to prioritize read papers
         current_user: Current user information
 
     Returns:
@@ -144,7 +156,15 @@ async def get_papers_lightweight(
     """
 
     async def get_papers_lightweight_operation() -> PaperListLightweightResponse:
-        limit, offset, language, prioritize_summaries, sort_by_relevance = params
+        (
+            limit,
+            offset,
+            language,
+            summaries,
+            relevance,
+            starred,
+            read,
+        ) = params
         paper_service = PaperService()
         user_id = current_user.user_id
         return await paper_service.get_papers_lightweight(
@@ -153,8 +173,10 @@ async def get_papers_lightweight(
             skip=offset,  # Convert offset to skip
             limit=limit,
             language=language,
-            prioritize_summaries=prioritize_summaries,
-            sort_by_relevance=sort_by_relevance,
+            prioritize_summaries=summaries,
+            sort_by_relevance=relevance,
+            prioritize_starred=starred,
+            prioritize_read=read,
         )
 
     return await handle_async_api_operation(

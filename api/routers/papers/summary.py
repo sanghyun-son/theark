@@ -87,7 +87,7 @@ async def get_summary(
         if not summary:
             raise ValueError("Summary not found")
 
-        # Check if the summary belongs to the specified paper
+        # Early exit: Check if the summary belongs to the specified paper
         if summary.paper_id != paper_id:
             raise ValueError("Summary does not belong to the specified paper")
 

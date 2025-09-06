@@ -105,16 +105,23 @@ class PaperSummarizationService:
 
         message = response.choices[0].message
 
-        # Handle tool responses with Pydantic validation
-        structured_summary = None
-        if message.tool_calls and use_tools:
-            tool_call = message.tool_calls[0]
-            if tool_call.function.name == "Structure":
-                structured_summary = parse_tool_call_response(tool_call, PaperAnalysis)
+        # Early exit: No tool calls or tools disabled
+        if not message.tool_calls or not use_tools:
+            raise ValueError("Failed to parse structured summary from tool response")
 
+        # Early exit: Wrong function name
+        if message.tool_calls[0].function.name != "Structure":
+            raise ValueError("Failed to parse structured summary from tool response")
+
+        # Process the tool call
+        tool_call = message.tool_calls[0]
+        structured_summary = parse_tool_call_response(tool_call, PaperAnalysis)
+
+        # Early exit: No structured summary
         if structured_summary is None:
             raise ValueError("Failed to parse structured summary from tool response")
 
+        # Return the result
         return Summary(
             paper_id=None,
             version=self.version,

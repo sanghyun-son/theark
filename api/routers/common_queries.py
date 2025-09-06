@@ -34,19 +34,29 @@ def get_paper_params(
     ),
     offset: int = Query(default=0, ge=0, description="Number of papers to skip"),
     language: str = Query(default="Korean", description="Language for summaries"),
-    prioritize_summaries: bool = Query(
+    summaries: bool = Query(
         default=False, description="Prioritize papers by summary status"
     ),
-    sort_by_relevance: bool = Query(
+    relevance: bool = Query(
         default=False, description="Sort papers by relevance score"
     ),
-) -> tuple[int, int, str, bool, bool]:
+    starred: bool = Query(default=False, description="Prioritize starred papers"),
+    read: bool = Query(default=False, description="Prioritize read papers"),
+) -> tuple[int, int, str, bool, bool, bool, bool]:
     """Get paper-specific query parameters.
 
     Returns:
-        Tuple of (limit, offset, language, prioritize_summaries, sort_by_relevance)
+        Tuple of (limit, offset, language, summaries, relevance, starred, read)
     """
-    return limit, offset, language, prioritize_summaries, sort_by_relevance
+    return (
+        limit,
+        offset,
+        language,
+        summaries,
+        relevance,
+        starred,
+        read,
+    )
 
 
 def get_enhanced_paper_params(
